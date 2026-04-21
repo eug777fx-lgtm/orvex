@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, X, Check, ArrowUpRight } from 'lucide-react'
 import db from '@/lib/db'
 import PageShell from '../components/PageShell'
+import useIsMobile from '../utils/useIsMobile'
 
 const STAGES = [
   { value: 'lead', label: 'Lead' },
@@ -367,13 +368,19 @@ function DealCard({ deal, onOpen, onMove, canMoveLeft, canMoveRight }) {
   )
 }
 
-function Column({ stage, deals, onOpen, onMove }) {
+function Column({ stage, deals, onOpen, onMove, isMobile }) {
   const stageIdx = STAGE_KEYS.indexOf(stage.value)
   const canLeft = stageIdx > 0
   const canRight = !CLOSED_STAGES.has(stage.value) && stageIdx < STAGE_KEYS.length - 1
 
   return (
-    <div style={columnStyle}>
+    <div
+      style={{
+        ...columnStyle,
+        width: isMobile ? '100%' : 280,
+        minHeight: isMobile ? 'auto' : 500,
+      }}
+    >
       <div style={columnHeaderStyle}>
         <div style={columnTitleStyle}>{stage.label}</div>
         <div style={countBadgeStyle}>{deals.length}</div>
@@ -634,6 +641,7 @@ function DealDetailModal({ deal, onClose, onUpdate, onNavigateLead }) {
 
 export default function Pipeline() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [deals, setDeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -777,8 +785,9 @@ export default function Pipeline() {
         <div
           style={{
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             gap: 14,
-            overflowX: 'auto',
+            overflowX: isMobile ? 'visible' : 'auto',
             paddingBottom: 8,
           }}
         >
@@ -789,6 +798,7 @@ export default function Pipeline() {
               deals={grouped[stage.value] || []}
               onOpen={(d) => setSelectedId(d.id)}
               onMove={moveDeal}
+              isMobile={isMobile}
             />
           ))}
         </div>

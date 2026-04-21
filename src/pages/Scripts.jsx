@@ -4,6 +4,7 @@ import db from '@/lib/db'
 import AddScriptModal from '../components/AddScriptModal'
 import { seedScriptsIfEmpty } from '../utils/seedScripts'
 import PageShell from '../components/PageShell'
+import useIsMobile from '../utils/useIsMobile'
 
 const TYPE_TABS = [
   { value: 'all', label: 'All' },
@@ -434,6 +435,7 @@ function EmptyState({ onAdd }) {
 }
 
 export default function Scripts() {
+  const isMobile = useIsMobile()
   const [scripts, setScripts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -553,7 +555,7 @@ export default function Scripts() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
             gap: 16,
           }}
         >
@@ -574,7 +576,7 @@ export default function Scripts() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
             gap: 16,
           }}
         >

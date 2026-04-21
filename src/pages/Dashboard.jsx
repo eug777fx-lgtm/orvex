@@ -20,6 +20,7 @@ import AddLeadModal from '../components/AddLeadModal'
 import AddTaskModal from '../components/AddTaskModal'
 import PageShell, { staggerContainer, staggerItem } from '../components/PageShell'
 import { useCountUp } from '../utils/useCountUp'
+import useIsMobile from '../utils/useIsMobile'
 
 const STAGE_ORDER = [
   { key: 'lead', label: 'Lead' },
@@ -522,6 +523,7 @@ function RevenueAreaChart({ data }) {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -877,8 +879,8 @@ export default function Dashboard() {
         animate="animate"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: 16,
+          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
+          gap: isMobile ? 10 : 16,
         }}
       >
         <StatCard
@@ -921,7 +923,7 @@ export default function Dashboard() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '3fr 2fr',
+          gridTemplateColumns: isMobile ? '1fr' : '3fr 2fr',
           gap: 16,
         }}
       >
@@ -1093,7 +1095,7 @@ export default function Dashboard() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
           gap: 16,
         }}
       >

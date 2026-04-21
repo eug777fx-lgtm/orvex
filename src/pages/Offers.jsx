@@ -4,6 +4,7 @@ import db from '@/lib/db'
 import AddOfferModal from '../components/AddOfferModal'
 import { seedOffersIfEmpty } from '../utils/seedOffers'
 import PageShell from '../components/PageShell'
+import useIsMobile from '../utils/useIsMobile'
 
 const pageHeadingStyle = {
   fontSize: '1.5rem',
@@ -336,6 +337,7 @@ function EmptyState({ onAdd }) {
 }
 
 export default function Offers() {
+  const isMobile = useIsMobile()
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -436,7 +438,7 @@ export default function Offers() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
             gap: 16,
           }}
         >
@@ -446,7 +448,7 @@ export default function Offers() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
             gap: 16,
           }}
         >

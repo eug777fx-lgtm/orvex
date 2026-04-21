@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Search, Plus, ExternalLink, Upload, X } from 'lucide-react'
+import { Search, Plus, ExternalLink, Upload, X, Trash2 } from 'lucide-react'
 import db from '@/lib/db'
 import AddLeadModal from '../components/AddLeadModal'
 import Discover from '../components/Discover'
 import PageShell from '../components/PageShell'
+import useIsMobile from '../utils/useIsMobile'
 
 const INDUSTRY_FILTERS = [
   'All',
@@ -239,9 +240,13 @@ function CenteredMessage({ children }) {
 export default function Leads() {
   const navigate = useNavigate()
   const location = useLocation()
+  const isMobile = useIsMobile()
   const [importBanner, setImportBanner] = useState(
     typeof location.state?.imported === 'number' ? location.state.imported : null,
   )
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [pendingDeleteId, setPendingDeleteId] = useState(null)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   useEffect(() => {
     if (location.state?.imported != null) {
@@ -282,6 +287,60 @@ export default function Leads() {
   useEffect(() => {
     fetchLeads()
   }, [])
+
+  async function deleteOne(leadId) {
+    if (!db) return
+    const prev = leads
+    setLeads((rows) => rows.filter((l) => l.id !== leadId))
+    setSelectedIds((s) => {
+      const n = new Set(s)
+      n.delete(leadId)
+      return n
+    })
+    setPendingDeleteId(null)
+    try {
+      await db.query('DELETE FROM leads WHERE id = $1', [leadId])
+    } catch (err) {
+      console.error(err)
+      setLeads(prev)
+      setError(err?.message || 'Failed to delete lead.')
+    }
+  }
+
+  async function deleteBulk() {
+    if (!db || selectedIds.size === 0) return
+    const ids = Array.from(selectedIds)
+    const prev = leads
+    setLeads((rows) => rows.filter((l) => !selectedIds.has(l.id)))
+    setSelectedIds(new Set())
+    setBulkDeleteOpen(false)
+    try {
+      await db.query('DELETE FROM leads WHERE id = ANY($1::uuid[])', [ids])
+    } catch (err) {
+      console.error(err)
+      setLeads(prev)
+      setError(err?.message || 'Failed to delete leads.')
+    }
+  }
+
+  function toggleSelect(leadId) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(leadId)) next.delete(leadId)
+      else next.add(leadId)
+      return next
+    })
+  }
+
+  function toggleSelectAll(visibleIds) {
+    setSelectedIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      const next = new Set(prev)
+      if (allSelected) visibleIds.forEach((id) => next.delete(id))
+      else visibleIds.forEach((id) => next.add(id))
+      return next
+    })
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -397,14 +456,24 @@ export default function Leads() {
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: isMobile ? 'stretch' : 'center',
+          flexDirection: isMobile ? 'column' : 'row',
           justifyContent: 'space-between',
           gap: 12,
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'stretch',
+            gap: 10,
+            flexWrap: 'wrap',
+            flex: isMobile ? 'none' : '0 0 auto',
+            width: isMobile ? '100%' : 'auto',
+          }}
+        >
+          <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }}>
             <Search
               size={14}
               style={{
@@ -416,7 +485,7 @@ export default function Leads() {
               }}
             />
             <input
-              style={inputStyle}
+              style={{ ...inputStyle, width: isMobile ? '100%' : 280 }}
               placeholder="Search companies..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -443,6 +512,21 @@ export default function Leads() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {selectedIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setBulkDeleteOpen(true)}
+              style={{
+                ...ghostButtonStyle,
+                color: '#ff8888',
+                borderColor: 'rgba(255,80,80,0.3)',
+                background: 'rgba(255,80,80,0.06)',
+              }}
+            >
+              <Trash2 size={12} />
+              Delete Selected ({selectedIds.size})
+            </button>
+          )}
           <button
             type="button"
             onClick={() => navigate('/import')}
@@ -483,11 +567,137 @@ export default function Leads() {
           <EmptyState onAdd={() => setModalOpen(true)} />
         ) : !hasFilteredLeads ? (
           <CenteredMessage>No leads match your filters</CenteredMessage>
+        ) : isMobile ? (
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {filtered.map((lead) => (
+              <div
+                key={lead.id}
+                onClick={() => navigate(`/leads/${lead.id}`)}
+                style={{
+                  background: 'rgba(17,17,20,0.85)',
+                  border: '0.5px solid rgba(255,255,255,0.08)',
+                  borderRadius: 14,
+                  padding: 14,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        color: '#ffffff',
+                        fontWeight: 700,
+                        fontSize: 14,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {lead.company_name || '—'}
+                    </div>
+                    {lead.location && (
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                        {lead.location}
+                      </div>
+                    )}
+                  </div>
+                  <ScoreBadge score={lead.opportunity_score} />
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {lead.industry && (
+                    <span style={industryPillStyle()}>{lead.industry}</span>
+                  )}
+                  <span style={statusPillStyle(lead.status)}>{lead.status || 'new'}</span>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    paddingTop: 8,
+                    borderTop: '0.5px solid rgba(255,255,255,0.06)',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    style={{ ...ghostButtonStyle, flex: 1, justifyContent: 'center', padding: '10px 12px' }}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
+                  >
+                    <ExternalLink size={12} />
+                    View
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      ...ghostButtonStyle,
+                      padding: '10px 14px',
+                      color: '#ff8888',
+                      borderColor: 'rgba(255, 80, 80, 0.3)',
+                      background: 'rgba(255, 80, 80, 0.06)',
+                    }}
+                    onClick={() => setPendingDeleteId(lead.id)}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+                {pendingDeleteId === lead.id && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      padding: '8px 10px',
+                      background: 'rgba(255,80,80,0.08)',
+                      borderRadius: 10,
+                      fontSize: 12,
+                      alignItems: 'center',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span style={{ flex: 1, color: '#ffdddd' }}>Delete this lead?</span>
+                    <button
+                      type="button"
+                      style={{ ...ghostButtonStyle, padding: '6px 12px' }}
+                      onClick={() => setPendingDeleteId(null)}
+                    >
+                      No
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        ...ghostButtonStyle,
+                        padding: '6px 12px',
+                        background: '#ff8888',
+                        color: '#000',
+                        borderColor: '#ff8888',
+                      }}
+                      onClick={() => deleteOne(lead.id)}
+                    >
+                      Yes
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
+                  <th style={{ ...tableHeaderCell, width: 36 }}>
+                    <input
+                      type="checkbox"
+                      checked={
+                        filtered.length > 0 &&
+                        filtered.every((l) => selectedIds.has(l.id))
+                      }
+                      onChange={() => toggleSelectAll(filtered.map((l) => l.id))}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
                   <th style={tableHeaderCell}>Company</th>
                   <th style={tableHeaderCell}>Industry</th>
                   <th style={tableHeaderCell}>Location</th>
@@ -510,6 +720,17 @@ export default function Leads() {
                       e.currentTarget.style.background = 'transparent'
                     }}
                   >
+                    <td
+                      style={{ ...tableCellBase, width: 36 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(lead.id)}
+                        onChange={() => toggleSelect(lead.id)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
                     <td style={tableCellBase}>
                       <div style={{ color: '#ffffff', fontWeight: 600, fontSize: 13 }}>
                         {lead.company_name || '—'}
@@ -545,18 +766,82 @@ export default function Leads() {
                     <td style={{ ...tableCellBase, color: 'rgba(255,255,255,0.55)' }}>
                       {lead.has_website ? 'Yes' : 'No'}
                     </td>
-                    <td style={{ ...tableCellBase, textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        style={ghostButtonStyle}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigate(`/leads/${lead.id}`)
-                        }}
-                      >
-                        <ExternalLink size={11} />
-                        View
-                      </button>
+                    <td
+                      style={{ ...tableCellBase, textAlign: 'right' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div style={{ display: 'inline-flex', gap: 6, position: 'relative' }}>
+                        <button
+                          type="button"
+                          style={ghostButtonStyle}
+                          onClick={() => navigate(`/leads/${lead.id}`)}
+                        >
+                          <ExternalLink size={11} />
+                          View
+                        </button>
+                        {pendingDeleteId === lead.id ? (
+                          <div
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              background: 'rgba(255,80,80,0.12)',
+                              border: '0.5px solid rgba(255,80,80,0.35)',
+                              borderRadius: 8,
+                              padding: '2px 4px',
+                            }}
+                          >
+                            <span style={{ fontSize: 11, color: '#ffdddd', padding: '0 6px' }}>
+                              Delete?
+                            </span>
+                            <button
+                              type="button"
+                              style={{
+                                fontSize: 11,
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                background: '#ff8888',
+                                color: '#000',
+                                fontWeight: 600,
+                              }}
+                              onClick={() => deleteOne(lead.id)}
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              style={{
+                                fontSize: 11,
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                color: 'rgba(255,255,255,0.7)',
+                              }}
+                              onClick={() => setPendingDeleteId(null)}
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            style={{
+                              ...ghostButtonStyle,
+                              padding: '5px 8px',
+                              color: 'rgba(255,255,255,0.3)',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = '#ff8888'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = 'rgba(255,255,255,0.3)'
+                            }}
+                            onClick={() => setPendingDeleteId(lead.id)}
+                            aria-label="Delete"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -565,6 +850,67 @@ export default function Leads() {
           </div>
         )}
       </div>
+      )}
+
+      {bulkDeleteOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 200,
+            padding: 16,
+          }}
+          onClick={() => setBulkDeleteOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#111',
+              border: '0.5px solid rgba(255,255,255,0.1)',
+              borderRadius: 16,
+              padding: 24,
+              maxWidth: 400,
+              width: '100%',
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>
+              Delete {selectedIds.size} {selectedIds.size === 1 ? 'lead' : 'leads'}?
+            </div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 8 }}>
+              This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              <button
+                type="button"
+                style={{ ...ghostButtonStyle, flex: 1, justifyContent: 'center', padding: '10px' }}
+                onClick={() => setBulkDeleteOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#ffffff',
+                  color: '#000',
+                  borderRadius: 10,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+                onClick={deleteBulk}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <AddLeadModal

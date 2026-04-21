@@ -14,6 +14,7 @@ import {
   Check,
   ExternalLink,
   X,
+  Trash2,
 } from 'lucide-react'
 import db from '@/lib/db'
 import EditLeadModal from '../components/EditLeadModal'
@@ -21,6 +22,7 @@ import CreateDealModal from '../components/CreateDealModal'
 import PageShell from '../components/PageShell'
 import { pickBestScript } from '../utils/matchScript'
 import { suggestOffer } from '../utils/suggestOffer'
+import useIsMobile from '../utils/useIsMobile'
 
 const STATUS_STYLES = {
   new: { bg: 'rgba(255,255,255,0.08)' },
@@ -1229,6 +1231,21 @@ export default function LeadDetail() {
   const [activityPrefill, setActivityPrefill] = useState(null)
   const [dealModalOpen, setDealModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const isMobile = useIsMobile()
+
+  async function deleteLead() {
+    if (!db || !id) return
+    setDeleting(true)
+    try {
+      await db.query('DELETE FROM leads WHERE id = $1', [id])
+      navigate('/leads', { replace: true })
+    } catch (err) {
+      console.error(err)
+      setDeleting(false)
+    }
+  }
 
   const loadAll = useCallback(async () => {
     if (!db) {
@@ -1391,7 +1408,7 @@ export default function LeadDetail() {
             {lead.company_name}
           </h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <StatusPill status={lead.status} />
           <button
             type="button"
@@ -1401,13 +1418,28 @@ export default function LeadDetail() {
             <Pencil size={12} />
             Edit
           </button>
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            style={{
+              ...ghostButtonStyle,
+              color: '#ff8888',
+              borderColor: 'rgba(255,80,80,0.3)',
+              background: 'rgba(255,80,80,0.06)',
+            }}
+          >
+            <Trash2 size={12} />
+            Delete
+          </button>
         </div>
       </div>
 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 65fr) minmax(0, 35fr)',
+          gridTemplateColumns: isMobile
+            ? '1fr'
+            : 'minmax(0, 65fr) minmax(0, 35fr)',
           gap: 20,
           alignItems: 'start',
         }}
@@ -1482,6 +1514,87 @@ export default function LeadDetail() {
       />
 
       <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+
+      <AnimatePresence>
+        {deleteOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => !deleting && setDeleteOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.75)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 200,
+              padding: 16,
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#111',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                borderRadius: 16,
+                padding: 24,
+                maxWidth: 420,
+                width: '100%',
+              }}
+            >
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>
+                Delete {lead.company_name || 'this lead'}?
+              </div>
+              <div
+                style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 8 }}
+              >
+                This cannot be undone. Activities, tasks, and deals linked to this lead will also be removed.
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                <button
+                  type="button"
+                  style={{
+                    ...ghostButtonStyle,
+                    flex: 1,
+                    justifyContent: 'center',
+                    padding: '10px',
+                  }}
+                  onClick={() => setDeleteOpen(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: '#ffffff',
+                    color: '#000',
+                    borderRadius: 10,
+                    fontWeight: 600,
+                    fontSize: 13,
+                    border: 'none',
+                    cursor: deleting ? 'not-allowed' : 'pointer',
+                    opacity: deleting ? 0.6 : 1,
+                  }}
+                  onClick={deleteLead}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Delete Lead'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </PageShell>
   )
 }

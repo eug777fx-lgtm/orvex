@@ -229,3 +229,31 @@ button {
   animation: shimmer 1.5s infinite;
   border-radius: 8px;
 }
+
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+  .orvex-desktop-only {
+    display: none !important;
+  }
+  .orvex-mobile-main {
+    padding: 1rem !important;
+    padding-bottom: 88px !important;
+  }
+  .orvex-topbar-mobile {
+    height: 52px !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .orvex-mobile-only {
+    display: none !important;
+  }
+}

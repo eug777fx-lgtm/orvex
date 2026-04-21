@@ -7,7 +7,16 @@ import {
   useNavigate,
 } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LogOut } from 'lucide-react'
+import {
+  LogOut,
+  LayoutDashboard,
+  Users,
+  Kanban,
+  Package,
+  BookOpen,
+  CheckSquare,
+  Upload,
+} from 'lucide-react'
 import { migrateSchema } from './utils/migrateSchema'
 import Background from './components/Background'
 import Dashboard from './pages/Dashboard'
@@ -19,39 +28,19 @@ import Scripts from './pages/Scripts'
 import Tasks from './pages/Tasks'
 import Import from './pages/Import'
 import Login from './pages/Login'
+import useIsMobile from './utils/useIsMobile'
 
 const navItems = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/leads', label: 'Leads' },
-  { to: '/pipeline', label: 'Pipeline' },
-  { to: '/offers', label: 'Offers' },
-  { to: '/scripts', label: 'Scripts' },
-  { to: '/tasks', label: 'Tasks' },
-  { to: '/import', label: 'Import' },
+  { to: '/', label: 'Dashboard', end: true, icon: LayoutDashboard },
+  { to: '/leads', label: 'Leads', icon: Users },
+  { to: '/pipeline', label: 'Pipeline', icon: Kanban },
+  { to: '/offers', label: 'Offers', icon: Package },
+  { to: '/scripts', label: 'Scripts', icon: BookOpen },
+  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { to: '/import', label: 'Import', icon: Upload },
 ]
 
-const topbarStyle = {
-  height: 56,
-  width: '100%',
-  background: 'rgba(12,12,14,0.65)',
-  borderBottom: '0.5px solid rgba(255,255,255,0.06)',
-  backdropFilter: 'blur(24px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '0 1.5rem',
-  position: 'sticky',
-  top: 0,
-  zIndex: 100,
-}
-
-const logoWrap = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  minWidth: 160,
-}
+const mobileBottomNavItems = navItems.slice(0, 6)
 
 const logoStyle = {
   color: '#ffffff',
@@ -67,24 +56,6 @@ const dotStyle = {
   background: 'var(--accent-blue)',
   boxShadow: '0 0 10px var(--accent-blue-glow)',
   animation: 'glowPulse 2s ease-in-out infinite',
-}
-
-const navStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 2,
-  background: 'rgba(255,255,255,0.03)',
-  border: '0.5px solid rgba(255,255,255,0.06)',
-  padding: 3,
-  borderRadius: 999,
-}
-
-const rightWrap = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  justifyContent: 'flex-end',
-  minWidth: 160,
 }
 
 const avatarStyle = {
@@ -116,21 +87,24 @@ const signOutStyle = {
   transition: 'color 0.15s ease, border-color 0.15s ease',
 }
 
-const mainStyle = {
-  maxWidth: 1400,
-  margin: '0 auto',
-  padding: '2rem',
-  position: 'relative',
-  zIndex: 1,
-}
-
 function NavTabs() {
   const location = useLocation()
   return (
-    <nav style={navStyle}>
+    <nav
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        background: 'rgba(255,255,255,0.03)',
+        border: '0.5px solid rgba(255,255,255,0.06)',
+        padding: 3,
+        borderRadius: 999,
+      }}
+    >
       {navItems.map((item) => {
-        const active =
-          item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)
+        const active = item.end
+          ? location.pathname === item.to
+          : location.pathname.startsWith(item.to)
         return (
           <NavLink
             key={item.to}
@@ -168,6 +142,60 @@ function NavTabs() {
   )
 }
 
+function MobileBottomNav() {
+  const location = useLocation()
+  return (
+    <nav
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 64,
+        background: 'rgba(8,8,8,0.95)',
+        borderTop: '0.5px solid rgba(255,255,255,0.08)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        padding: '0 4px',
+        zIndex: 90,
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
+      {mobileBottomNavItems.map((item) => {
+        const Icon = item.icon
+        const active = item.end
+          ? location.pathname === item.to
+          : location.pathname.startsWith(item.to)
+        return (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
+              padding: '8px 0',
+              minHeight: 48,
+              color: active ? '#ffffff' : 'rgba(255,255,255,0.35)',
+              transition: 'color 0.15s ease',
+            }}
+          >
+            <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+            <span style={{ fontSize: 10, fontWeight: 500 }}>{item.label}</span>
+          </NavLink>
+        )
+      })}
+    </nav>
+  )
+}
+
 function AnimatedRoutes() {
   const location = useLocation()
   return (
@@ -188,6 +216,7 @@ function AnimatedRoutes() {
 
 function Shell() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
 
   function signOut() {
     localStorage.removeItem('orvex_auth')
@@ -195,30 +224,62 @@ function Shell() {
     window.location.reload()
   }
 
+  const topbarStyle = {
+    height: isMobile ? 52 : 56,
+    width: '100%',
+    background: 'rgba(12,12,14,0.65)',
+    borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+    backdropFilter: 'blur(24px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: isMobile ? '0 1rem' : '0 1.5rem',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
+  }
+
+  const mainStyle = {
+    maxWidth: 1400,
+    margin: '0 auto',
+    padding: isMobile ? '1rem' : '2rem',
+    paddingBottom: isMobile ? 88 : 32,
+    position: 'relative',
+    zIndex: 1,
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'transparent', color: '#fff', position: 'relative' }}>
       <Background />
       <header style={topbarStyle}>
-        <div style={logoWrap}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            minWidth: isMobile ? 'auto' : 160,
+          }}
+        >
           <span style={logoStyle}>ORVEX</span>
           <span style={dotStyle} />
         </div>
-        <NavTabs />
-        <div style={rightWrap}>
+        {!isMobile && <NavTabs />}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            justifyContent: 'flex-end',
+            minWidth: isMobile ? 'auto' : 160,
+          }}
+        >
           <div style={avatarStyle}>EG</div>
           <button
             type="button"
             onClick={signOut}
             style={signOutStyle}
             aria-label="Sign out"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#ffffff'
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.3)'
-              e.currentTarget.style.borderColor = 'transparent'
-            }}
           >
             <LogOut size={14} />
           </button>
@@ -227,6 +288,7 @@ function Shell() {
       <main style={mainStyle}>
         <AnimatedRoutes />
       </main>
+      {isMobile && <MobileBottomNav />}
     </div>
   )
 }
