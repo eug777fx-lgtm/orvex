@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Search, Plus, ExternalLink, Upload, X } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 import AddLeadModal from '../components/AddLeadModal'
 import Discover from '../components/Discover'
 import PageShell from '../components/PageShell'

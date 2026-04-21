@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 import AddTaskModal from '../components/AddTaskModal'
 import PageShell from '../components/PageShell'
 import {

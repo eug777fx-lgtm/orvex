@@ -1,4 +1,4 @@
-import db from '../lib/db'
+import db from '@/lib/db'
 
 const SCRIPTS_LIBRARY_VERSION = 'v3-15'
 

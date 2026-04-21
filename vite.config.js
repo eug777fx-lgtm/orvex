@@ -1,15 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  build: {
-    rollupOptions: {
-      external: [],
+  resolve: {
+    alias: {
+      '@/lib/db':
+        mode === 'development'
+          ? path.resolve(__dirname, 'src/lib/db.dev.js')
+          : path.resolve(__dirname, 'src/lib/db.prod.js'),
     },
   },
-  optimizeDeps: {
-    exclude: ['@neondatabase/serverless'],
+  build: {
+    rollupOptions: {
+      external: (id) => (id === '@neondatabase/serverless' ? false : false),
+    },
   },
   server: {
     proxy: {
@@ -21,4 +27,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

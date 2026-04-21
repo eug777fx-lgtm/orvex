@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 
 const STAGES = [
   { value: 'lead', label: 'Lead' },

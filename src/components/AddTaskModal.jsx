@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Check } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 import { todayKey } from '../utils/dates'
 
 const TYPES = [

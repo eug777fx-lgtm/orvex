@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Plus, Trash2, Check } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 
 const overlayStyle = {
   position: 'fixed',

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, X, Check, ArrowUpRight } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 import PageShell from '../components/PageShell'
 
 const STAGES = [

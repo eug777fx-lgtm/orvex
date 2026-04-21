@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Copy, ChevronDown, ChevronUp, Check, UserPlus } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 import AddScriptModal from '../components/AddScriptModal'
 import { seedScriptsIfEmpty } from '../utils/seedScripts'
 import PageShell from '../components/PageShell'

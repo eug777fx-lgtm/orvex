@@ -15,7 +15,7 @@ import {
 } from 'recharts'
 import { Plus, ArrowUpRight, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
-import db from '../lib/db'
+import db from '@/lib/db'
 import AddLeadModal from '../components/AddLeadModal'
 import AddTaskModal from '../components/AddTaskModal'
 import PageShell, { staggerContainer, staggerItem } from '../components/PageShell'

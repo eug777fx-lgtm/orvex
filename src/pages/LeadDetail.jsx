@@ -15,7 +15,7 @@ import {
   ExternalLink,
   X,
 } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 import EditLeadModal from '../components/EditLeadModal'
 import CreateDealModal from '../components/CreateDealModal'
 import PageShell from '../components/PageShell'

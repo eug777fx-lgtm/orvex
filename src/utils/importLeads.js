@@ -1,4 +1,4 @@
-import db from '../lib/db'
+import db from '@/lib/db'
 
 const ORVEX_FIELDS = new Set([
   'company_name',

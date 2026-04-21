@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Sparkles, Check, X, Phone, Star, MapPin } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 import { searchBusinesses } from '../utils/placesSearch'
 
 const INDUSTRIES = [

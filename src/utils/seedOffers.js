@@ -1,4 +1,4 @@
-import db from '../lib/db'
+import db from '@/lib/db'
 
 const OFFERS_LIBRARY_VERSION = 'v2-15'
 

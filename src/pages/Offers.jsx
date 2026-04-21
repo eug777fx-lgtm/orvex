@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Check, Pencil, FileText } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 import AddOfferModal from '../components/AddOfferModal'
 import { seedOffersIfEmpty } from '../utils/seedOffers'
 import PageShell from '../components/PageShell'

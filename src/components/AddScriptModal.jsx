@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Plus, Trash2 } from 'lucide-react'
-import db from '../lib/db'
+import db from '@/lib/db'
 
 const TYPES = [
   { value: 'cold_call', label: 'Cold Call' },
