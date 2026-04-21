@@ -18,13 +18,30 @@ const INDUSTRIES = {
   Gym: 'gym fitness center',
 }
 
+function buildApiUrl(endpoint, params) {
+  const isDev = import.meta.env.DEV
+
+  if (isDev) {
+    const queryParams = new URLSearchParams({
+      ...params,
+      key: import.meta.env.VITE_GOOGLE_PLACES_KEY,
+    })
+    return `/maps-api/${endpoint}?${queryParams}`
+  }
+
+  const queryParams = new URLSearchParams(params)
+  return `/api/places?endpoint=${endpoint}&${queryParams}`
+}
+
 export async function searchBusinesses(
   selectedIndustries,
   selectedLocations,
-  apiKey,
   onProgress,
 ) {
-  console.log('Starting search with key:', apiKey ? 'KEY_PRESENT' : 'KEY_MISSING')
+  console.log(
+    'Starting search. Mode:',
+    import.meta.env.DEV ? 'dev (Vite proxy)' : 'prod (Vercel function)',
+  )
 
   const results = []
   const seen = new Set()
@@ -39,7 +56,7 @@ export async function searchBusinesses(
       try {
         onProgress?.(`Searching ${industry} in ${location}... (${completed + 1} of ${total})`)
 
-        const searchUrl = `/maps-api/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`
+        const searchUrl = buildApiUrl('maps/api/place/textsearch/json', { query })
         console.log('Searching:', query)
 
         const response = await fetch(searchUrl)
@@ -73,7 +90,11 @@ export async function searchBusinesses(
 
             let phone = null
             try {
-              const detailUrl = `/maps-api/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_phone_number,formatted_address,rating,user_ratings_total,website,business_status&key=${apiKey}`
+              const detailUrl = buildApiUrl('maps/api/place/details/json', {
+                place_id: place.place_id,
+                fields:
+                  'name,formatted_phone_number,formatted_address,rating,user_ratings_total,website,business_status',
+              })
               const detailResponse = await fetch(detailUrl)
               const detailData = await detailResponse.json()
 

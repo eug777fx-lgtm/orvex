@@ -293,9 +293,10 @@ export default function Discover({ onLeadsAdded }) {
   const [error, setError] = useState(null)
 
   const apiKey = import.meta.env.VITE_GOOGLE_PLACES_KEY
+  const isDev = import.meta.env.DEV
 
   useEffect(() => {
-    if (!apiKey) {
+    if (isDev && !apiKey) {
       setError('Google Places API key not configured. Add VITE_GOOGLE_PLACES_KEY to your .env file and restart the dev server.')
     }
     if (!sql) return
@@ -323,7 +324,7 @@ export default function Discover({ onLeadsAdded }) {
   }
 
   async function handleSearch() {
-    if (!apiKey) {
+    if (isDev && !apiKey) {
       setError('Google Places API key not configured. Add VITE_GOOGLE_PLACES_KEY to your .env file.')
       return
     }
@@ -343,7 +344,6 @@ export default function Discover({ onLeadsAdded }) {
       const found = await searchBusinesses(
         selectedIndustries,
         selectedLocations,
-        apiKey,
         (msg) => setProgress(msg),
       )
       setResults(found)
