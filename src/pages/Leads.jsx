@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Search, Plus, ExternalLink, Upload, X } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import AddLeadModal from '../components/AddLeadModal'
 import Discover from '../components/Discover'
 import PageShell from '../components/PageShell'
@@ -259,7 +259,7 @@ export default function Leads() {
   const [tab, setTab] = useState('my')
 
   async function fetchLeads() {
-    if (!sql) {
+    if (!db) {
       setLoading(false)
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
@@ -269,7 +269,7 @@ export default function Leads() {
     setLoading(true)
     setError(null)
     try {
-      const rows = await sql`SELECT * FROM leads ORDER BY created_at DESC`
+      const rows = await db.query('SELECT * FROM leads ORDER BY created_at DESC')
       setLeads(rows)
     } catch (err) {
       console.error(err)
@@ -461,7 +461,7 @@ export default function Leads() {
 
       {tab === 'my' && (
       <div style={glassCardStyle}>
-        {!sql ? (
+        {!db ? (
           <div
             style={{
               padding: '4rem 1rem',

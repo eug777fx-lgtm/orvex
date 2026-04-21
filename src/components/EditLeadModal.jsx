@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Check } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import { calculateScore } from '../utils/scoring'
 
 const INDUSTRIES = [
@@ -295,7 +295,7 @@ export default function EditLeadModal({ open, lead, onClose, onSaved }) {
       return
     }
 
-    if (!sql) {
+    if (!db) {
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
       )
@@ -304,25 +304,43 @@ export default function EditLeadModal({ open, lead, onClose, onSaved }) {
 
     setSubmitting(true)
     try {
-      await sql`
-        UPDATE leads SET
-          company_name = ${form.company_name.trim()},
-          owner_name = ${form.owner_name.trim() || null},
-          phone = ${form.phone.trim() || null},
-          email = ${form.email.trim() || null},
-          location = ${form.location.trim() || null},
-          industry = ${form.industry || null},
-          website_url = ${form.website_url.trim() || null},
-          source = ${form.source || 'manual'},
-          status = ${form.status || 'new'},
-          notes = ${form.notes.trim() || null},
-          has_website = ${!flags.no_website},
-          website_quality = ${flags.poor_website ? 'poor' : null},
-          has_crm = ${!flags.no_crm},
-          manual_processes = ${!!flags.manual_processes},
-          opportunity_score = ${score}
-        WHERE id = ${lead.id}
-      `
+      await db.query(
+        `UPDATE leads SET
+          company_name = $1,
+          owner_name = $2,
+          phone = $3,
+          email = $4,
+          location = $5,
+          industry = $6,
+          website_url = $7,
+          source = $8,
+          status = $9,
+          notes = $10,
+          has_website = $11,
+          website_quality = $12,
+          has_crm = $13,
+          manual_processes = $14,
+          opportunity_score = $15
+        WHERE id = $16`,
+        [
+          form.company_name.trim(),
+          form.owner_name.trim() || null,
+          form.phone.trim() || null,
+          form.email.trim() || null,
+          form.location.trim() || null,
+          form.industry || null,
+          form.website_url.trim() || null,
+          form.source || 'manual',
+          form.status || 'new',
+          form.notes.trim() || null,
+          !flags.no_website,
+          flags.poor_website ? 'poor' : null,
+          !flags.no_crm,
+          !!flags.manual_processes,
+          score,
+          lead.id,
+        ],
+      )
 
       onSaved?.()
     } catch (err) {

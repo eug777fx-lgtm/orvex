@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, X, Check, ArrowUpRight } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import PageShell from '../components/PageShell'
 
 const STAGES = [
@@ -431,12 +431,12 @@ function DealDetailModal({ deal, onClose, onUpdate, onNavigateLead }) {
   }, [deal, onClose])
 
   async function savePrice() {
-    if (!sql) return
+    if (!db) return
     const value = finalPrice === '' ? null : Number(finalPrice)
     if (value === deal.final_price) return
     setSavingPrice(true)
     try {
-      await sql`UPDATE deals SET final_price = ${value} WHERE id = ${deal.id}`
+      await db.query('UPDATE deals SET final_price = $1 WHERE id = $2', [value, deal.id])
       onUpdate?.({ ...deal, final_price: value })
     } catch (err) {
       console.error(err)
@@ -447,12 +447,12 @@ function DealDetailModal({ deal, onClose, onUpdate, onNavigateLead }) {
   }
 
   async function saveNotes() {
-    if (!sql) return
+    if (!db) return
     const next = notes.trim() === '' ? null : notes
     if ((next || '') === (deal.notes || '')) return
     setSavingNotes(true)
     try {
-      await sql`UPDATE deals SET notes = ${next} WHERE id = ${deal.id}`
+      await db.query('UPDATE deals SET notes = $1 WHERE id = $2', [next, deal.id])
       onUpdate?.({ ...deal, notes: next })
     } catch (err) {
       console.error(err)
@@ -463,17 +463,18 @@ function DealDetailModal({ deal, onClose, onUpdate, onNavigateLead }) {
   }
 
   async function setStage(newStage) {
-    if (!sql) return
+    if (!db) return
     try {
       const closedAt = CLOSED_STAGES.has(newStage) ? new Date().toISOString() : null
-      await sql`
-        UPDATE deals
-        SET stage = ${newStage},
-            stage_changed_at = now(),
-            days_in_stage = 0,
-            closed_at = ${closedAt}
-        WHERE id = ${deal.id}
-      `
+      await db.query(
+        `UPDATE deals
+         SET stage = $1,
+             stage_changed_at = now(),
+             days_in_stage = 0,
+             closed_at = $2
+         WHERE id = $3`,
+        [newStage, closedAt, deal.id],
+      )
       onUpdate?.({
         ...deal,
         stage: newStage,
@@ -639,7 +640,7 @@ export default function Pipeline() {
   const [selectedId, setSelectedId] = useState(null)
 
   async function fetchDeals() {
-    if (!sql) {
+    if (!db) {
       setLoading(false)
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
@@ -649,7 +650,7 @@ export default function Pipeline() {
     setLoading(true)
     setError(null)
     try {
-      const rows = await sql`
+      const rows = await db.query(`
         SELECT
           deals.*,
           leads.company_name,
@@ -660,7 +661,7 @@ export default function Pipeline() {
         LEFT JOIN leads ON deals.lead_id = leads.id
         LEFT JOIN offers ON deals.offer_id = offers.id
         ORDER BY deals.created_at DESC
-      `
+      `)
       setDeals(rows || [])
     } catch (err) {
       console.error(err)
@@ -701,16 +702,17 @@ export default function Pipeline() {
     }
     setDeals((prev) => prev.map((d) => (d.id === deal.id ? optimistic : d)))
 
-    if (!sql) return
+    if (!db) return
     try {
-      await sql`
-        UPDATE deals
-        SET stage = ${nextStage},
-            stage_changed_at = now(),
-            days_in_stage = 0,
-            closed_at = ${closedAt}
-        WHERE id = ${deal.id}
-      `
+      await db.query(
+        `UPDATE deals
+         SET stage = $1,
+             stage_changed_at = now(),
+             days_in_stage = 0,
+             closed_at = $2
+         WHERE id = $3`,
+        [nextStage, closedAt, deal.id],
+      )
     } catch (err) {
       console.error(err)
       setDeals((prev) => prev.map((d) => (d.id === deal.id ? deal : d)))

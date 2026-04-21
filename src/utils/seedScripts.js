@@ -1,4 +1,4 @@
-import sql from '../lib/db'
+import db from '../lib/db'
 
 const SCRIPTS_LIBRARY_VERSION = 'v3-15'
 
@@ -281,49 +281,63 @@ const SEED_SCRIPTS = [
 
 async function insertAll() {
   for (const s of SEED_SCRIPTS) {
-    await sql`
-      INSERT INTO scripts (
+    await db.query(
+      `INSERT INTO scripts (
         name, type, industry_tags, problem_tags,
         opening, problem_hook, value_prop, cta,
         objections, is_active
       ) VALUES (
-        ${s.name}, ${s.type}, ${s.industry_tags}, ${s.problem_tags},
-        ${s.opening}, ${s.problem_hook}, ${s.value_prop}, ${s.cta},
-        ${JSON.stringify(s.objections)}, true
-      )
-    `
+        $1, $2, $3, $4,
+        $5, $6, $7, $8,
+        $9, true
+      )`,
+      [
+        s.name,
+        s.type,
+        s.industry_tags,
+        s.problem_tags,
+        s.opening,
+        s.problem_hook,
+        s.value_prop,
+        s.cta,
+        JSON.stringify(s.objections),
+      ],
+    )
   }
 }
 
 let seedPromise = null
 
 export function seedScriptsIfEmpty() {
-  if (!sql) return Promise.resolve(false)
+  if (!db) return Promise.resolve(false)
   if (seedPromise) return seedPromise
 
   seedPromise = (async () => {
     try {
-      await sql`CREATE TABLE IF NOT EXISTS app_meta (key text PRIMARY KEY, value text)`
+      await db.query(
+        'CREATE TABLE IF NOT EXISTS app_meta (key text PRIMARY KEY, value text)',
+      )
 
-      const versionRows = await sql`
-        SELECT value FROM app_meta WHERE key = 'scripts_library_version'
-      `
+      const versionRows = await db.query(
+        `SELECT value FROM app_meta WHERE key = 'scripts_library_version'`,
+      )
       const currentVersion = versionRows?.[0]?.value || null
 
       if (currentVersion === SCRIPTS_LIBRARY_VERSION) {
-        const countRows = await sql`SELECT COUNT(*)::int AS count FROM scripts`
+        const countRows = await db.query('SELECT COUNT(*)::int AS count FROM scripts')
         if ((countRows?.[0]?.count ?? 0) > 0) return false
         await insertAll()
         return true
       }
 
-      await sql`DELETE FROM scripts`
+      await db.query('DELETE FROM scripts')
       await insertAll()
-      await sql`
-        INSERT INTO app_meta (key, value)
-        VALUES ('scripts_library_version', ${SCRIPTS_LIBRARY_VERSION})
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-      `
+      await db.query(
+        `INSERT INTO app_meta (key, value)
+         VALUES ('scripts_library_version', $1)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [SCRIPTS_LIBRARY_VERSION],
+      )
       return true
     } catch (err) {
       console.error('seedScriptsIfEmpty failed', err)

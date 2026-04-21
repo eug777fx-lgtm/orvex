@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Plus, Trash2 } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 
 const TYPES = [
   { value: 'cold_call', label: 'Cold Call' },
@@ -220,7 +220,7 @@ export default function AddScriptModal({ open, onClose, onCreated }) {
       return
     }
 
-    if (!sql) {
+    if (!db) {
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
       )
@@ -235,18 +235,29 @@ export default function AddScriptModal({ open, onClose, onCreated }) {
 
     setSubmitting(true)
     try {
-      await sql`
-        INSERT INTO scripts (
+      await db.query(
+        `INSERT INTO scripts (
           name, type, industry_tags, problem_tags,
           opening, problem_hook, value_prop, cta,
           objections, is_active
         ) VALUES (
-          ${form.name.trim()}, ${form.type}, ${industryTags}, ${problemTags},
-          ${form.opening.trim() || null}, ${form.problem_hook.trim() || null},
-          ${form.value_prop.trim() || null}, ${form.cta.trim() || null},
-          ${JSON.stringify(cleanObjections)}, true
-        )
-      `
+          $1, $2, $3, $4,
+          $5, $6,
+          $7, $8,
+          $9, true
+        )`,
+        [
+          form.name.trim(),
+          form.type,
+          industryTags,
+          problemTags,
+          form.opening.trim() || null,
+          form.problem_hook.trim() || null,
+          form.value_prop.trim() || null,
+          form.cta.trim() || null,
+          JSON.stringify(cleanObjections),
+        ],
+      )
       onCreated?.()
       onClose?.()
     } catch (err) {

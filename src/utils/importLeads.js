@@ -1,4 +1,4 @@
-import sql from '../lib/db'
+import db from '../lib/db'
 
 const ORVEX_FIELDS = new Set([
   'company_name',
@@ -33,7 +33,7 @@ function makeDupKey(name, phone) {
 }
 
 export async function importLeads(rows, fieldMap, options = {}, onProgress) {
-  if (!sql) {
+  if (!db) {
     throw new Error('Database not connected.')
   }
 
@@ -63,7 +63,7 @@ export async function importLeads(rows, fieldMap, options = {}, onProgress) {
   let existing = new Set()
   if (skipDuplicates) {
     try {
-      const existingRows = await sql`SELECT company_name, phone FROM leads`
+      const existingRows = await db.query('SELECT company_name, phone FROM leads')
       existing = new Set(
         (existingRows || []).map((r) => makeDupKey(r.company_name, r.phone)),
       )
@@ -98,19 +98,32 @@ export async function importLeads(rows, fieldMap, options = {}, onProgress) {
             score += 2
           }
 
-          await sql`
-            INSERT INTO leads (
+          await db.query(
+            `INSERT INTO leads (
               company_name, owner_name, phone, email, location, industry,
               website_url, notes, source, status,
               has_website, has_crm, manual_processes, opportunity_score
             ) VALUES (
-              ${lead.company_name}, ${lead.owner_name || null}, ${lead.phone || null},
-              ${lead.email || null}, ${lead.location || null}, ${lead.industry || null},
-              ${lead.website_url || null}, ${lead.notes || null},
-              'import', ${defaultStatus},
-              ${hasWebsite}, false, true, ${score}
-            )
-          `
+              $1, $2, $3,
+              $4, $5, $6,
+              $7, $8,
+              'import', $9,
+              $10, false, true, $11
+            )`,
+            [
+              lead.company_name,
+              lead.owner_name || null,
+              lead.phone || null,
+              lead.email || null,
+              lead.location || null,
+              lead.industry || null,
+              lead.website_url || null,
+              lead.notes || null,
+              defaultStatus,
+              hasWebsite,
+              score,
+            ],
+          )
           imported += 1
         } catch (err) {
           console.error('import row failed', err)

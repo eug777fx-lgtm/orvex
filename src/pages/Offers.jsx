@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Check, Pencil, FileText } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import AddOfferModal from '../components/AddOfferModal'
 import { seedOffersIfEmpty } from '../utils/seedOffers'
 import PageShell from '../components/PageShell'
@@ -342,7 +342,7 @@ export default function Offers() {
   const [modalOpen, setModalOpen] = useState(false)
 
   async function fetchOffers() {
-    if (!sql) {
+    if (!db) {
       setLoading(false)
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
@@ -353,7 +353,9 @@ export default function Offers() {
     setError(null)
     try {
       await seedOffersIfEmpty()
-      const rows = await sql`SELECT * FROM offers ORDER BY price_min ASC NULLS LAST, created_at ASC`
+      const rows = await db.query(
+        'SELECT * FROM offers ORDER BY price_min ASC NULLS LAST, created_at ASC',
+      )
       setOffers(rows || [])
     } catch (err) {
       console.error(err)
@@ -368,13 +370,13 @@ export default function Offers() {
   }, [])
 
   async function toggleActive(offer) {
-    if (!sql) return
+    if (!db) return
     const next = !(offer.is_active !== false)
     setOffers((prev) =>
       prev.map((o) => (o.id === offer.id ? { ...o, is_active: next } : o)),
     )
     try {
-      await sql`UPDATE offers SET is_active = ${next} WHERE id = ${offer.id}`
+      await db.query('UPDATE offers SET is_active = $1 WHERE id = $2', [next, offer.id])
     } catch (err) {
       console.error(err)
       setOffers((prev) =>

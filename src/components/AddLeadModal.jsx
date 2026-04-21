@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Check } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import { calculateScore } from '../utils/scoring'
 
 const INDUSTRIES = [
@@ -268,7 +268,7 @@ export default function AddLeadModal({ open, onClose, onCreated }) {
       return
     }
 
-    if (!sql) {
+    if (!db) {
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
       )
@@ -295,20 +295,37 @@ export default function AddLeadModal({ open, onClose, onCreated }) {
         status: 'new',
       }
 
-      await sql`
-        INSERT INTO leads (
+      await db.query(
+        `INSERT INTO leads (
           company_name, owner_name, phone, email, location, industry,
           website_url, source, notes, has_website, website_quality,
           has_crm, manual_processes, opportunity_score, status
         ) VALUES (
-          ${payload.company_name}, ${payload.owner_name}, ${payload.phone},
-          ${payload.email}, ${payload.location}, ${payload.industry},
-          ${payload.website_url}, ${payload.source}, ${payload.notes},
-          ${payload.has_website}, ${payload.website_quality},
-          ${payload.has_crm}, ${payload.manual_processes},
-          ${payload.opportunity_score}, ${payload.status}
-        )
-      `
+          $1, $2, $3,
+          $4, $5, $6,
+          $7, $8, $9,
+          $10, $11,
+          $12, $13,
+          $14, $15
+        )`,
+        [
+          payload.company_name,
+          payload.owner_name,
+          payload.phone,
+          payload.email,
+          payload.location,
+          payload.industry,
+          payload.website_url,
+          payload.source,
+          payload.notes,
+          payload.has_website,
+          payload.website_quality,
+          payload.has_crm,
+          payload.manual_processes,
+          payload.opportunity_score,
+          payload.status,
+        ],
+      )
 
       onCreated?.()
       onClose?.()

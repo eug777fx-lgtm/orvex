@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 
 const STAGES = [
   { value: 'lead', label: 'Lead' },
@@ -182,9 +182,11 @@ export default function CreateDealModal({ open, lead, onClose, onCreated }) {
     setError(null)
     setSubmitting(false)
 
-    if (!sql) return
+    if (!db) return
     setLoadingOffers(true)
-    sql`SELECT id, name, price_min, price_max FROM offers WHERE is_active = true ORDER BY price_min ASC NULLS LAST`
+    db.query(
+      'SELECT id, name, price_min, price_max FROM offers WHERE is_active = true ORDER BY price_min ASC NULLS LAST',
+    )
       .then((rows) => setOffers(rows || []))
       .catch((err) => {
         console.error(err)
@@ -222,7 +224,7 @@ export default function CreateDealModal({ open, lead, onClose, onCreated }) {
       return
     }
 
-    if (!sql) {
+    if (!db) {
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
       )
@@ -234,11 +236,12 @@ export default function CreateDealModal({ open, lead, onClose, onCreated }) {
 
     setSubmitting(true)
     try {
-      const rows = await sql`
-        INSERT INTO deals (lead_id, offer_id, proposed_price, stage, notes)
-        VALUES (${lead.id}, ${offerValue}, ${proposedPrice}, ${stage}, ${notes.trim() || null})
-        RETURNING id
-      `
+      const rows = await db.query(
+        `INSERT INTO deals (lead_id, offer_id, proposed_price, stage, notes)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id`,
+        [lead.id, offerValue, proposedPrice, stage, notes.trim() || null],
+      )
       const dealId = rows?.[0]?.id ?? null
       onCreated?.({ id: dealId })
     } catch (err) {

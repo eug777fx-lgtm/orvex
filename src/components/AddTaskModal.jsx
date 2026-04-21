@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Check } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import { todayKey } from '../utils/dates'
 
 const TYPES = [
@@ -254,8 +254,8 @@ export default function AddTaskModal({ open, onClose, onCreated, defaultLeadId =
     setError(null)
     setSubmitting(false)
 
-    if (!sql) return
-    sql`SELECT id, company_name FROM leads ORDER BY company_name ASC`
+    if (!db) return
+    db.query('SELECT id, company_name FROM leads ORDER BY company_name ASC')
       .then((rows) => setLeads(rows || []))
       .catch((err) => console.error('Failed to load leads', err))
   }, [open, defaultLeadId])
@@ -278,7 +278,7 @@ export default function AddTaskModal({ open, onClose, onCreated, defaultLeadId =
       return
     }
 
-    if (!sql) {
+    if (!db) {
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
       )
@@ -287,14 +287,22 @@ export default function AddTaskModal({ open, onClose, onCreated, defaultLeadId =
 
     setSubmitting(true)
     try {
-      await sql`
-        INSERT INTO tasks (
+      await db.query(
+        `INSERT INTO tasks (
           lead_id, title, type, due_date, priority, is_complete, notes
         ) VALUES (
-          ${leadId || null}, ${title.trim()}, ${type}, ${dueDate || null},
-          ${priority}, false, ${notes.trim() || null}
-        )
-      `
+          $1, $2, $3, $4,
+          $5, false, $6
+        )`,
+        [
+          leadId || null,
+          title.trim(),
+          type,
+          dueDate || null,
+          priority,
+          notes.trim() || null,
+        ],
+      )
       onCreated?.()
       onClose?.()
     } catch (err) {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import AddTaskModal from '../components/AddTaskModal'
 import PageShell from '../components/PageShell'
 import {
@@ -320,7 +320,7 @@ export default function Tasks() {
   const [modalOpen, setModalOpen] = useState(false)
 
   async function fetchOpen() {
-    if (!sql) {
+    if (!db) {
       setLoading(false)
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
@@ -331,7 +331,7 @@ export default function Tasks() {
     setError(null)
     try {
       const [openRows, countRows] = await Promise.all([
-        sql`
+        db.query(`
           SELECT
             tasks.*,
             leads.company_name,
@@ -340,14 +340,14 @@ export default function Tasks() {
           LEFT JOIN leads ON tasks.lead_id = leads.id
           WHERE tasks.is_complete = false
           ORDER BY tasks.due_date ASC NULLS LAST, tasks.priority DESC
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT COUNT(*)::int AS count
           FROM tasks
           WHERE is_complete = true
             AND completed_at >= date_trunc('day', now())
             AND completed_at < date_trunc('day', now()) + interval '1 day'
-        `,
+        `),
       ])
       setTasks(openRows || [])
       setCompletedToday(countRows?.[0]?.count ?? 0)
@@ -360,10 +360,10 @@ export default function Tasks() {
   }
 
   async function fetchCompleted() {
-    if (!sql) return
+    if (!db) return
     setCompletedLoading(true)
     try {
-      const rows = await sql`
+      const rows = await db.query(`
         SELECT
           tasks.*,
           leads.company_name,
@@ -373,7 +373,7 @@ export default function Tasks() {
         WHERE tasks.is_complete = true
         ORDER BY tasks.completed_at DESC NULLS LAST
         LIMIT 100
-      `
+      `)
       setCompleted(rows || [])
     } catch (err) {
       console.error(err)
@@ -440,15 +440,16 @@ export default function Tasks() {
   }, [upcoming])
 
   async function completeTask(task) {
-    if (!sql) return
+    if (!db) return
     setTasks((prev) => prev.filter((t) => t.id !== task.id))
     setCompletedToday((prev) => prev + 1)
     try {
-      await sql`
-        UPDATE tasks
-        SET is_complete = true, completed_at = now()
-        WHERE id = ${task.id}
-      `
+      await db.query(
+        `UPDATE tasks
+         SET is_complete = true, completed_at = now()
+         WHERE id = $1`,
+        [task.id],
+      )
       if (completedExpanded) {
         fetchCompleted()
       }
@@ -460,15 +461,16 @@ export default function Tasks() {
   }
 
   async function uncompleteTask(task) {
-    if (!sql) return
+    if (!db) return
     setCompleted((prev) => prev.filter((t) => t.id !== task.id))
     setCompletedToday((prev) => Math.max(0, prev - 1))
     try {
-      await sql`
-        UPDATE tasks
-        SET is_complete = false, completed_at = NULL
-        WHERE id = ${task.id}
-      `
+      await db.query(
+        `UPDATE tasks
+         SET is_complete = false, completed_at = NULL
+         WHERE id = $1`,
+        [task.id],
+      )
       fetchOpen()
     } catch (err) {
       console.error(err)
@@ -477,12 +479,12 @@ export default function Tasks() {
   }
 
   async function deleteTask(task) {
-    if (!sql) return
+    if (!db) return
     const wasCompleted = task.is_complete
     setTasks((prev) => prev.filter((t) => t.id !== task.id))
     setCompleted((prev) => prev.filter((t) => t.id !== task.id))
     try {
-      await sql`DELETE FROM tasks WHERE id = ${task.id}`
+      await db.query('DELETE FROM tasks WHERE id = $1', [task.id])
     } catch (err) {
       console.error(err)
       if (wasCompleted) setCompleted((prev) => [task, ...prev])

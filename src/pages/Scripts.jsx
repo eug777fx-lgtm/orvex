@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Copy, ChevronDown, ChevronUp, Check, UserPlus } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import AddScriptModal from '../components/AddScriptModal'
 import { seedScriptsIfEmpty } from '../utils/seedScripts'
 import PageShell from '../components/PageShell'
@@ -442,7 +442,7 @@ export default function Scripts() {
   const [modalOpen, setModalOpen] = useState(false)
 
   async function fetchScripts() {
-    if (!sql) {
+    if (!db) {
       setLoading(false)
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
@@ -453,7 +453,7 @@ export default function Scripts() {
     setError(null)
     try {
       await seedScriptsIfEmpty()
-      const rows = await sql`SELECT * FROM scripts ORDER BY created_at DESC`
+      const rows = await db.query('SELECT * FROM scripts ORDER BY created_at DESC')
       setScripts(rows || [])
     } catch (err) {
       console.error(err)

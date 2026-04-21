@@ -15,7 +15,7 @@ import {
 } from 'recharts'
 import { Plus, ArrowUpRight, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
-import sql from '../lib/db'
+import db from '../lib/db'
 import AddLeadModal from '../components/AddLeadModal'
 import AddTaskModal from '../components/AddTaskModal'
 import PageShell, { staggerContainer, staggerItem } from '../components/PageShell'
@@ -552,7 +552,7 @@ export default function Dashboard() {
   const [addTaskOpen, setAddTaskOpen] = useState(false)
 
   async function loadDashboard() {
-    if (!sql) {
+    if (!db) {
       setLoading(false)
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
@@ -578,8 +578,8 @@ export default function Dashboard() {
         revenueMonthlyRows,
         discoveredRows,
       ] = await Promise.all([
-        sql`SELECT COUNT(*)::int AS count FROM leads`,
-        sql`
+        db.query('SELECT COUNT(*)::int AS count FROM leads'),
+        db.query(`
           SELECT
             COUNT(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS this_week,
             COUNT(*) FILTER (
@@ -587,21 +587,21 @@ export default function Dashboard() {
                 AND created_at < now() - interval '7 days'
             )::int AS last_week
           FROM leads
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT
             COALESCE(SUM(proposed_price) FILTER (WHERE stage NOT IN ('closed_won','closed_lost')), 0)::float AS pipeline_value,
             COALESCE(SUM(COALESCE(final_price, proposed_price)) FILTER (WHERE stage = 'closed_won'), 0)::float AS revenue_closed,
             COUNT(*) FILTER (WHERE stage = 'closed_won')::int AS won_count,
             COUNT(*) FILTER (WHERE stage = 'closed_lost')::int AS lost_count
           FROM deals
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT stage, COUNT(*)::int AS count
           FROM deals
           GROUP BY stage
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT tasks.*, leads.company_name
           FROM tasks
           LEFT JOIN leads ON tasks.lead_id = leads.id
@@ -615,33 +615,33 @@ export default function Dashboard() {
               ELSE 3
             END ASC
           LIMIT 5
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT industry, COUNT(*)::int AS count
           FROM leads
           WHERE industry IS NOT NULL AND industry <> ''
           GROUP BY industry
           ORDER BY count DESC
           LIMIT 6
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT id, company_name, industry, status, opportunity_score
           FROM leads
           ORDER BY created_at DESC
           LIMIT 5
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT COUNT(*)::int AS count
           FROM activities
           WHERE created_at >= date_trunc('week', now())
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT type, COUNT(*)::int AS count
           FROM activities
           WHERE created_at >= date_trunc('week', now())
           GROUP BY type
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT
             to_char(date_trunc('day', day_series), 'Dy') AS label,
             to_char(date_trunc('day', day_series), 'YYYY-MM-DD') AS day_key,
@@ -657,8 +657,8 @@ export default function Dashboard() {
             GROUP BY day
           ) counts ON counts.day = day_series
           ORDER BY day_series ASC
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT
             to_char(date_trunc('month', month_series), 'Mon') AS label,
             to_char(date_trunc('month', month_series), 'YYYY-MM') AS month_key,
@@ -673,8 +673,8 @@ export default function Dashboard() {
             AND date_trunc('month', COALESCE(deals.closed_at, deals.created_at)) = month_series
           GROUP BY month_series
           ORDER BY month_series ASC
-        `,
-        sql`
+        `),
+        db.query(`
           SELECT
             COALESCE(SUM(COALESCE(final_price, proposed_price)) FILTER (
               WHERE stage = 'closed_won'
@@ -686,8 +686,10 @@ export default function Dashboard() {
                 AND COALESCE(closed_at, created_at) < date_trunc('month', now())
             ), 0)::float AS last_month
           FROM deals
-        `,
-        sql`SELECT COUNT(*)::int AS count FROM leads WHERE source = 'google_places'`,
+        `),
+        db.query(
+          `SELECT COUNT(*)::int AS count FROM leads WHERE source = 'google_places'`,
+        ),
       ])
 
       const agg = dealsAggRows?.[0] || {}
@@ -750,14 +752,15 @@ export default function Dashboard() {
   }, [])
 
   async function toggleTaskComplete(task) {
-    if (!sql) return
+    if (!db) return
     setTodayTasks((prev) => prev.filter((t) => t.id !== task.id))
     try {
-      await sql`
-        UPDATE tasks
-        SET is_complete = true, completed_at = now()
-        WHERE id = ${task.id}
-      `
+      await db.query(
+        `UPDATE tasks
+         SET is_complete = true, completed_at = now()
+         WHERE id = $1`,
+        [task.id],
+      )
     } catch (err) {
       console.error(err)
       setTodayTasks((prev) => [...prev, task])

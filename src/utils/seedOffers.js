@@ -1,4 +1,4 @@
-import sql from '../lib/db'
+import db from '../lib/db'
 
 const OFFERS_LIBRARY_VERSION = 'v2-15'
 
@@ -111,54 +111,68 @@ const SEED_OFFERS = [
 
 async function insertAll() {
   for (const o of SEED_OFFERS) {
-    await sql`
-      INSERT INTO offers (
+    await db.query(
+      `INSERT INTO offers (
         name, description, price_min, price_max,
         target_industries, problems_solved, delivery_days,
         is_active, included
       ) VALUES (
-        ${o.name}, ${o.description}, ${o.price_min}, ${o.price_max},
-        ${o.target_industries}, ${o.problems_solved}, ${o.delivery_days},
-        ${o.is_active}, ${o.included}
-      )
-    `
+        $1, $2, $3, $4,
+        $5, $6, $7,
+        $8, $9
+      )`,
+      [
+        o.name,
+        o.description,
+        o.price_min,
+        o.price_max,
+        o.target_industries,
+        o.problems_solved,
+        o.delivery_days,
+        o.is_active,
+        o.included,
+      ],
+    )
   }
 }
 
 let seedPromise = null
 
 export function seedOffersIfEmpty() {
-  if (!sql) return Promise.resolve(false)
+  if (!db) return Promise.resolve(false)
   if (seedPromise) return seedPromise
 
   seedPromise = (async () => {
     try {
-      await sql`CREATE TABLE IF NOT EXISTS app_meta (key text PRIMARY KEY, value text)`
+      await db.query(
+        'CREATE TABLE IF NOT EXISTS app_meta (key text PRIMARY KEY, value text)',
+      )
 
-      const versionRows = await sql`
-        SELECT value FROM app_meta WHERE key = 'offers_library_version'
-      `
+      const versionRows = await db.query(
+        `SELECT value FROM app_meta WHERE key = 'offers_library_version'`,
+      )
       const currentVersion = versionRows?.[0]?.value || null
 
       if (currentVersion === OFFERS_LIBRARY_VERSION) {
-        const countRows = await sql`SELECT COUNT(*)::int AS count FROM offers`
+        const countRows = await db.query('SELECT COUNT(*)::int AS count FROM offers')
         if ((countRows?.[0]?.count ?? 0) > 0) return false
         await insertAll()
         return true
       }
 
-      const countRows = await sql`SELECT COUNT(*)::int AS count FROM offers`
+      const countRows = await db.query('SELECT COUNT(*)::int AS count FROM offers')
       const existingCount = countRows?.[0]?.count ?? 0
 
       if (existingCount === 0) {
         await insertAll()
       }
 
-      await sql`
-        INSERT INTO app_meta (key, value)
-        VALUES ('offers_library_version', ${OFFERS_LIBRARY_VERSION})
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-      `
+      await db.query(
+        `INSERT INTO app_meta (key, value)
+         VALUES ('offers_library_version', $1)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [OFFERS_LIBRARY_VERSION],
+      )
       return true
     } catch (err) {
       console.error('seedOffersIfEmpty failed', err)

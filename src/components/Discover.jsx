@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Sparkles, Check, X, Phone, Star, MapPin } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import { searchBusinesses } from '../utils/placesSearch'
 
 const INDUSTRIES = [
@@ -299,8 +299,8 @@ export default function Discover({ onLeadsAdded }) {
     if (isDev && !apiKey) {
       setError('Google Places API key not configured. Add VITE_GOOGLE_PLACES_KEY to your .env file and restart the dev server.')
     }
-    if (!sql) return
-    sql`SELECT company_name FROM leads`
+    if (!db) return
+    db.query('SELECT company_name FROM leads')
       .then((rows) => {
         setExistingLeads(
           (rows || [])
@@ -369,27 +369,37 @@ export default function Discover({ onLeadsAdded }) {
   }
 
   async function handleAdd(result) {
-    if (!sql) return
+    if (!db) return
     try {
       const rating = result.rating != null ? Number(result.rating) : null
       const reviews = result.review_count != null ? Number(result.review_count) : null
 
-      await sql`
-        INSERT INTO leads (
+      await db.query(
+        `INSERT INTO leads (
           company_name, phone, email, location, industry,
           has_website, website_quality, has_crm, manual_processes,
           avg_rating, review_count, opportunity_score,
           status, source, notes
         ) VALUES (
-          ${result.company_name}, ${result.phone || null}, ${null},
-          ${result.address || result.location || null},
-          ${(result.industry || '').toLowerCase() || null},
+          $1, $2, $3,
+          $4,
+          $5,
           false, 'none', false, true,
-          ${rating}, ${reviews}, ${result.opportunity_score || 0},
+          $6, $7, $8,
           'new', 'google_places',
           'Found via Orvex Discover — no website detected'
-        )
-      `
+        )`,
+        [
+          result.company_name,
+          result.phone || null,
+          null,
+          result.address || result.location || null,
+          (result.industry || '').toLowerCase() || null,
+          rating,
+          reviews,
+          result.opportunity_score || 0,
+        ],
+      )
       setAddedIds((prev) => {
         const next = new Set(prev)
         next.add(result.place_id)

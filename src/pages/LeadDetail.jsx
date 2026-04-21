@@ -15,7 +15,7 @@ import {
   ExternalLink,
   X,
 } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 import EditLeadModal from '../components/EditLeadModal'
 import CreateDealModal from '../components/CreateDealModal'
 import PageShell from '../components/PageShell'
@@ -436,14 +436,15 @@ function ActivityLogCard({
 
   async function submit(e) {
     e?.preventDefault?.()
-    if (!sql) return
+    if (!db) return
     setSubmitting(true)
     setError(null)
     try {
-      await sql`
-        INSERT INTO activities (lead_id, type, outcome, notes)
-        VALUES (${leadId}, ${type}, ${outcome}, ${notes.trim() || null})
-      `
+      await db.query(
+        `INSERT INTO activities (lead_id, type, outcome, notes)
+         VALUES ($1, $2, $3, $4)`,
+        [leadId, type, outcome, notes.trim() || null],
+      )
 
       if (outcome === 'callback' || outcome === 'follow_up') {
         const tomorrow = new Date()
@@ -454,10 +455,11 @@ function ActivityLogCard({
         const dueDate = `${yyyy}-${mm}-${dd}`
         const title = `Follow up with ${companyName || 'this lead'}`
         try {
-          await sql`
-            INSERT INTO tasks (lead_id, title, type, due_date, priority, is_complete)
-            VALUES (${leadId}, ${title}, 'follow_up', ${dueDate}, 'high', false)
-          `
+          await db.query(
+            `INSERT INTO tasks (lead_id, title, type, due_date, priority, is_complete)
+             VALUES ($1, $2, 'follow_up', $3, 'high', false)`,
+            [leadId, title, dueDate],
+          )
           onTaskAutoCreated?.()
           onToast?.('Follow-up task created for tomorrow')
         } catch (taskErr) {
@@ -652,11 +654,11 @@ function NotesCard({ leadId, initialNotes, onSaved }) {
   }, [initialNotes])
 
   async function save() {
-    if (!sql) return
+    if (!db) return
     setSaving(true)
     setError(null)
     try {
-      await sql`UPDATE leads SET notes = ${notes} WHERE id = ${leadId}`
+      await db.query('UPDATE leads SET notes = $1 WHERE id = $2', [notes, leadId])
       onSaved?.()
     } catch (err) {
       console.error(err)
@@ -754,7 +756,7 @@ function TasksPanel({ leadId, tasks, onChanged, formOpen, onOpenForm, onCloseFor
 
   async function addTask(e) {
     e.preventDefault()
-    if (!sql) return
+    if (!db) return
     if (!title.trim()) {
       setError('Title is required.')
       return
@@ -762,10 +764,11 @@ function TasksPanel({ leadId, tasks, onChanged, formOpen, onOpenForm, onCloseFor
     setSubmitting(true)
     setError(null)
     try {
-      await sql`
-        INSERT INTO tasks (lead_id, title, type, due_date, priority, is_complete)
-        VALUES (${leadId}, ${title.trim()}, ${type}, ${dueDate || null}, ${priority}, false)
-      `
+      await db.query(
+        `INSERT INTO tasks (lead_id, title, type, due_date, priority, is_complete)
+         VALUES ($1, $2, $3, $4, $5, false)`,
+        [leadId, title.trim(), type, dueDate || null, priority],
+      )
       setTitle('')
       setDueDate('')
       setPriority('medium')
@@ -781,9 +784,9 @@ function TasksPanel({ leadId, tasks, onChanged, formOpen, onOpenForm, onCloseFor
   }
 
   async function complete(taskId) {
-    if (!sql) return
+    if (!db) return
     try {
-      await sql`UPDATE tasks SET is_complete = true WHERE id = ${taskId}`
+      await db.query('UPDATE tasks SET is_complete = true WHERE id = $1', [taskId])
       onChanged?.()
     } catch (err) {
       console.error(err)
@@ -1228,7 +1231,7 @@ export default function LeadDetail() {
   const [toastMessage, setToastMessage] = useState(null)
 
   const loadAll = useCallback(async () => {
-    if (!sql) {
+    if (!db) {
       setError('Database not connected. Add VITE_DATABASE_URL to your .env file.')
       setLoading(false)
       return
@@ -1238,21 +1241,30 @@ export default function LeadDetail() {
     try {
       const [leadRows, activityRows, taskRows, dealRows, scriptRows, offerRows] =
         await Promise.all([
-          sql`SELECT * FROM leads WHERE id = ${id} LIMIT 1`,
-          sql`SELECT * FROM activities WHERE lead_id = ${id} ORDER BY created_at DESC`,
-          sql`SELECT * FROM tasks WHERE lead_id = ${id} AND is_complete = false ORDER BY due_date ASC NULLS LAST`,
-          sql`
-            SELECT deals.*, offers.name as offer_name
-            FROM deals
-            LEFT JOIN offers ON deals.offer_id = offers.id
-            WHERE deals.lead_id = ${id}
-              AND deals.stage != 'closed_won'
-              AND deals.stage != 'closed_lost'
-            ORDER BY deals.created_at DESC
-            LIMIT 1
-          `,
-          sql`SELECT * FROM scripts WHERE type = 'cold_call' AND is_active = true`,
-          sql`SELECT * FROM offers WHERE is_active = true`,
+          db.query('SELECT * FROM leads WHERE id = $1 LIMIT 1', [id]),
+          db.query(
+            'SELECT * FROM activities WHERE lead_id = $1 ORDER BY created_at DESC',
+            [id],
+          ),
+          db.query(
+            'SELECT * FROM tasks WHERE lead_id = $1 AND is_complete = false ORDER BY due_date ASC NULLS LAST',
+            [id],
+          ),
+          db.query(
+            `SELECT deals.*, offers.name as offer_name
+             FROM deals
+             LEFT JOIN offers ON deals.offer_id = offers.id
+             WHERE deals.lead_id = $1
+               AND deals.stage != 'closed_won'
+               AND deals.stage != 'closed_lost'
+             ORDER BY deals.created_at DESC
+             LIMIT 1`,
+            [id],
+          ),
+          db.query(
+            `SELECT * FROM scripts WHERE type = 'cold_call' AND is_active = true`,
+          ),
+          db.query('SELECT * FROM offers WHERE is_active = true'),
         ])
       setLead(leadRows[0] || null)
       setActivities(activityRows || [])
@@ -1273,9 +1285,9 @@ export default function LeadDetail() {
   }, [loadAll])
 
   const reloadLead = useCallback(async () => {
-    if (!sql) return
+    if (!db) return
     try {
-      const rows = await sql`SELECT * FROM leads WHERE id = ${id} LIMIT 1`
+      const rows = await db.query('SELECT * FROM leads WHERE id = $1 LIMIT 1', [id])
       setLead(rows[0] || null)
     } catch (err) {
       console.error(err)
@@ -1283,9 +1295,12 @@ export default function LeadDetail() {
   }, [id])
 
   const reloadActivities = useCallback(async () => {
-    if (!sql) return
+    if (!db) return
     try {
-      const rows = await sql`SELECT * FROM activities WHERE lead_id = ${id} ORDER BY created_at DESC`
+      const rows = await db.query(
+        'SELECT * FROM activities WHERE lead_id = $1 ORDER BY created_at DESC',
+        [id],
+      )
       setActivities(rows || [])
     } catch (err) {
       console.error(err)
@@ -1293,9 +1308,12 @@ export default function LeadDetail() {
   }, [id])
 
   const reloadTasks = useCallback(async () => {
-    if (!sql) return
+    if (!db) return
     try {
-      const rows = await sql`SELECT * FROM tasks WHERE lead_id = ${id} AND is_complete = false ORDER BY due_date ASC NULLS LAST`
+      const rows = await db.query(
+        'SELECT * FROM tasks WHERE lead_id = $1 AND is_complete = false ORDER BY due_date ASC NULLS LAST',
+        [id],
+      )
       setTasks(rows || [])
     } catch (err) {
       console.error(err)

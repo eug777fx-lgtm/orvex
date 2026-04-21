@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Plus, Trash2, Check } from 'lucide-react'
-import sql from '../lib/db'
+import db from '../lib/db'
 
 const overlayStyle = {
   position: 'fixed',
@@ -213,7 +213,7 @@ export default function AddOfferModal({ open, onClose, onCreated }) {
       return
     }
 
-    if (!sql) {
+    if (!db) {
       setError(
         'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
       )
@@ -229,18 +229,29 @@ export default function AddOfferModal({ open, onClose, onCreated }) {
 
     setSubmitting(true)
     try {
-      await sql`
-        INSERT INTO offers (
+      await db.query(
+        `INSERT INTO offers (
           name, description, price_min, price_max,
           target_industries, problems_solved, delivery_days,
           is_active, included
         ) VALUES (
-          ${form.name.trim()}, ${form.description.trim() || null},
-          ${priceMin}, ${priceMax},
-          ${industries}, ${problems}, ${deliveryDays},
-          ${form.is_active}, ${cleanIncluded}
-        )
-      `
+          $1, $2,
+          $3, $4,
+          $5, $6, $7,
+          $8, $9
+        )`,
+        [
+          form.name.trim(),
+          form.description.trim() || null,
+          priceMin,
+          priceMax,
+          industries,
+          problems,
+          deliveryDays,
+          form.is_active,
+          cleanIncluded,
+        ],
+      )
       onCreated?.()
       onClose?.()
     } catch (err) {
