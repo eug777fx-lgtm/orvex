@@ -219,7 +219,7 @@ function Shell() {
   const isMobile = useIsMobile()
 
   function signOut() {
-    localStorage.removeItem('orvex_auth')
+    localStorage.removeItem('cos_auth')
     navigate('/', { replace: true })
     window.location.reload()
   }
@@ -261,7 +261,7 @@ function Shell() {
             minWidth: isMobile ? 'auto' : 160,
           }}
         >
-          <span style={logoStyle}>ORVEX</span>
+          <span style={logoStyle}>COS</span>
           <span style={dotStyle} />
         </div>
         {!isMobile && <NavTabs />}
@@ -295,7 +295,7 @@ function Shell() {
 
 export default function App() {
   const [authed, setAuthed] = useState(
-    () => localStorage.getItem('orvex_auth') === 'true',
+    () => localStorage.getItem('cos_auth') === 'true',
   )
 
   useEffect(() => {

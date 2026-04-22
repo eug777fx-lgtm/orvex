@@ -387,7 +387,7 @@ export default function Discover({ onLeadsAdded }) {
           false, 'none', false, true,
           $6, $7, $8,
           'new', 'google_places',
-          'Found via Orvex Discover — no website detected'
+          'Found via COS Discover — no website detected'
         )`,
         [
           result.company_name,
@@ -528,7 +528,7 @@ export default function Discover({ onLeadsAdded }) {
                       height: '100%',
                       background: 'rgba(255,255,255,0.8)',
                       borderRadius: 999,
-                      animation: 'orvex-progress 1.4s ease-in-out infinite',
+                      animation: 'cos-progress 1.4s ease-in-out infinite',
                     }}
                   />
                 </div>

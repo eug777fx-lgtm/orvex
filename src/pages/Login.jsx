@@ -113,7 +113,7 @@ export default function Login({ onSuccess }) {
   function submit(e) {
     e?.preventDefault?.()
     if (password === 'Hebrews11') {
-      localStorage.setItem('orvex_auth', 'true')
+      localStorage.setItem('cos_auth', 'true')
       setWrong(false)
       onSuccess?.()
     } else {
@@ -178,15 +178,18 @@ export default function Login({ onSuccess }) {
         }}
         style={cardStyle}
       >
-        <div style={logoStyle}>ORVEX</div>
-        <div style={subtitleStyle}>Sales Intelligence</div>
+        <div style={logoStyle}>COS</div>
+        <div style={subtitleStyle}>Client Operating System</div>
+        <div style={{ ...subtitleStyle, fontSize: 11, marginTop: 2 }}>
+          More clients. Less chaos.
+        </div>
 
         <div style={dividerStyle} />
 
         <form onSubmit={submit}>
-          <label style={labelStyle} htmlFor="orvex-access">Access Code</label>
+          <label style={labelStyle} htmlFor="cos-access">Access Code</label>
           <input
-            id="orvex-access"
+            id="cos-access"
             type="password"
             autoFocus
             value={password}

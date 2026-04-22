@@ -159,7 +159,7 @@ button {
   }
 }
 
-@keyframes orvex-progress {
+@keyframes cos-progress {
   0% {
     transform: translateX(-100%);
   }
@@ -217,8 +217,8 @@ button {
   }
 }
 
-.orvex-shimmer,
-.orvex-skeleton {
+.cos-shimmer,
+.cos-skeleton {
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.04) 25%,
@@ -240,20 +240,20 @@ textarea {
   body {
     font-size: 14px;
   }
-  .orvex-desktop-only {
+  .cos-desktop-only {
     display: none !important;
   }
-  .orvex-mobile-main {
+  .cos-mobile-main {
     padding: 1rem !important;
     padding-bottom: 88px !important;
   }
-  .orvex-topbar-mobile {
+  .cos-topbar-mobile {
     height: 52px !important;
   }
 }
 
 @media (min-width: 769px) {
-  .orvex-mobile-only {
+  .cos-mobile-only {
     display: none !important;
   }
 }

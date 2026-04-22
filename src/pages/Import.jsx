@@ -6,7 +6,7 @@ import { importLeads } from '../utils/importLeads'
 import { downloadSampleCSV } from '../utils/downloadSampleCSV'
 import PageShell from '../components/PageShell'
 
-const ORVEX_FIELDS = [
+const COS_FIELDS = [
   { value: 'skip', label: '— skip —' },
   { value: 'company_name', label: 'Company Name' },
   { value: 'owner_name', label: 'Owner Name' },
@@ -313,8 +313,8 @@ function PreviewStep({
   const preview = rows.slice(0, 5)
   const mappedFields = useMemo(() => {
     const list = []
-    for (const [csvCol, orvexField] of Object.entries(fieldMap)) {
-      if (orvexField && orvexField !== 'skip') list.push({ csvCol, orvexField })
+    for (const [csvCol, cosField] of Object.entries(fieldMap)) {
+      if (cosField && cosField !== 'skip') list.push({ csvCol, cosField })
     }
     return list
   }, [fieldMap])
@@ -394,7 +394,7 @@ function PreviewStep({
         <div style={{ marginBottom: 12 }}>
           <div style={sectionTitleStyle}>Map Your Columns</div>
           <div style={sectionSubStyle}>
-            Match each CSV column to the right Orvex field
+            Match each CSV column to the right COS field
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -426,7 +426,7 @@ function PreviewStep({
                 value={fieldMap[header] || 'skip'}
                 onChange={(e) => updateMap(header, e.target.value)}
               >
-                {ORVEX_FIELDS.map((f) => (
+                {COS_FIELDS.map((f) => (
                   <option key={f.value} value={f.value}>
                     {f.label}
                   </option>
@@ -459,9 +459,9 @@ function PreviewStep({
               <thead>
                 <tr>
                   {mappedFields.map((mf) => (
-                    <th key={mf.orvexField} style={tableHeaderCell}>
-                      {ORVEX_FIELDS.find((f) => f.value === mf.orvexField)?.label ||
-                        mf.orvexField}
+                    <th key={mf.cosField} style={tableHeaderCell}>
+                      {COS_FIELDS.find((f) => f.value === mf.cosField)?.label ||
+                        mf.cosField}
                     </th>
                   ))}
                 </tr>
@@ -473,7 +473,7 @@ function PreviewStep({
                       const val = (row[mf.csvCol] || '').toString().trim()
                       return (
                         <td
-                          key={mf.orvexField}
+                          key={mf.cosField}
                           style={{
                             ...tableCellStyle,
                             color: val ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.25)',

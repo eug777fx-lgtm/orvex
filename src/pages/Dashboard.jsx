@@ -177,7 +177,7 @@ function TrendPill({ delta, suffix = '' }) {
 function Skeleton({ width = '60%', height = 32, style }) {
   return (
     <div
-      className="orvex-skeleton"
+      className="cos-skeleton"
       style={{ width, height, ...style }}
     />
   )

@@ -1,6 +1,6 @@
 import db from '@/lib/db'
 
-const ORVEX_FIELDS = new Set([
+const COS_FIELDS = new Set([
   'company_name',
   'owner_name',
   'phone',
@@ -19,11 +19,11 @@ function clean(value) {
 
 function buildLead(row, fieldMap) {
   const lead = {}
-  for (const [csvColumn, orvexField] of Object.entries(fieldMap)) {
-    if (!orvexField || orvexField === 'skip') continue
-    if (!ORVEX_FIELDS.has(orvexField)) continue
+  for (const [csvColumn, cosField] of Object.entries(fieldMap)) {
+    if (!cosField || cosField === 'skip') continue
+    if (!COS_FIELDS.has(cosField)) continue
     const value = clean(row[csvColumn])
-    if (value != null) lead[orvexField] = value
+    if (value != null) lead[cosField] = value
   }
   return lead
 }
