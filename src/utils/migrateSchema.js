@@ -60,6 +60,23 @@ export function migrateSchema() {
         )
       `)
 
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS demos (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          created_at timestamptz DEFAULT now(),
+          client_name text,
+          business_name text NOT NULL,
+          template text NOT NULL,
+          slug text UNIQUE NOT NULL,
+          config jsonb NOT NULL,
+          status text DEFAULT 'draft' CHECK (status IN ('draft','sent','viewed','interested','closed')),
+          view_count int DEFAULT 0,
+          last_viewed_at timestamptz,
+          lead_id uuid REFERENCES leads(id) ON DELETE SET NULL,
+          notes text
+        )
+      `)
+
       await db.query(
         `ALTER TABLE scripts ADD COLUMN IF NOT EXISTS language text DEFAULT 'english'`,
       )

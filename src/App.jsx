@@ -16,6 +16,7 @@ import {
   BookOpen,
   CheckSquare,
   Upload,
+  Monitor,
 } from 'lucide-react'
 import { migrateSchema } from './utils/migrateSchema'
 import Background from './components/Background'
@@ -27,6 +28,8 @@ import Offers from './pages/Offers'
 import Scripts from './pages/Scripts'
 import Tasks from './pages/Tasks'
 import Import from './pages/Import'
+import Demos from './pages/Demos'
+import PublicDemo from './pages/PublicDemo'
 import Login from './pages/Login'
 import useIsMobile from './utils/useIsMobile'
 
@@ -37,6 +40,7 @@ const navItems = [
   { to: '/offers', label: 'Offers', icon: Package },
   { to: '/scripts', label: 'Scripts', icon: BookOpen },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { to: '/demos', label: 'Demos', icon: Monitor },
   { to: '/import', label: 'Import', icon: Upload },
 ]
 
@@ -208,6 +212,7 @@ function AnimatedRoutes() {
         <Route path="/offers" element={<Offers />} />
         <Route path="/scripts" element={<Scripts />} />
         <Route path="/tasks" element={<Tasks />} />
+        <Route path="/demos" element={<Demos />} />
         <Route path="/import" element={<Import />} />
       </Routes>
     </AnimatePresence>
@@ -294,6 +299,7 @@ function Shell() {
 }
 
 export default function App() {
+  const location = useLocation()
   const [authed, setAuthed] = useState(
     () => localStorage.getItem('cos_auth') === 'true',
   )
@@ -301,6 +307,14 @@ export default function App() {
   useEffect(() => {
     if (authed) migrateSchema()
   }, [authed])
+
+  if (location.pathname.startsWith('/demo/')) {
+    return (
+      <Routes>
+        <Route path="/demo/:slug" element={<PublicDemo />} />
+      </Routes>
+    )
+  }
 
   if (!authed) {
     return <Login onSuccess={() => setAuthed(true)} />

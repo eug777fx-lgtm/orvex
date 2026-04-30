@@ -1,0 +1,408 @@
+import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { X, Plus, Trash2 } from 'lucide-react'
+import db from '@/lib/db'
+
+const overlayStyle = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.75)',
+  backdropFilter: 'blur(4px)',
+  WebkitBackdropFilter: 'blur(4px)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 50,
+  padding: '1.5rem',
+}
+
+const modalStyle = {
+  background: '#111111',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 20,
+  padding: '2rem',
+  width: '100%',
+  maxWidth: 600,
+  maxHeight: '90vh',
+  overflowY: 'auto',
+  position: 'relative',
+  boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+}
+
+const closeButtonStyle = {
+  position: 'absolute',
+  top: 16,
+  right: 16,
+  width: 32,
+  height: 32,
+  borderRadius: 8,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: 'rgba(255,255,255,0.5)',
+  background: 'transparent',
+  border: '1px solid transparent',
+}
+
+const titleStyle = { fontSize: 18, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }
+const subtitleStyle = { fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }
+const labelStyle = {
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.55)',
+  fontWeight: 500,
+  marginBottom: 6,
+}
+const inputStyle = {
+  width: '100%',
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 10,
+  color: '#ffffff',
+  padding: '10px 14px',
+  fontSize: 13,
+  fontFamily: 'inherit',
+  outline: 'none',
+}
+const submitButtonStyle = {
+  width: '100%',
+  background: '#ffffff',
+  color: '#000000',
+  borderRadius: 10,
+  padding: '12px 16px',
+  fontSize: 14,
+  fontWeight: 600,
+  border: 'none',
+  cursor: 'pointer',
+}
+const ghostButtonStyle = {
+  background: 'transparent',
+  border: '1px solid rgba(255,255,255,0.1)',
+  color: 'rgba(255,255,255,0.75)',
+  borderRadius: 10,
+  padding: '8px 14px',
+  fontSize: 12,
+  fontWeight: 500,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  cursor: 'pointer',
+}
+const errorStyle = {
+  marginTop: 12,
+  padding: '10px 12px',
+  background: 'rgba(255, 80, 80, 0.08)',
+  border: '1px solid rgba(255, 80, 80, 0.3)',
+  color: '#ff8888',
+  borderRadius: 10,
+  fontSize: 12,
+}
+
+function Field({ label, required, children }) {
+  return (
+    <div>
+      <div style={labelStyle}>
+        {label}
+        {required && <span style={{ color: 'rgba(255,255,255,0.35)' }}> *</span>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function slugify(name) {
+  const base = String(name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+  const suffix = Math.random().toString(36).slice(2, 7)
+  return base ? `${base}-${suffix}` : `demo-${suffix}`
+}
+
+const INITIAL = {
+  business_name: '',
+  client_name: '',
+  primary_color: '#6378ff',
+  tagline: 'Train hard. Look great. Feel unstoppable.',
+  phone: '',
+  email: '',
+  location: '',
+}
+
+export default function CreateDemoModal({ open, onClose, onCreated }) {
+  const [form, setForm] = useState(INITIAL)
+  const [services, setServices] = useState([
+    { name: 'Personal Training', price: '$60 / session' },
+    { name: 'Group Classes', price: '$25 / class' },
+    { name: 'Open Gym', price: '$15 / day' },
+  ])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (open) {
+      setForm(INITIAL)
+      setServices([
+        { name: 'Personal Training', price: '$60 / session' },
+        { name: 'Group Classes', price: '$25 / class' },
+        { name: 'Open Gym', price: '$15 / day' },
+      ])
+      setError(null)
+      setSubmitting(false)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e) {
+      if (e.key === 'Escape') onClose?.()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  function update(key, value) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+  function updateService(idx, key, value) {
+    setServices((prev) => prev.map((s, i) => (i === idx ? { ...s, [key]: value } : s)))
+  }
+  function addService() {
+    setServices((prev) => [...prev, { name: '', price: '' }])
+  }
+  function removeService(idx) {
+    setServices((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError(null)
+    if (!form.business_name.trim()) {
+      setError('Business name is required.')
+      return
+    }
+    if (!db) {
+      setError('Database not connected.')
+      return
+    }
+    const cleanServices = services
+      .map((s) => ({ name: s.name.trim(), price: s.price.trim() }))
+      .filter((s) => s.name)
+    const slug = slugify(form.business_name)
+    const config = {
+      business_name: form.business_name.trim(),
+      tagline: form.tagline.trim() || 'Train hard. Look great. Feel unstoppable.',
+      primary_color: form.primary_color || '#6378ff',
+      phone: form.phone.trim() || null,
+      email: form.email.trim() || null,
+      location: form.location.trim() || null,
+      services: cleanServices,
+    }
+    setSubmitting(true)
+    try {
+      const rows = await db.query(
+        `INSERT INTO demos (business_name, client_name, template, slug, config, status)
+         VALUES ($1, $2, 'gym', $3, $4, 'draft')
+         RETURNING *`,
+        [
+          form.business_name.trim(),
+          form.client_name.trim() || null,
+          slug,
+          JSON.stringify(config),
+        ],
+      )
+      onCreated?.(rows?.[0] || null)
+      onClose?.()
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Failed to create demo.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          style={overlayStyle}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) onClose?.()
+          }}
+        >
+          <motion.div
+            style={modalStyle}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close">
+              <X size={16} />
+            </button>
+
+            <div style={{ marginBottom: 20 }}>
+              <div style={titleStyle}>Create Gym Demo</div>
+              <div style={subtitleStyle}>Personalized website + dashboard preview</div>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="Business Name" required>
+                  <input
+                    style={inputStyle}
+                    value={form.business_name}
+                    onChange={(e) => update('business_name', e.target.value)}
+                    placeholder="Iron Beach Gym"
+                    required
+                  />
+                </Field>
+                <Field label="Client Name">
+                  <input
+                    style={inputStyle}
+                    value={form.client_name}
+                    onChange={(e) => update('client_name', e.target.value)}
+                    placeholder="Marco"
+                  />
+                </Field>
+              </div>
+
+              <Field label="Tagline">
+                <input
+                  style={inputStyle}
+                  value={form.tagline}
+                  onChange={(e) => update('tagline', e.target.value)}
+                  placeholder="Train hard. Look great. Feel unstoppable."
+                />
+              </Field>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="Primary Color">
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="color"
+                      value={form.primary_color}
+                      onChange={(e) => update('primary_color', e.target.value)}
+                      style={{
+                        width: 44,
+                        height: 38,
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 10,
+                        padding: 2,
+                        background: 'rgba(255,255,255,0.05)',
+                        cursor: 'pointer',
+                      }}
+                    />
+                    <input
+                      style={{ ...inputStyle, flex: 1 }}
+                      value={form.primary_color}
+                      onChange={(e) => update('primary_color', e.target.value)}
+                      placeholder="#6378ff"
+                    />
+                  </div>
+                </Field>
+                <Field label="Location">
+                  <input
+                    style={inputStyle}
+                    value={form.location}
+                    onChange={(e) => update('location', e.target.value)}
+                    placeholder="Oranjestad, Aruba"
+                  />
+                </Field>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="Phone">
+                  <input
+                    style={inputStyle}
+                    value={form.phone}
+                    onChange={(e) => update('phone', e.target.value)}
+                    placeholder="+297 555 0100"
+                  />
+                </Field>
+                <Field label="Email">
+                  <input
+                    type="email"
+                    style={inputStyle}
+                    value={form.email}
+                    onChange={(e) => update('email', e.target.value)}
+                    placeholder="hello@gym.com"
+                  />
+                </Field>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: 6,
+                }}
+              >
+                <div style={{ ...labelStyle, marginBottom: 0 }}>Services</div>
+                <button type="button" style={ghostButtonStyle} onClick={addService}>
+                  <Plus size={12} />
+                  Add Service
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {services.map((s, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '2fr 1fr auto',
+                      gap: 8,
+                    }}
+                  >
+                    <input
+                      style={inputStyle}
+                      value={s.name}
+                      onChange={(e) => updateService(idx, 'name', e.target.value)}
+                      placeholder="Service name"
+                    />
+                    <input
+                      style={inputStyle}
+                      value={s.price}
+                      onChange={(e) => updateService(idx, 'price', e.target.value)}
+                      placeholder="$ / unit"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeService(idx)}
+                      style={{ ...ghostButtonStyle, padding: '8px 10px', color: 'rgba(255,255,255,0.4)' }}
+                      aria-label="Remove"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  ...submitButtonStyle,
+                  opacity: submitting ? 0.6 : 1,
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  marginTop: 6,
+                }}
+              >
+                {submitting ? 'Creating...' : 'Create Demo'}
+              </button>
+
+              {error && <div style={errorStyle}>{error}</div>}
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
