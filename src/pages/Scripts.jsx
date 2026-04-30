@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Copy, ChevronDown, ChevronUp, Check, UserPlus } from 'lucide-react'
+import {
+  Plus,
+  Copy,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  UserPlus,
+  Pencil,
+  X,
+} from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import db from '@/lib/db'
 import AddScriptModal from '../components/AddScriptModal'
 import { seedScriptsIfEmpty } from '../utils/seedScripts'
@@ -229,29 +239,147 @@ function ScriptSection({ label, text }) {
   )
 }
 
-function ScriptCard({ script }) {
+const editInputStyle = {
+  width: '100%',
+  background: 'rgba(255,255,255,0.04)',
+  border: '0.5px solid rgba(255,255,255,0.1)',
+  borderRadius: 8,
+  color: '#ffffff',
+  padding: '10px 12px',
+  fontSize: 13,
+  fontFamily: 'inherit',
+  outline: 'none',
+  resize: 'vertical',
+}
+
+const editLabelStyle = {
+  fontSize: 10,
+  fontWeight: 600,
+  color: 'rgba(255,255,255,0.4)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.12em',
+  marginBottom: 6,
+}
+
+function parseObjections(raw) {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function ScriptCard({ script, onSaved, onToast }) {
   const [expanded, setExpanded] = useState(false)
   const [objectionsOpen, setObjectionsOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState(null)
 
-  const objections = useMemo(() => {
-    const raw = script.objections
-    if (!raw) return []
-    if (Array.isArray(raw)) return raw
-    if (typeof raw === 'string') {
-      try {
-        const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) ? parsed : []
-      } catch {
-        return []
-      }
-    }
-    return []
-  }, [script.objections])
-
+  const objections = useMemo(() => parseObjections(script.objections), [script.objections])
   const industryTags = Array.isArray(script.industry_tags) ? script.industry_tags : []
 
+  function startEdit() {
+    setForm({
+      name: script.name || '',
+      opening: script.opening || '',
+      problem_hook: script.problem_hook || '',
+      value_prop: script.value_prop || '',
+      cta: script.cta || '',
+      objections: objections.map((o) => ({
+        trigger: o.trigger || '',
+        response: o.response || '',
+      })),
+    })
+    setIsEditing(true)
+  }
+
+  function cancelEdit() {
+    setIsEditing(false)
+    setForm(null)
+  }
+
+  function updateField(key, value) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function updateObjection(idx, key, value) {
+    setForm((prev) => ({
+      ...prev,
+      objections: prev.objections.map((o, i) => (i === idx ? { ...o, [key]: value } : o)),
+    }))
+  }
+
+  function addObjection() {
+    setForm((prev) => ({
+      ...prev,
+      objections: [...prev.objections, { trigger: '', response: '' }],
+    }))
+  }
+
+  function removeObjection(idx) {
+    setForm((prev) => ({
+      ...prev,
+      objections: prev.objections.filter((_, i) => i !== idx),
+    }))
+  }
+
+  async function save() {
+    if (!form) return
+    setSaving(true)
+    const cleanObjections = form.objections
+      .filter((o) => o.trigger.trim() || o.response.trim())
+      .map((o) => ({ trigger: o.trigger.trim(), response: o.response.trim() }))
+    try {
+      await db.query(
+        `UPDATE scripts
+         SET name = $1, opening = $2, problem_hook = $3, value_prop = $4, cta = $5, objections = $6
+         WHERE id = $7`,
+        [
+          form.name.trim() || script.name,
+          form.opening,
+          form.problem_hook,
+          form.value_prop,
+          form.cta,
+          JSON.stringify(cleanObjections),
+          script.id,
+        ],
+      )
+      onSaved?.({
+        ...script,
+        name: form.name.trim() || script.name,
+        opening: form.opening,
+        problem_hook: form.problem_hook,
+        value_prop: form.value_prop,
+        cta: form.cta,
+        objections: cleanObjections,
+      })
+      onToast?.('Script saved ✓', 'success')
+      setIsEditing(false)
+      setForm(null)
+    } catch (err) {
+      console.error(err)
+      onToast?.('Failed to save. Try again.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const editingCardStyle = {
+    ...cardStyle,
+    border: '1px solid rgba(255,255,255,0.25)',
+    background: 'rgba(20,20,24,0.9)',
+    transition: 'border-color 0.2s ease, background 0.2s ease',
+  }
+
   return (
-    <div style={cardStyle}>
+    <div style={isEditing ? editingCardStyle : cardStyle}>
       <div
         style={{
           display: 'flex',
@@ -261,17 +389,31 @@ function ScriptCard({ script }) {
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              color: '#ffffff',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {script.name}
-          </div>
-          {industryTags.length > 0 && (
+          {isEditing ? (
+            <input
+              style={{
+                ...editInputStyle,
+                fontSize: 14,
+                fontWeight: 600,
+                padding: '8px 12px',
+              }}
+              value={form.name}
+              onChange={(e) => updateField('name', e.target.value)}
+              placeholder="Script name"
+            />
+          ) : (
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: '#ffffff',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {script.name}
+            </div>
+          )}
+          {!isEditing && industryTags.length > 0 && (
             <div
               style={{
                 display: 'flex',
@@ -301,96 +443,227 @@ function ScriptCard({ script }) {
           )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-          <Pill>{typeLabel(script.type)}</Pill>
-          <Pill size="sm">{LANGUAGE_BADGE[(script.language || 'english').toLowerCase()] || 'EN'}</Pill>
+          {isEditing ? (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '3px 10px',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.15)',
+                color: '#ffffff',
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+              }}
+            >
+              EDITING
+            </span>
+          ) : (
+            <>
+              <Pill>{typeLabel(script.type)}</Pill>
+              <Pill size="sm">
+                {LANGUAGE_BADGE[(script.language || 'english').toLowerCase()] || 'EN'}
+              </Pill>
+            </>
+          )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <ScriptSection label="Opening" text={script.opening} />
-        {expanded && (
-          <>
-            <ScriptSection label="Problem Hook" text={script.problem_hook} />
-            <ScriptSection label="Value Prop" text={script.value_prop} />
-            <ScriptSection label="Call to Action" text={script.cta} />
-          </>
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        style={{
-          ...ghostButtonStyle,
-          alignSelf: 'flex-start',
-          padding: '5px 10px',
-          fontSize: 11,
-          color: 'rgba(255,255,255,0.6)',
-        }}
-      >
-        {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-        {expanded ? 'Hide sections' : 'Show full script'}
-      </button>
-
-      {objections.length > 0 && (
-        <div
-          style={{
-            borderTop: '1px solid rgba(255,255,255,0.05)',
-            paddingTop: 14,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setObjectionsOpen((v) => !v)}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'transparent',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              color: 'rgba(255,255,255,0.75)',
-              fontSize: 12,
-              fontWeight: 500,
-            }}
-          >
-            <span style={sectionLabelStyle}>Objection Handling</span>
-            {objectionsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-
-          {objectionsOpen && (
+      {isEditing ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <div style={editLabelStyle}>Opening</div>
+            <textarea
+              rows={3}
+              style={editInputStyle}
+              value={form.opening}
+              onChange={(e) => updateField('opening', e.target.value)}
+            />
+          </div>
+          <div>
+            <div style={editLabelStyle}>Problem Hook</div>
+            <textarea
+              rows={3}
+              style={editInputStyle}
+              value={form.problem_hook}
+              onChange={(e) => updateField('problem_hook', e.target.value)}
+            />
+          </div>
+          <div>
+            <div style={editLabelStyle}>Value Prop</div>
+            <textarea
+              rows={3}
+              style={editInputStyle}
+              value={form.value_prop}
+              onChange={(e) => updateField('value_prop', e.target.value)}
+            />
+          </div>
+          <div>
+            <div style={editLabelStyle}>Call to Action</div>
+            <textarea
+              rows={2}
+              style={editInputStyle}
+              value={form.cta}
+              onChange={(e) => updateField('cta', e.target.value)}
+            />
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 14 }}>
             <div
-              style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 10,
+              }}
             >
-              {objections.map((o, idx) => (
+              <span style={editLabelStyle}>Objections</span>
+              <button
+                type="button"
+                onClick={addObjection}
+                style={{
+                  ...ghostButtonStyle,
+                  padding: '5px 10px',
+                  fontSize: 11,
+                  color: 'rgba(255,255,255,0.7)',
+                }}
+              >
+                <Plus size={11} />
+                Add Objection
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {form.objections.map((o, idx) => (
                 <div
                   key={idx}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'minmax(110px, auto) 1fr',
-                    gap: 12,
+                    gridTemplateColumns: 'minmax(120px, 1fr) minmax(0, 2fr) auto',
+                    gap: 8,
                     alignItems: 'start',
                   }}
                 >
-                  <div>
-                    <Pill size="sm">{o.trigger}</Pill>
-                  </div>
-                  <div
+                  <input
+                    style={editInputStyle}
+                    value={o.trigger}
+                    onChange={(e) => updateObjection(idx, 'trigger', e.target.value)}
+                    placeholder="Trigger"
+                  />
+                  <input
+                    style={editInputStyle}
+                    value={o.response}
+                    onChange={(e) => updateObjection(idx, 'response', e.target.value)}
+                    placeholder="Response"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeObjection(idx)}
                     style={{
-                      fontSize: 13,
-                      color: 'rgba(255,255,255,0.7)',
-                      lineHeight: 1.5,
+                      ...ghostButtonStyle,
+                      padding: '8px 10px',
+                      color: 'rgba(255,255,255,0.4)',
                     }}
+                    aria-label="Remove"
                   >
-                    {o.response}
-                  </div>
+                    <X size={12} />
+                  </button>
                 </div>
               ))}
+              {form.objections.length === 0 && (
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                  No objections. Click "Add Objection" to create one.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <ScriptSection label="Opening" text={script.opening} />
+            {expanded && (
+              <>
+                <ScriptSection label="Problem Hook" text={script.problem_hook} />
+                <ScriptSection label="Value Prop" text={script.value_prop} />
+                <ScriptSection label="Call to Action" text={script.cta} />
+              </>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            style={{
+              ...ghostButtonStyle,
+              alignSelf: 'flex-start',
+              padding: '5px 10px',
+              fontSize: 11,
+              color: 'rgba(255,255,255,0.6)',
+            }}
+          >
+            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            {expanded ? 'Hide sections' : 'Show full script'}
+          </button>
+
+          {objections.length > 0 && (
+            <div
+              style={{
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+                paddingTop: 14,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setObjectionsOpen((v) => !v)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  color: 'rgba(255,255,255,0.75)',
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}
+              >
+                <span style={sectionLabelStyle}>Objection Handling</span>
+                {objectionsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+
+              {objectionsOpen && (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {objections.map((o, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(110px, auto) 1fr',
+                        gap: 12,
+                        alignItems: 'start',
+                      }}
+                    >
+                      <div>
+                        <Pill size="sm">{o.trigger}</Pill>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: 'rgba(255,255,255,0.7)',
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {o.response}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       <div
@@ -402,12 +675,68 @@ function ScriptCard({ script }) {
           paddingTop: 14,
         }}
       >
-        <CopyButton label="Copy Opening" getText={() => script.opening || ''} />
-        <CopyButton label="Copy Full Script" getText={() => buildFullScript(script)} />
-        <button type="button" style={ghostButtonStyle} title="Coming soon">
-          <UserPlus size={11} />
-          Use on Lead
-        </button>
+        {isEditing ? (
+          <>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={save}
+              disabled={saving}
+              style={{
+                background: '#ffffff',
+                color: '#000000',
+                borderRadius: 8,
+                padding: '8px 20px',
+                fontSize: 13,
+                fontWeight: 600,
+                border: 'none',
+                cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.6 : 1,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Check size={12} strokeWidth={2.5} />
+              {saving ? 'Saving...' : 'Save'}
+            </motion.button>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={cancelEdit}
+              disabled={saving}
+              style={{
+                background: 'transparent',
+                color: 'rgba(255,255,255,0.5)',
+                border: '0.5px solid rgba(255,255,255,0.15)',
+                borderRadius: 8,
+                padding: '8px 20px',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </motion.button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              style={ghostButtonStyle}
+              onClick={startEdit}
+            >
+              <Pencil size={11} />
+              Edit
+            </button>
+            <CopyButton label="Copy Opening" getText={() => script.opening || ''} />
+            <CopyButton label="Copy Full Script" getText={() => buildFullScript(script)} />
+            <button type="button" style={ghostButtonStyle} title="Coming soon">
+              <UserPlus size={11} />
+              Use on Lead
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
@@ -458,6 +787,13 @@ export default function Scripts() {
   const [industry, setIndustry] = useState('All')
   const [language, setLanguage] = useState('english')
   const [modalOpen, setModalOpen] = useState(false)
+  const [toast, setToast] = useState(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 2500)
+    return () => clearTimeout(t)
+  }, [toast])
 
   async function fetchScripts() {
     if (!db) {
@@ -612,7 +948,16 @@ export default function Scripts() {
           }}
         >
           {filtered.map((s) => (
-            <ScriptCard key={s.id} script={s} />
+            <ScriptCard
+              key={s.id}
+              script={s}
+              onSaved={(updated) =>
+                setScripts((prev) =>
+                  prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)),
+                )
+              }
+              onToast={(message, kind) => setToast({ message, kind })}
+            />
           ))}
         </div>
       )}
@@ -622,6 +967,34 @@ export default function Scripts() {
         onClose={() => setModalOpen(false)}
         onCreated={fetchScripts}
       />
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key="toast"
+            initial={{ opacity: 0, x: 80 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              position: 'fixed',
+              bottom: 24,
+              right: 24,
+              background: '#1a1a1e',
+              color: '#ffffff',
+              border: '0.5px solid rgba(255,255,255,0.12)',
+              borderRadius: 12,
+              padding: '12px 20px',
+              fontSize: 14,
+              fontWeight: 500,
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5), 0 0 30px rgba(99,120,255,0.06)',
+              zIndex: 200,
+            }}
+          >
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </PageShell>
   )
 }
