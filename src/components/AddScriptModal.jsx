@@ -139,9 +139,16 @@ const errorStyle = {
   fontSize: 12,
 }
 
+const LANGUAGES = [
+  { value: 'english', label: 'English' },
+  { value: 'papiamento', label: 'Papiamento' },
+  { value: 'spanish', label: 'Spanish' },
+]
+
 const INITIAL = {
   name: '',
   type: 'cold_call',
+  language: 'english',
   industries: '',
   problems: '',
   opening: '',
@@ -237,18 +244,19 @@ export default function AddScriptModal({ open, onClose, onCreated }) {
     try {
       await db.query(
         `INSERT INTO scripts (
-          name, type, industry_tags, problem_tags,
+          name, type, language, industry_tags, problem_tags,
           opening, problem_hook, value_prop, cta,
           objections, is_active
         ) VALUES (
-          $1, $2, $3, $4,
-          $5, $6,
-          $7, $8,
-          $9, true
+          $1, $2, $3, $4, $5,
+          $6, $7,
+          $8, $9,
+          $10, true
         )`,
         [
           form.name.trim(),
           form.type,
+          form.language || 'english',
           industryTags,
           problemTags,
           form.opening.trim() || null,
@@ -322,6 +330,22 @@ export default function AddScriptModal({ open, onClose, onCreated }) {
                 ))}
               </select>
             </Field>
+            <Field label="Language">
+              <select
+                style={selectStyle}
+                value={form.language}
+                onChange={(e) => update('language', e.target.value)}
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
             <Field label="Industries (comma separated)">
               <input
                 style={inputStyle}

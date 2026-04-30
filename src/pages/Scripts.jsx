@@ -300,7 +300,10 @@ function ScriptCard({ script }) {
             </div>
           )}
         </div>
-        <Pill>{typeLabel(script.type)}</Pill>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <Pill>{typeLabel(script.type)}</Pill>
+          <Pill size="sm">{LANGUAGE_BADGE[(script.language || 'english').toLowerCase()] || 'EN'}</Pill>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -434,6 +437,18 @@ function EmptyState({ onAdd }) {
   )
 }
 
+const LANGUAGE_TABS = [
+  { value: 'english', label: '🇺🇸 English' },
+  { value: 'papiamento', label: '🇦🇼 Papiamento' },
+  { value: 'spanish', label: '🇪🇸 Spanish' },
+]
+
+const LANGUAGE_BADGE = {
+  english: 'EN',
+  papiamento: 'PAP 🇦🇼',
+  spanish: 'ES 🇪🇸',
+}
+
 export default function Scripts() {
   const isMobile = useIsMobile()
   const [scripts, setScripts] = useState([])
@@ -441,6 +456,7 @@ export default function Scripts() {
   const [error, setError] = useState(null)
   const [type, setType] = useState('all')
   const [industry, setIndustry] = useState('All')
+  const [language, setLanguage] = useState('english')
   const [modalOpen, setModalOpen] = useState(false)
 
   async function fetchScripts() {
@@ -472,6 +488,8 @@ export default function Scripts() {
   const filtered = useMemo(() => {
     const ind = industry === 'All' ? null : industry.toLowerCase()
     return scripts.filter((s) => {
+      const scriptLang = (s.language || 'english').toLowerCase()
+      if (scriptLang !== language) return false
       if (type !== 'all' && s.type !== type) return false
       if (ind) {
         const tags = Array.isArray(s.industry_tags) ? s.industry_tags : []
@@ -480,13 +498,26 @@ export default function Scripts() {
       }
       return true
     })
-  }, [scripts, type, industry])
+  }, [scripts, type, industry, language])
 
   return (
     <PageShell style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
         <h2 style={pageHeadingStyle}>Scripts</h2>
         <p style={pageSubStyle}>Your cold call and sales scripts library</p>
+      </div>
+
+      <div style={{ ...tabGroupStyle, alignSelf: 'flex-start' }}>
+        {LANGUAGE_TABS.map((l) => (
+          <button
+            key={l.value}
+            type="button"
+            style={tabButtonStyle(language === l.value)}
+            onClick={() => setLanguage(l.value)}
+          >
+            {l.label}
+          </button>
+        ))}
       </div>
 
       <div

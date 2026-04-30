@@ -61,6 +61,13 @@ export function migrateSchema() {
       `)
 
       await db.query(
+        `ALTER TABLE scripts ADD COLUMN IF NOT EXISTS language text DEFAULT 'english'`,
+      )
+      await db.query(
+        `UPDATE scripts SET language = 'english' WHERE language IS NULL`,
+      )
+
+      await db.query(
         `DELETE FROM scripts WHERE problem_tags @> ARRAY['no_social']::text[]`,
       )
       await db.query(
