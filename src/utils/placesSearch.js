@@ -1,21 +1,14 @@
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const INDUSTRIES = {
-  Plumber: 'plumber',
-  Electrician: 'electrician',
-  HVAC: 'hvac air conditioning',
-  'Pest Control': 'pest control',
-  Landscaping: 'landscaping',
-  Cleaning: 'cleaning service',
-  'Clothing Store': 'clothing store boutique',
-  'Coffee Shop': 'coffee shop cafe',
-  'Smoothie Bar': 'smoothie juice bar',
-  'Food Truck': 'food truck',
-  Restaurant: 'restaurant',
-  Bakery: 'bakery',
-  Salon: 'hair salon beauty',
-  Barbershop: 'barbershop',
-  Gym: 'gym fitness center',
+  Plumber: 'plumber plumbing company',
+  Electrician: 'electrician electrical contractor',
+  HVAC: 'hvac air conditioning heating',
+  Roofing: 'roofing contractor roofer',
+  'Real Estate Brokerage': 'real estate brokerage realtor',
+  'Solar Panel Company': 'solar panel company solar installer',
+  'Med Spa': 'med spa medical spa aesthetics',
+  'Gym / Fitness Coach': 'gym fitness center personal trainer',
 }
 
 function buildApiUrl(endpoint, params) {
@@ -51,7 +44,7 @@ export async function searchBusinesses(
 
   for (const industry of selectedIndustries) {
     for (const location of selectedLocations) {
-      const query = `${INDUSTRIES[industry] || industry} in ${location} Aruba`
+      const query = `${INDUSTRIES[industry] || industry} in ${location}`
 
       try {
         onProgress?.(`Searching ${industry} in ${location}... (${completed + 1} of ${total})`)

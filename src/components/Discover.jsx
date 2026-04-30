@@ -7,27 +7,22 @@ const INDUSTRIES = [
   'Plumber',
   'Electrician',
   'HVAC',
-  'Pest Control',
-  'Landscaping',
-  'Cleaning',
-  'Clothing Store',
-  'Coffee Shop',
-  'Smoothie Bar',
-  'Food Truck',
-  'Restaurant',
-  'Bakery',
-  'Salon',
-  'Barbershop',
-  'Gym',
+  'Roofing',
+  'Real Estate Brokerage',
+  'Solar Panel Company',
+  'Med Spa',
+  'Gym / Fitness Coach',
 ]
 
-const LOCATIONS = [
+const ARUBA_LOCATIONS = [
   'Oranjestad',
   'San Nicolas',
   'Santa Cruz',
   'Noord',
   'Paradera',
   'Palm Beach',
+  'Savaneta',
+  'Eagle Beach',
 ]
 
 const glassCardStyle = {
@@ -283,7 +278,9 @@ function ResultCard({ result, alreadyInLeads, added, onAdd, onSkip }) {
 
 export default function Discover({ onLeadsAdded }) {
   const [selectedIndustries, setSelectedIndustries] = useState(INDUSTRIES)
-  const [selectedLocations, setSelectedLocations] = useState(LOCATIONS)
+  const [selectedLocations, setSelectedLocations] = useState(ARUBA_LOCATIONS)
+  const [locationMode, setLocationMode] = useState('aruba')
+  const [globalLocation, setGlobalLocation] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [progress, setProgress] = useState('')
   const [results, setResults] = useState([])
@@ -328,9 +325,28 @@ export default function Discover({ onLeadsAdded }) {
       setError('Google Places API key not configured. Add VITE_GOOGLE_PLACES_KEY to your .env file.')
       return
     }
-    if (selectedIndustries.length === 0 || selectedLocations.length === 0) {
-      setError('Select at least one industry and one location.')
+    if (selectedIndustries.length === 0) {
+      setError('Select at least one industry.')
       return
+    }
+
+    let locationsToSearch = []
+    if (locationMode === 'aruba') {
+      if (selectedLocations.length === 0) {
+        setError('Select at least one Aruba location.')
+        return
+      }
+      locationsToSearch = selectedLocations.map((loc) => `${loc} Aruba`)
+    } else {
+      const parts = globalLocation
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      if (parts.length === 0) {
+        setError('Please enter at least one location.')
+        return
+      }
+      locationsToSearch = parts
     }
 
     setIsSearching(true)
@@ -343,7 +359,7 @@ export default function Discover({ onLeadsAdded }) {
     try {
       const found = await searchBusinesses(
         selectedIndustries,
-        selectedLocations,
+        locationsToSearch,
         (msg) => setProgress(msg),
       )
       setResults(found)
@@ -481,20 +497,66 @@ export default function Discover({ onLeadsAdded }) {
           </div>
 
           <div>
-            <div style={labelStyle}>Locations</div>
+            <div style={labelStyle}>Location Mode</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {LOCATIONS.map((loc) => (
-                <button
-                  key={loc}
-                  type="button"
-                  style={togglePillStyle(selectedLocations.includes(loc))}
-                  onClick={() => toggleLocation(loc)}
-                >
-                  {loc}
-                </button>
-              ))}
+              <button
+                type="button"
+                style={togglePillStyle(locationMode === 'aruba')}
+                onClick={() => setLocationMode('aruba')}
+              >
+                🇦🇼 Aruba Only
+              </button>
+              <button
+                type="button"
+                style={togglePillStyle(locationMode === 'global')}
+                onClick={() => setLocationMode('global')}
+              >
+                🌍 Global Search
+              </button>
             </div>
           </div>
+
+          {locationMode === 'aruba' ? (
+            <div>
+              <div style={labelStyle}>Aruba Locations</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {ARUBA_LOCATIONS.map((loc) => (
+                  <button
+                    key={loc}
+                    type="button"
+                    style={togglePillStyle(selectedLocations.includes(loc))}
+                    onClick={() => toggleLocation(loc)}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={labelStyle}>Where to search</div>
+              <input
+                type="text"
+                value={globalLocation}
+                onChange={(e) => setGlobalLocation(e.target.value)}
+                placeholder="e.g. Miami Florida, Amsterdam Netherlands, Dubai UAE"
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '0.5px solid rgba(255,255,255,0.12)',
+                  borderRadius: 10,
+                  color: '#ffffff',
+                  padding: '12px 16px',
+                  fontSize: 14,
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                }}
+              />
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
+                Separate multiple locations with commas. We'll search each one.
+              </div>
+            </div>
+          )}
 
           <div>
             <button
@@ -508,7 +570,11 @@ export default function Discover({ onLeadsAdded }) {
               disabled={isSearching}
             >
               <Sparkles size={14} strokeWidth={2.5} />
-              {isSearching ? 'Searching...' : 'Find Businesses'}
+              {isSearching
+                ? 'Searching...'
+                : locationMode === 'aruba'
+                  ? 'Find Businesses in Aruba'
+                  : 'Find Businesses Worldwide'}
             </button>
 
             {isSearching && (
