@@ -121,7 +121,64 @@ function slugify(name) {
   return base ? `${base}-${suffix}` : `demo-${suffix}`
 }
 
+export const TEMPLATE_OPTIONS = [
+  { key: 'gym', label: 'Gym / Fitness', tagline: 'Train hard. Look great. Feel unstoppable.' },
+  { key: 'plumber', label: 'Plumber', tagline: 'Fast. Reliable. Done Right.' },
+  { key: 'realestate', label: 'Real Estate Brokerage', tagline: 'Find Your Dream Property.' },
+  { key: 'medspa', label: 'Med Spa', tagline: 'Reveal Your Best Self.' },
+  { key: 'hvac', label: 'HVAC', tagline: 'Keep Your Home Comfortable Year-Round.' },
+  { key: 'roofing', label: 'Roofing', tagline: 'Protect Your Home From the Top Down.' },
+]
+
+export const TEMPLATE_SERVICES = {
+  gym: [
+    { name: 'Personal Training', price: '$75/session' },
+    { name: 'Group Classes', price: '$35/class' },
+    { name: 'Nutrition Coaching', price: '$200/month' },
+  ],
+  plumber: [
+    { name: 'Emergency Repairs', price: 'From $150' },
+    { name: 'Pipe Installation', price: 'From $200' },
+    { name: 'Drain Cleaning', price: 'From $100' },
+    { name: 'Water Heater Service', price: 'From $175' },
+  ],
+  realestate: [
+    { name: 'Property Listings', price: 'Free' },
+    { name: 'Buyer Representation', price: 'No upfront cost' },
+    { name: 'Property Valuation', price: 'Free consultation' },
+    { name: 'Investment Consulting', price: 'Custom pricing' },
+  ],
+  medspa: [
+    { name: 'Botox & Fillers', price: 'From $299' },
+    { name: 'Laser Skin Treatments', price: 'From $199' },
+    { name: 'Body Contouring', price: 'From $399' },
+    { name: 'Facials & Peels', price: 'From $129' },
+  ],
+  hvac: [
+    { name: 'AC Installation', price: 'From $1,200' },
+    { name: 'AC Repair', price: 'From $150' },
+    { name: 'Maintenance Service', price: 'From $99' },
+    { name: 'Emergency Service', price: 'From $200' },
+  ],
+  roofing: [
+    { name: 'Roof Installation', price: 'Free estimate' },
+    { name: 'Roof Repair', price: 'From $300' },
+    { name: 'Roof Inspection', price: 'From $150' },
+    { name: 'Gutter Installation', price: 'From $400' },
+  ],
+}
+
+function defaultsForTemplate(key) {
+  const tpl = TEMPLATE_OPTIONS.find((t) => t.key === key) || TEMPLATE_OPTIONS[0]
+  return {
+    template: tpl.key,
+    tagline: tpl.tagline,
+    services: TEMPLATE_SERVICES[tpl.key] || [],
+  }
+}
+
 const INITIAL = {
+  template: 'gym',
   business_name: '',
   client_name: '',
   primary_color: '#6378ff',
@@ -131,28 +188,29 @@ const INITIAL = {
   location: '',
 }
 
-export default function CreateDemoModal({ open, onClose, onCreated }) {
-  const [form, setForm] = useState(INITIAL)
-  const [services, setServices] = useState([
-    { name: 'Personal Training', price: '$60 / session' },
-    { name: 'Group Classes', price: '$25 / class' },
-    { name: 'Open Gym', price: '$15 / day' },
-  ])
+export default function CreateDemoModal({ open, onClose, onCreated, defaultTemplate = 'gym' }) {
+  const [form, setForm] = useState({ ...INITIAL, template: defaultTemplate, tagline: defaultsForTemplate(defaultTemplate).tagline })
+  const [services, setServices] = useState(
+    defaultsForTemplate(defaultTemplate).services.map((s) => ({ ...s })),
+  )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     if (open) {
-      setForm(INITIAL)
-      setServices([
-        { name: 'Personal Training', price: '$60 / session' },
-        { name: 'Group Classes', price: '$25 / class' },
-        { name: 'Open Gym', price: '$15 / day' },
-      ])
+      const def = defaultsForTemplate(defaultTemplate)
+      setForm({ ...INITIAL, template: def.template, tagline: def.tagline })
+      setServices(def.services.map((s) => ({ ...s })))
       setError(null)
       setSubmitting(false)
     }
-  }, [open])
+  }, [open, defaultTemplate])
+
+  function changeTemplate(key) {
+    const def = defaultsForTemplate(key)
+    setForm((prev) => ({ ...prev, template: def.template, tagline: def.tagline }))
+    setServices(def.services.map((s) => ({ ...s })))
+  }
 
   useEffect(() => {
     if (!open) return
@@ -204,11 +262,12 @@ export default function CreateDemoModal({ open, onClose, onCreated }) {
     try {
       const rows = await db.query(
         `INSERT INTO demos (business_name, client_name, template, slug, config, status)
-         VALUES ($1, $2, 'gym', $3, $4, 'draft')
+         VALUES ($1, $2, $3, $4, $5, 'draft')
          RETURNING *`,
         [
           form.business_name.trim(),
           form.client_name.trim() || null,
+          form.template || 'gym',
           slug,
           JSON.stringify(config),
         ],
@@ -248,11 +307,40 @@ export default function CreateDemoModal({ open, onClose, onCreated }) {
             </button>
 
             <div style={{ marginBottom: 20 }}>
-              <div style={titleStyle}>Create Gym Demo</div>
+              <div style={titleStyle}>Create Demo</div>
               <div style={subtitleStyle}>Personalized website + dashboard preview</div>
             </div>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Field label="Template" required>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {TEMPLATE_OPTIONS.map((t) => {
+                    const active = form.template === t.key
+                    return (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => changeTemplate(t.key)}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 500,
+                          background: active ? '#ffffff' : 'rgba(255,255,255,0.06)',
+                          color: active ? '#000' : '#fff',
+                          border: active
+                            ? '1px solid #ffffff'
+                            : '1px solid rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Field>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Field label="Business Name" required>
                   <input

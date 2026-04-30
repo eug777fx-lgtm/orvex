@@ -5,9 +5,14 @@ import {
   ExternalLink,
   Copy,
   Check,
-  Lock,
   Dumbbell,
   Trash2,
+  Wrench,
+  Home,
+  Sparkles,
+  Wind,
+  Hammer,
+  MessageCircle,
 } from 'lucide-react'
 import db from '@/lib/db'
 import PageShell from '../components/PageShell'
@@ -139,12 +144,34 @@ const sectionLabelStyle = {
 
 const TEMPLATES = [
   { key: 'gym', name: 'Gym / Fitness', icon: Dumbbell, available: true },
-  { key: 'restaurant', name: 'Restaurant', icon: Lock, available: false },
-  { key: 'salon', name: 'Salon / Barbershop', icon: Lock, available: false },
-  { key: 'plumber', name: 'Plumber / Trades', icon: Lock, available: false },
-  { key: 'realestate', name: 'Real Estate', icon: Lock, available: false },
-  { key: 'medspa', name: 'Med Spa', icon: Lock, available: false },
+  { key: 'plumber', name: 'Plumber', icon: Wrench, available: true },
+  { key: 'realestate', name: 'Real Estate', icon: Home, available: true },
+  { key: 'medspa', name: 'Med Spa', icon: Sparkles, available: true },
+  { key: 'hvac', name: 'HVAC', icon: Wind, available: true },
+  { key: 'roofing', name: 'Roofing', icon: Hammer, available: true },
 ]
+
+function relativeTime(date) {
+  if (!date) return null
+  const t = new Date(date).getTime()
+  if (Number.isNaN(t)) return null
+  const seconds = Math.floor((Date.now() - t) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(date).toLocaleDateString()
+}
+
+function isRecentlyViewed(date) {
+  if (!date) return false
+  const t = new Date(date).getTime()
+  if (Number.isNaN(t)) return false
+  return Date.now() - t < 24 * 60 * 60 * 1000
+}
 
 function StatusPill({ status }) {
   const conf = STATUS_STYLES[status] || STATUS_STYLES.draft
@@ -174,7 +201,7 @@ function CopyLinkButton({ url }) {
     try {
       await navigator.clipboard.writeText(url)
       setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error(err)
     }
@@ -182,8 +209,71 @@ function CopyLinkButton({ url }) {
   return (
     <button type="button" style={ghostButtonStyle} onClick={copy}>
       {copied ? <Check size={11} /> : <Copy size={11} />}
-      {copied ? 'Copied' : 'Copy link'}
+      {copied ? 'Copied!' : 'Copy link'}
     </button>
+  )
+}
+
+function buildWhatsAppMessage(demo, url, lang) {
+  const name = demo.client_name || 'there'
+  if (lang === 'pap') {
+    return `Halo ${name}! 👋 Mi a prepara un demo di con bo negoshi por mira online. Echa un vistazo: ${url} — Laga mi sa kico bo ta pensa! Bo por pidi cambionan. — Eugene, COS Studios`
+  }
+  return `Hi ${name}! 👋 I put together a quick demo of what your business could look like online. Take a look: ${url} — Let me know what you think! Feel free to request any changes. — Eugene, COS Studios`
+}
+
+function SendWhatsAppButton({ demo, url, lang, setLang }) {
+  function send() {
+    const msg = buildWhatsAppMessage(demo, url, lang)
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer')
+  }
+  const wrapStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0,
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 999,
+    overflow: 'hidden',
+    background: 'rgba(255,255,255,0.04)',
+  }
+  const langBtn = (active) => ({
+    padding: '5px 8px',
+    fontSize: 10,
+    fontWeight: 600,
+    letterSpacing: '0.04em',
+    background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+    color: active ? '#fff' : 'rgba(255,255,255,0.4)',
+    border: 'none',
+    cursor: 'pointer',
+  })
+  return (
+    <div style={wrapStyle}>
+      <button type="button" onClick={() => setLang(demo.id, 'en')} style={langBtn(lang === 'en')}>
+        EN
+      </button>
+      <button type="button" onClick={() => setLang(demo.id, 'pap')} style={langBtn(lang === 'pap')}>
+        PAP
+      </button>
+      <button
+        type="button"
+        onClick={send}
+        style={{
+          padding: '5px 12px',
+          fontSize: 12,
+          fontWeight: 600,
+          background: '#25D366',
+          color: '#fff',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+        }}
+      >
+        <MessageCircle size={11} />
+        Send
+      </button>
+    </div>
   )
 }
 
@@ -194,6 +284,11 @@ export default function Demos() {
   const [error, setError] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [toast, setToast] = useState(null)
+  const [whatsappLang, setWhatsappLang] = useState({})
+
+  function setLangFor(id, lang) {
+    setWhatsappLang((prev) => ({ ...prev, [id]: lang }))
+  }
 
   useEffect(() => {
     if (!toast) return
@@ -224,18 +319,49 @@ export default function Demos() {
     fetchDemos()
   }, [])
 
+  // Poll every 30s for new views; toast when a previously-unviewed demo gets a view
+  useEffect(() => {
+    if (!db) return
+    const interval = setInterval(async () => {
+      try {
+        const rows = await db.query('SELECT * FROM demos ORDER BY created_at DESC')
+        if (!rows) return
+        setDemos((prev) => {
+          const prevById = new Map(prev.map((d) => [d.id, d]))
+          for (const fresh of rows) {
+            const old = prevById.get(fresh.id)
+            if (
+              old &&
+              (fresh.view_count || 0) > (old.view_count || 0)
+            ) {
+              setToast(`📱 ${fresh.business_name} just viewed their demo!`)
+            }
+          }
+          return rows
+        })
+      } catch (err) {
+        console.error(err)
+      }
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
   const stats = useMemo(() => {
     const total = demos.length
     let sent = 0
     let viewed = 0
+    let viewedToday = 0
     let closed = 0
+    const dayStart = new Date()
+    dayStart.setHours(0, 0, 0, 0)
     for (const d of demos) {
       if (d.status === 'sent') sent += 1
       if ((d.view_count || 0) > 0 || d.status === 'viewed' || d.status === 'interested')
         viewed += 1
+      if (d.last_viewed_at && new Date(d.last_viewed_at) >= dayStart) viewedToday += 1
       if (d.status === 'closed') closed += 1
     }
-    return { total, sent, viewed, closed }
+    return { total, sent, viewed, viewedToday, closed }
   }, [demos])
 
   async function changeStatus(demo, newStatus) {
@@ -295,6 +421,31 @@ export default function Demos() {
         <div style={statPillStyle}>
           <span style={statLabelStyle}>Viewed</span>
           <span style={statNumberStyle}>{stats.viewed}</span>
+        </div>
+        <div
+          style={{
+            ...statPillStyle,
+            ...(stats.viewedToday > 0
+              ? {
+                  borderColor: 'rgba(255,255,255,0.25)',
+                  background: 'rgba(255,255,255,0.07)',
+                }
+              : {}),
+          }}
+        >
+          <span style={statLabelStyle}>Viewed Today</span>
+          <span style={statNumberStyle}>{stats.viewedToday}</span>
+          {stats.viewedToday > 0 && (
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: '#fff',
+                animation: 'glowPulse 1.5s ease-in-out infinite',
+              }}
+            />
+          )}
         </div>
         <div style={statPillStyle}>
           <span style={statLabelStyle}>Closed</span>
@@ -421,11 +572,44 @@ export default function Demos() {
               <tbody>
                 {demos.map((demo) => {
                   const url = `${origin}/demo/${demo.slug}`
+                  const recent = isRecentlyViewed(demo.last_viewed_at)
+                  const lang = whatsappLang[demo.id] || 'en'
                   return (
-                    <tr key={demo.id}>
+                    <tr
+                      key={demo.id}
+                      style={
+                        recent
+                          ? {
+                              boxShadow: 'inset 2px 0 0 0 rgba(255,255,255,0.5)',
+                              background: 'rgba(255,255,255,0.02)',
+                            }
+                          : undefined
+                      }
+                    >
                       <td style={tableCellBase}>
-                        <div style={{ color: '#ffffff', fontWeight: 600 }}>
+                        <div
+                          style={{
+                            color: '#ffffff',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                          }}
+                        >
                           {demo.business_name}
+                          {recent && (
+                            <span
+                              title="Recently viewed"
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: '50%',
+                                background: '#fff',
+                                boxShadow: '0 0 8px rgba(255,255,255,0.8)',
+                                animation: 'glowPulse 1.5s ease-in-out infinite',
+                              }}
+                            />
+                          )}
                         </div>
                         {demo.client_name && (
                           <div
@@ -468,6 +652,17 @@ export default function Demos() {
                         <span style={{ color: '#ffffff', fontWeight: 600 }}>
                           {demo.view_count || 0}
                         </span>
+                        {demo.last_viewed_at && (
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: 'rgba(255,255,255,0.4)',
+                              marginTop: 2,
+                            }}
+                          >
+                            Viewed {relativeTime(demo.last_viewed_at)}
+                          </div>
+                        )}
                       </td>
                       <td style={{ ...tableCellBase, textAlign: 'right' }}>
                         <div
@@ -476,8 +671,15 @@ export default function Demos() {
                             gap: 6,
                             alignItems: 'center',
                             justifyContent: 'flex-end',
+                            flexWrap: 'wrap',
                           }}
                         >
+                          <SendWhatsAppButton
+                            demo={demo}
+                            url={url}
+                            lang={lang}
+                            setLang={setLangFor}
+                          />
                           <CopyLinkButton url={url} />
                           <a
                             href={`/demo/${demo.slug}`}
