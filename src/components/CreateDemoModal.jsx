@@ -478,6 +478,7 @@ export default function CreateDemoModal({ open, onClose, onCreated, defaultTempl
       theme: form.theme || 'eclipse',
     }
     setSubmitting(true)
+    console.log('Creating demo with theme:', form.theme, config)
     try {
       const rows = await db.query(
         `INSERT INTO demos (business_name, client_name, template, slug, config, status)
