@@ -39,6 +39,7 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import db from '@/lib/db'
+import { STYLE2_RENDERERS } from '../demos/Style2'
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -3570,7 +3571,9 @@ export default function PublicDemo() {
 
       {(() => {
         const tplKey = (demo.template || 'gym').toLowerCase()
-        const renderer = TEMPLATE_RENDERERS[tplKey] || TEMPLATE_RENDERERS.gym
+        const styleKey = (config?.style || 'classic').toLowerCase()
+        const rendererMap = styleKey === 'premium' ? STYLE2_RENDERERS : TEMPLATE_RENDERERS
+        const renderer = rendererMap[tplKey] || rendererMap.gym
         const Component = tab === 'website' ? renderer.Website : renderer.Dashboard
         return <Component config={config} accent={accent} />
       })()}

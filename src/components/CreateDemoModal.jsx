@@ -179,6 +179,7 @@ function defaultsForTemplate(key) {
 
 const INITIAL = {
   template: 'gym',
+  style: 'classic',
   business_name: '',
   client_name: '',
   primary_color: '#6378ff',
@@ -257,6 +258,7 @@ export default function CreateDemoModal({ open, onClose, onCreated, defaultTempl
       email: form.email.trim() || null,
       location: form.location.trim() || null,
       services: cleanServices,
+      style: form.style === 'premium' ? 'premium' : 'classic',
     }
     setSubmitting(true)
     try {
@@ -335,6 +337,126 @@ export default function CreateDemoModal({ open, onClose, onCreated, defaultTempl
                         }}
                       >
                         {t.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Field>
+
+              <Field label="Visual Style" required>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {[
+                    {
+                      key: 'classic',
+                      label: 'Classic Dark',
+                      desc: 'Monochrome glass aesthetic',
+                      preview: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
+                      accent: 'rgba(255,255,255,0.85)',
+                    },
+                    {
+                      key: 'premium',
+                      label: 'Warm Premium',
+                      desc: 'Amber glow, floating widgets',
+                      preview: 'linear-gradient(135deg, #0d0a08 0%, #1f1810 100%)',
+                      accent: 'rgba(255,160,60,0.9)',
+                    },
+                  ].map((opt) => {
+                    const active = (form.style || 'classic') === opt.key
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => update('style', opt.key)}
+                        style={{
+                          textAlign: 'left',
+                          padding: 12,
+                          borderRadius: 12,
+                          background: active ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+                          border: active
+                            ? `1px solid ${opt.accent}`
+                            : '1px solid rgba(255,255,255,0.08)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                          transition: 'border-color 0.2s, background 0.2s',
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: 44,
+                            borderRadius: 8,
+                            background: opt.preview,
+                            border: '1px solid rgba(255,255,255,0.06)',
+                            position: 'relative',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 6,
+                              left: 8,
+                              width: 24,
+                              height: 4,
+                              borderRadius: 2,
+                              background: opt.accent,
+                              opacity: 0.8,
+                            }}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 14,
+                              left: 8,
+                              width: 40,
+                              height: 3,
+                              borderRadius: 2,
+                              background: 'rgba(255,255,255,0.2)',
+                            }}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: 8,
+                              right: 8,
+                              width: 18,
+                              height: 18,
+                              borderRadius: '50%',
+                              background: opt.accent,
+                              opacity: 0.25,
+                              filter: 'blur(6px)',
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: active ? '#fff' : 'rgba(255,255,255,0.85)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            {opt.label}
+                            {active && (
+                              <span
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  background: opt.accent,
+                                  display: 'inline-block',
+                                }}
+                              />
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                            {opt.desc}
+                          </div>
+                        </div>
                       </button>
                     )
                   })}

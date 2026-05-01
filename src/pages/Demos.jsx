@@ -500,6 +500,52 @@ export default function Demos() {
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
                   {tpl.available ? 'Ready to use' : 'Coming soon'}
                 </div>
+                {tpl.available && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <div
+                      title="Classic Dark"
+                      style={{
+                        flex: 1,
+                        height: 18,
+                        borderRadius: 5,
+                        background: 'linear-gradient(135deg, #0a0a0a 0%, #1f1f24 100%)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background:
+                            'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08), transparent 60%)',
+                        }}
+                      />
+                    </div>
+                    <div
+                      title="Warm Premium"
+                      style={{
+                        flex: 1,
+                        height: 18,
+                        borderRadius: 5,
+                        background: 'linear-gradient(135deg, #0d0a08 0%, #221710 100%)',
+                        border: '1px solid rgba(255,160,60,0.15)',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background:
+                            'radial-gradient(circle at 80% 50%, rgba(255,140,50,0.25), transparent 60%)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )
           })}
@@ -564,6 +610,7 @@ export default function Demos() {
                 <tr>
                   <th style={tableHeaderCell}>Business</th>
                   <th style={tableHeaderCell}>Template</th>
+                  <th style={tableHeaderCell}>Style</th>
                   <th style={tableHeaderCell}>Status</th>
                   <th style={tableHeaderCell}>Views</th>
                   <th style={{ ...tableHeaderCell, textAlign: 'right' }}>Actions</th>
@@ -625,6 +672,45 @@ export default function Demos() {
                       </td>
                       <td style={{ ...tableCellBase, textTransform: 'capitalize' }}>
                         {demo.template}
+                      </td>
+                      <td style={tableCellBase}>
+                        {(() => {
+                          const isPremium =
+                            (demo.config?.style || 'classic').toLowerCase() === 'premium'
+                          return (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                                padding: '3px 10px',
+                                borderRadius: 999,
+                                background: isPremium
+                                  ? 'rgba(255,140,50,0.15)'
+                                  : 'rgba(255,255,255,0.08)',
+                                color: isPremium ? 'rgba(255,160,60,0.95)' : 'rgba(255,255,255,0.75)',
+                                border: isPremium
+                                  ? '1px solid rgba(255,160,60,0.25)'
+                                  : '1px solid rgba(255,255,255,0.08)',
+                                fontSize: 11,
+                                fontWeight: 500,
+                                letterSpacing: '0.02em',
+                              }}
+                            >
+                              <span
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  background: isPremium
+                                    ? 'rgba(255,160,60,0.9)'
+                                    : 'rgba(255,255,255,0.6)',
+                                }}
+                              />
+                              {isPremium ? 'Premium' : 'Classic'}
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td style={tableCellBase}>
                         <select
