@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, useInView } from 'framer-motion'
+import ResponsiveBase from './responsiveBase'
 import {
   ArrowRight,
   ChevronRight,
@@ -259,6 +260,52 @@ function PulseGlobalCss() {
         letter-spacing: 0.05em;
       }
       .pulse-content { position: relative; z-index: 1; }
+
+      @media (max-width: 767px) {
+        .pulse-grid-bg { background-size: 18px 18px !important; opacity: 0.7; }
+        .pulse-orb { width: 380px !important; height: 380px !important; }
+        .pulse-nav { padding: 14px 18px !important; gap: 8px; }
+        .pulse-nav-links { display: none !important; }
+        .pulse-nav-cta { padding: 10px 16px !important; font-size: 11px !important; }
+        .pulse-hero { padding: 56px 18px 64px !important; }
+        .pulse-hero h1 { font-size: clamp(32px, 9vw, 56px) !important; }
+        .pulse-hero p { font-size: 14px !important; }
+        .pulse-hero-cta { flex-direction: column !important; }
+        .pulse-hero-cta button { width: 100% !important; justify-content: center; }
+        .pulse-hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .pulse-hero-stats > div:nth-child(2) { border-right: none !important; }
+        .pulse-hero-stats > div:nth-child(3),
+        .pulse-hero-stats > div:nth-child(4) {
+          border-top: 1px solid rgba(0,255,136,0.2);
+        }
+        .pulse-hero-stats > div:nth-child(3) { border-right: 1px solid rgba(0,255,136,0.2) !important; }
+        .pulse-section { padding: 56px 18px 56px !important; }
+        .pulse-section h2 { font-size: clamp(28px, 7vw, 40px) !important; }
+        .pulse-services-grid, .pulse-pricing-grid, .pulse-reviews-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .pulse-trust-row {
+          flex-direction: column !important;
+          align-items: flex-start !important;
+          gap: 10px !important;
+          padding: 16px 0 !important;
+        }
+        .pulse-contact-card {
+          padding: 28px 22px !important;
+          grid-template-columns: 1fr !important;
+          gap: 36px !important;
+        }
+        .pulse-typewriter { font-size: 11px !important; }
+        .pulse-card { padding: 22px !important; }
+
+        .pulse-dash-shell { flex-direction: column !important; }
+        .pulse-dash-sidebar { display: none !important; }
+        .pulse-dash-topbar { padding: 14px 16px !important; gap: 10px; }
+        .pulse-dash-search { min-width: 0 !important; flex: 1; }
+        .pulse-dash-main { padding: 80px 16px 100px !important; }
+        .pulse-dash-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .pulse-dash-twocol { grid-template-columns: 1fr !important; }
+      }
     `}</style>
   )
 }
@@ -291,7 +338,10 @@ function Typewriter({ text, prefix = '> ' }) {
     return () => clearInterval(id)
   }, [text])
   return (
-    <span className="pulse-mono" style={{ fontSize: 13, color: NEON, letterSpacing: '0.02em' }}>
+    <span
+      className="pulse-mono pulse-typewriter"
+      style={{ fontSize: 13, color: NEON, letterSpacing: '0.02em' }}
+    >
       {prefix}
       {shown}
       <span className="pulse-cursor" />
@@ -300,6 +350,7 @@ function Typewriter({ text, prefix = '> ' }) {
 }
 
 function PulseNav({ config }) {
+  const [open, setOpen] = useState(false)
   return (
     <div
       style={{
@@ -313,6 +364,7 @@ function PulseNav({ config }) {
       }}
     >
       <div
+        className="pulse-nav"
         style={{
           maxWidth: 1200,
           margin: '0 auto',
@@ -320,15 +372,26 @@ function PulseNav({ config }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 12,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
           <Zap size={16} color={NEON} />
-          <div className="pulse-mono" style={{ fontSize: 16, fontWeight: 700, letterSpacing: '0.04em' }}>
+          <div
+            className="pulse-mono"
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {(config.business_name || 'Studio').toUpperCase()}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+        <div className="pulse-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
           <a className="pulse-link" href="#services">// services</a>
           <a className="pulse-link" href="#pricing">// pricing</a>
           <a className="pulse-link" href="#reviews">// reviews</a>
@@ -337,7 +400,69 @@ function PulseNav({ config }) {
             Connect_
           </button>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button type="button" className="pulse-btn pulse-nav-cta demo-mobile-only">
+            Connect_
+          </button>
+          <button
+            type="button"
+            className="demo-mobile-only"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Toggle menu"
+            style={{
+              background: 'rgba(0,255,136,0.08)',
+              border: `1px solid ${NEON}`,
+              color: NEON,
+              width: 44,
+              height: 44,
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontSize: 16,
+              fontFamily: 'JetBrains Mono, monospace',
+              fontWeight: 700,
+            }}
+          >
+            {open ? '×' : '☰'}
+          </button>
+        </div>
       </div>
+      {open && (
+        <div
+          className="demo-mobile-only"
+          style={{
+            background: 'rgba(6,6,16,0.97)',
+            borderTop: '1px solid rgba(0,255,136,0.18)',
+            padding: '14px 24px 22px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}
+        >
+          {[
+            { href: '#services', label: '// services' },
+            { href: '#pricing', label: '// pricing' },
+            { href: '#reviews', label: '// reviews' },
+            { href: '#contact', label: '// contact' },
+          ].map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              onClick={() => setOpen(false)}
+              className="pulse-link"
+              style={{
+                padding: '14px 4px',
+                fontSize: 14,
+                borderBottom: '1px solid rgba(0,255,136,0.1)',
+                minHeight: 44,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              {l.label}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -347,6 +472,7 @@ function PulseHero({ config, niche }) {
   const businessName = config.business_name || 'Studio'
   return (
     <section
+      className="pulse-hero pulse-section"
       style={{
         maxWidth: 1200,
         margin: '0 auto',
@@ -386,7 +512,7 @@ function PulseHero({ config, niche }) {
         </p>
       </FadeIn>
       <FadeIn delay={0.3}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div className="pulse-hero-cta" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <button type="button" className="pulse-btn">
             Get_Started <ArrowRight size={14} />
           </button>
@@ -397,6 +523,7 @@ function PulseHero({ config, niche }) {
       </FadeIn>
       <FadeIn delay={0.4}>
         <div
+          className="pulse-hero-stats"
           style={{
             marginTop: 64,
             display: 'grid',
@@ -461,6 +588,7 @@ function PulseHero({ config, niche }) {
 function PulseTrust({ niche }) {
   return (
     <section
+      className="pulse-section"
       style={{
         maxWidth: 1200,
         margin: '0 auto',
@@ -468,6 +596,7 @@ function PulseTrust({ niche }) {
       }}
     >
       <div
+        className="pulse-trust-row"
         style={{
           padding: '24px 0',
           borderTop: `1px solid ${NEON_BORDER}`,
@@ -507,6 +636,7 @@ function PulseServices({ config }) {
   return (
     <section
       id="services"
+      className="pulse-section"
       style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 28px 80px' }}
     >
       <FadeIn>
@@ -528,6 +658,7 @@ function PulseServices({ config }) {
         </h2>
       </FadeIn>
       <div
+        className="pulse-services-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
@@ -616,6 +747,7 @@ function PulsePricing({ config }) {
   return (
     <section
       id="pricing"
+      className="pulse-section"
       style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 28px 100px' }}
     >
       <FadeIn>
@@ -637,6 +769,7 @@ function PulsePricing({ config }) {
         </h2>
       </FadeIn>
       <div
+        className="pulse-pricing-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -754,6 +887,7 @@ function PulseReviews({ niche }) {
   return (
     <section
       id="reviews"
+      className="pulse-section"
       style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 28px 100px' }}
     >
       <FadeIn>
@@ -775,6 +909,7 @@ function PulseReviews({ niche }) {
         </h2>
       </FadeIn>
       <div
+        className="pulse-reviews-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -830,10 +965,11 @@ function PulseContact({ config }) {
   return (
     <section
       id="contact"
+      className="pulse-section"
       style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 28px 100px' }}
     >
       <div
-        className="pulse-card"
+        className="pulse-card pulse-contact-card"
         style={{
           padding: 'clamp(36px, 6vw, 80px)',
           display: 'grid',
@@ -960,6 +1096,7 @@ export function PulseWebsite({ config }) {
   const niche = getNiche(config.template)
   return (
     <div className="pulse-root">
+      <ResponsiveBase />
       <PulseGlobalCss />
       <div className="pulse-grid-bg" />
       <div className="pulse-scanlines" />
@@ -983,6 +1120,7 @@ export function PulseWebsite({ config }) {
 function PulseDashSidebar({ config, niche }) {
   return (
     <div
+      className="pulse-dash-sidebar"
       style={{
         width: 240,
         flexShrink: 0,
@@ -1100,10 +1238,12 @@ function PulseDashSidebar({ config, niche }) {
 function PulseDashTopbar({ config }) {
   return (
     <div
+      className="pulse-dash-topbar"
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 10,
         padding: '18px 28px',
         background: 'rgba(6,6,16,0.85)',
         backdropFilter: 'blur(10px)',
@@ -1114,6 +1254,7 @@ function PulseDashTopbar({ config }) {
       }}
     >
       <div
+        className="pulse-dash-search"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -1457,11 +1598,15 @@ export function PulseDashboard({ config }) {
         minHeight: '100vh',
       }}
     >
+      <ResponsiveBase />
       <PulseGlobalCss />
       <div className="pulse-grid-bg" style={{ opacity: 0.6 }} />
-      <div className="pulse-content" style={{ display: 'flex', flex: 1, minHeight: '100vh', minWidth: 0 }}>
+      <div
+        className="pulse-content pulse-dash-shell"
+        style={{ display: 'flex', flex: 1, minHeight: '100vh', minWidth: 0 }}
+      >
         <PulseDashSidebar config={config} niche={niche} />
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="pulse-dash-main" style={{ flex: 1, minWidth: 0 }}>
           <PulseDashTopbar config={config} />
           <div style={{ padding: 28 }}>
             <div
@@ -1477,6 +1622,7 @@ export function PulseDashboard({ config }) {
               {niche.dashSections.length} channels active · realtime feed
             </div>
             <div
+              className="pulse-dash-stats-grid"
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -1490,6 +1636,7 @@ export function PulseDashboard({ config }) {
               <PulseStat icon={TrendingUp} label="Conversion" value="38%" change="+2.1%" />
             </div>
             <div
+              className="pulse-dash-twocol"
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)',

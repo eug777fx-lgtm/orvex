@@ -109,6 +109,29 @@ function Style2GlobalCss() {
         0%,100% { box-shadow: 0 0 0 0 rgba(255,140,50,0.5); }
         100% { box-shadow: 0 0 0 10px rgba(255,140,50,0); }
       }
+      @media (max-width: 767px) {
+        .s2-root section { padding-left: 20px !important; padding-right: 20px !important; }
+        .s2-hero-section {
+          padding-top: 88px !important;
+          padding-bottom: 64px !important;
+          min-height: auto !important;
+        }
+        .s2-amber-btn, .s2-ghost-btn {
+          padding: 12px 22px !important;
+          font-size: 14px !important;
+          width: 100%;
+          justify-content: center;
+        }
+        .s2-watermark { display: none !important; }
+        .s2-bento-row, .s2-services-grid, .s2-pricing-grid, .s2-reviews-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .s2-dash-shell {
+          grid-template-columns: 1fr !important;
+        }
+        .s2-dash-sidebar { display: none !important; }
+        .s2-dash-main { padding: 80px 18px 100px !important; }
+      }
     `}</style>
   )
 }
@@ -186,6 +209,7 @@ function S2Nav({ Icon, businessName, ctaText }) {
 function HeroWidget({ children, top, right, bottom, left, delay = 0, width = 200 }) {
   return (
     <motion.div
+      className="demo-desktop-only s2-hero-widget"
       initial={{ opacity: 0, y: 16, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.7, delay, ease: EASE }}
@@ -215,6 +239,7 @@ function HeroWidget({ children, top, right, bottom, left, delay = 0, width = 200
 function S2Hero({ businessName, headline, subhead, primaryCta, secondaryCta, widgets }) {
   return (
     <section
+      className="s2-hero-section"
       style={{
         position: 'relative',
         minHeight: '88vh',
@@ -814,6 +839,7 @@ function S2Dashboard({ Icon, businessName, sidebarItems, stats, sections }) {
         }}
       />
       <div
+        className="s2-dash-shell"
         style={{
           position: 'relative',
           zIndex: 1,
@@ -823,6 +849,7 @@ function S2Dashboard({ Icon, businessName, sidebarItems, stats, sections }) {
         }}
       >
         <aside
+          className="s2-dash-sidebar demo-desktop-only"
           style={{
             background: 'rgba(18,12,6,0.95)',
             backdropFilter: 'blur(14px)',
@@ -869,7 +896,7 @@ function S2Dashboard({ Icon, businessName, sidebarItems, stats, sections }) {
             )
           })}
         </aside>
-        <main style={{ padding: '24px 28px 80px', overflowX: 'hidden' }}>
+        <main className="s2-dash-main" style={{ padding: '24px 28px 80px', overflowX: 'hidden' }}>
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em' }}>
               {businessName}

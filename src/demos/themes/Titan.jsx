@@ -1,5 +1,6 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { motion, useInView } from 'framer-motion'
+import ResponsiveBase from './responsiveBase'
 import {
   ArrowRight,
   ArrowUpRight,
@@ -176,6 +177,34 @@ function TitanGlobalCss() {
         color: rgba(255,255,255,0.55);
       }
       .titan-eyebrow.dark { color: rgba(8,8,8,0.55); }
+
+      @media (max-width: 767px) {
+        .titan-nav { padding: 16px 18px !important; }
+        .titan-nav-links { display: none !important; }
+        .titan-hero { padding: 100px 18px 60px !important; min-height: auto !important; }
+        .titan-hero h1 { font-size: clamp(48px, 14vw, 96px) !important; }
+        .titan-hero .titan-cta-row { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
+        .titan-hero .titan-cta-row > div { width: 100%; }
+        .titan-hero .titan-cta-row button { width: 100% !important; justify-content: center; }
+        .titan-section { padding: 64px 18px !important; }
+        .titan-whyus-grid { grid-template-columns: 1fr !important; }
+        .titan-whyus-grid > div { border-right: none !important; border-bottom: 1px solid rgba(8,8,8,0.12); padding-left: 0 !important; padding-right: 0 !important; }
+        .titan-whyus-grid > div:last-child { border-bottom: none; }
+        .titan-services-row { padding: 28px 18px !important; gap: 16px !important; flex-direction: column !important; align-items: flex-start !important; }
+        .titan-services-row:hover { padding-left: 18px !important; }
+        .titan-services-row .titan-service-meta { width: 100%; justify-content: space-between !important; }
+        .titan-services-row .titan-service-name { font-size: clamp(28px, 9vw, 48px) !important; white-space: normal !important; }
+        .titan-pricing-grid { grid-template-columns: 1fr !important; }
+        .titan-pricing-grid > div { border-right: none !important; border-bottom: 1px solid rgba(255,255,255,0.15); }
+        .titan-pricing-grid > div:last-child { border-bottom: none; }
+        .titan-contact-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
+        .titan-btn, .titan-btn-outline { width: 100%; justify-content: center; }
+        .titan-dash-shell { flex-direction: column !important; }
+        .titan-dash-sidebar { display: none !important; }
+        .titan-dash-main { padding-top: 60px; }
+        .titan-dash-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .titan-dash-twocol { grid-template-columns: 1fr !important; }
+      }
     `}</style>
   )
 }
@@ -196,32 +225,124 @@ function FadeIn({ children, delay = 0, y = 24 }) {
 }
 
 function TitanNav({ config }) {
+  const [open, setOpen] = useState(false)
   return (
-    <nav
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 30,
-        padding: '24px 32px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'transparent',
-      }}
-    >
-      <div className="titan-display" style={{ fontSize: 22, color: '#ffffff' }}>
-        {(config.business_name || 'Studio').toUpperCase()}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-        <a className="titan-link" href="#work">Work</a>
-        <a className="titan-link" href="#services">Services</a>
-        <a className="titan-link" href="#pricing">Pricing</a>
-        <a className="titan-link" href="#contact">Contact</a>
-        <button type="button" className="titan-btn">Get In Touch</button>
-      </div>
-    </nav>
+    <>
+      <nav
+        className="titan-nav"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 30,
+          padding: '24px 32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'transparent',
+          gap: 12,
+        }}
+      >
+        <div className="titan-display" style={{ fontSize: 22, color: '#ffffff' }}>
+          {(config.business_name || 'Studio').toUpperCase()}
+        </div>
+        <div className="titan-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          <a className="titan-link" href="#work">Work</a>
+          <a className="titan-link" href="#services">Services</a>
+          <a className="titan-link" href="#pricing">Pricing</a>
+          <a className="titan-link" href="#contact">Contact</a>
+          <button type="button" className="titan-btn">Get In Touch</button>
+        </div>
+        <button
+          type="button"
+          className="demo-mobile-only"
+          onClick={() => setOpen((v) => !v)}
+          aria-label="Toggle menu"
+          style={{
+            background: 'transparent',
+            border: '1px solid #ffffff',
+            color: '#ffffff',
+            width: 44,
+            height: 44,
+            cursor: 'pointer',
+            fontSize: 18,
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+          }}
+        >
+          {open ? '×' : '☰'}
+        </button>
+      </nav>
+      {open && (
+        <div
+          className="demo-mobile-only"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 100,
+            background: '#080808',
+            padding: '88px 24px 32px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close menu"
+            style={{
+              position: 'absolute',
+              top: 24,
+              right: 24,
+              width: 44,
+              height: 44,
+              background: 'transparent',
+              border: '1px solid #ffffff',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontSize: 20,
+            }}
+          >
+            ×
+          </button>
+          {[
+            { href: '#work', label: 'Work' },
+            { href: '#services', label: 'Services' },
+            { href: '#pricing', label: 'Pricing' },
+            { href: '#contact', label: 'Contact' },
+          ].map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              onClick={() => setOpen(false)}
+              className="titan-display"
+              style={{
+                color: '#ffffff',
+                fontSize: 32,
+                padding: '14px 0',
+                borderBottom: '1px solid rgba(255,255,255,0.15)',
+                textDecoration: 'none',
+              }}
+            >
+              {l.label}
+            </a>
+          ))}
+          <button
+            type="button"
+            className="titan-btn"
+            style={{ marginTop: 24, justifyContent: 'center' }}
+            onClick={() => setOpen(false)}
+          >
+            Get In Touch
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -229,6 +350,7 @@ function TitanHero({ config, niche }) {
   const headline = (config.business_name || 'Studio')
   return (
     <section
+      className="titan-hero"
       style={{
         position: 'relative',
         minHeight: '100vh',
@@ -262,6 +384,7 @@ function TitanHero({ config, niche }) {
       </FadeIn>
       <FadeIn delay={0.18}>
         <div
+          className="titan-cta-row"
           style={{
             display: 'flex',
             alignItems: 'flex-end',
@@ -310,6 +433,7 @@ function TitanHero({ config, niche }) {
 function TitanWhyUs({ niche }) {
   return (
     <section
+      className="titan-section"
       style={{
         background: '#ffffff',
         color: '#080808',
@@ -331,6 +455,7 @@ function TitanWhyUs({ niche }) {
           </h2>
         </FadeIn>
         <div
+          className="titan-whyus-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -413,7 +538,7 @@ function TitanServices({ config }) {
           <FadeIn key={`${s.name}-${i}`} delay={Math.min(i * 0.04, 0.2)}>
             <a
               href="#contact"
-              className="titan-link"
+              className="titan-link titan-services-row"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -452,6 +577,7 @@ function TitanServices({ config }) {
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <span
+                  className="titan-service-name"
                   style={{
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -462,6 +588,7 @@ function TitanServices({ config }) {
                 </span>
               </div>
               <div
+                className="titan-service-meta"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -618,6 +745,7 @@ function TitanPricing({ config }) {
           </h2>
         </FadeIn>
         <div
+          className="titan-pricing-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -735,6 +863,7 @@ function TitanContact({ config }) {
           </h2>
         </FadeIn>
         <div
+          className="titan-contact-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -831,6 +960,7 @@ export function TitanWebsite({ config }) {
   const niche = getNiche(config.template)
   return (
     <div className="titan-root">
+      <ResponsiveBase />
       <TitanGlobalCss />
       <TitanNav config={config} />
       <TitanHero config={config} niche={niche} />
@@ -849,6 +979,7 @@ export function TitanWebsite({ config }) {
 function TitanDashSidebar({ config, niche }) {
   return (
     <div
+      className="titan-dash-sidebar"
       style={{
         width: 240,
         flexShrink: 0,
@@ -1138,6 +1269,7 @@ export function TitanDashboard({ config }) {
   const niche = getNiche(config.template)
   return (
     <div
+      className="titan-dash-shell"
       style={{
         background: '#080808',
         minHeight: '100vh',
@@ -1146,9 +1278,10 @@ export function TitanDashboard({ config }) {
         display: 'flex',
       }}
     >
+      <ResponsiveBase />
       <TitanGlobalCss />
       <TitanDashSidebar config={config} niche={niche} />
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="titan-dash-main" style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
             padding: '24px 32px',
@@ -1172,6 +1305,7 @@ export function TitanDashboard({ config }) {
         </div>
         <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div
+            className="titan-dash-stats-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -1187,6 +1321,7 @@ export function TitanDashboard({ config }) {
             <TitanStat icon={TrendingUp} label="Conversion" value="38%" change="+2.1%" />
           </div>
           <div
+            className="titan-dash-twocol"
             style={{
               display: 'grid',
               gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)',

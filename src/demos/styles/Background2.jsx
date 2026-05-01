@@ -31,6 +31,7 @@ export default function Background2({ businessName = '' }) {
 
       {/* Watermark with business name */}
       <div
+        className="s2-watermark"
         style={{
           position: 'absolute',
           top: '24%',

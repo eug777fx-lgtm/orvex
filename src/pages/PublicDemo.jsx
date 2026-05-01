@@ -43,6 +43,8 @@ import { EMBER_RENDERERS } from '../demos/themes/Ember'
 import { PEARL_RENDERERS } from '../demos/themes/Pearl'
 import { TITAN_RENDERERS } from '../demos/themes/Titan'
 import { PULSE_RENDERERS } from '../demos/themes/Pulse'
+import ResponsiveBase from '../demos/themes/responsiveBase'
+import useIsMobile from '../lib/useIsMobile'
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -3419,6 +3421,7 @@ export default function PublicDemo() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState('website')
+  const isMobile = useIsMobile()
   const incrementedRef = useRef(false)
 
   useEffect(() => {
@@ -3549,37 +3552,59 @@ export default function PublicDemo() {
 
   return (
     <>
+      <ResponsiveBase />
       <GlobalDemoStyles accent={accent} />
       <div
-        style={{
-          position: 'fixed',
-          top: 16,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 200,
-          background: 'rgba(8,8,10,0.85)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          border: '0.5px solid rgba(255,255,255,0.1)',
-          borderRadius: 999,
-          padding: 4,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-        }}
+        style={
+          isMobile
+            ? {
+                position: 'fixed',
+                bottom: 14,
+                left: 12,
+                right: 12,
+                zIndex: 200,
+                background: 'rgba(8,8,10,0.92)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                borderRadius: 999,
+                padding: 4,
+                display: 'flex',
+                alignItems: 'stretch',
+                gap: 4,
+              }
+            : {
+                position: 'fixed',
+                top: 16,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 200,
+                background: 'rgba(8,8,10,0.85)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                borderRadius: 999,
+                padding: 4,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+              }
+        }
       >
         {[
-          { value: 'website', label: 'Website Preview' },
-          { value: 'dashboard', label: 'Dashboard Preview' },
+          { value: 'website', label: isMobile ? 'Website' : 'Website Preview' },
+          { value: 'dashboard', label: isMobile ? 'Dashboard' : 'Dashboard Preview' },
         ].map((t) => (
           <button
             key={t.value}
             type="button"
             onClick={() => setTab(t.value)}
             style={{
-              padding: '6px 16px',
+              padding: isMobile ? '12px 16px' : '6px 16px',
+              flex: isMobile ? 1 : 'unset',
+              minHeight: isMobile ? 44 : 'auto',
               borderRadius: 999,
-              fontSize: 12,
+              fontSize: isMobile ? 13 : 12,
               fontWeight: 600,
               border: 'none',
               cursor: 'pointer',

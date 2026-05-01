@@ -24,6 +24,7 @@ import {
   Search,
   Bell,
 } from 'lucide-react'
+import ResponsiveBase from './responsiveBase'
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -227,6 +228,38 @@ function PearlGlobalCss() {
         pointer-events: none;
         user-select: none;
       }
+
+      @media (max-width: 767px) {
+        .pearl-section-num { display: none !important; }
+        .pearl-nav-links { display: none !important; }
+        .pearl-nav-cta { padding: 10px 16px !important; font-size: 12px !important; min-height: 44px; }
+        .pearl-hero {
+          grid-template-columns: 1fr !important;
+          gap: 32px !important;
+          padding: 80px 20px 56px !important;
+          text-align: center;
+        }
+        .pearl-hero h1 { font-size: clamp(32px, 9vw, 52px) !important; }
+        .pearl-hero p { margin-left: auto !important; margin-right: auto !important; }
+        .pearl-hero .pearl-trust { justify-content: center; }
+        .pearl-hero-cta { flex-direction: column !important; width: 100%; }
+        .pearl-hero-cta button { width: 100% !important; justify-content: center; }
+        .pearl-hero-image { aspect-ratio: 16 / 11 !important; max-height: 300px; }
+        .pearl-section { padding-left: 20px !important; padding-right: 20px !important; }
+        .pearl-section-pad { padding-top: 64px !important; padding-bottom: 64px !important; }
+        .pearl-pricing-grid { grid-template-columns: 1fr !important; }
+        .pearl-services-grid { grid-template-columns: 1fr !important; }
+        .pearl-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .pearl-contact-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
+        .pearl-card { padding: 22px !important; }
+        .pearl-dash-sidebar { display: none !important; }
+        .pearl-dash-main { padding: 80px 16px 100px !important; }
+        .pearl-dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .pearl-dash-twocol { grid-template-columns: 1fr !important; }
+        .pearl-dash-topbar { padding: 14px 16px !important; }
+        .pearl-dash-topbar input { min-width: 0 !important; }
+        .pearl-dash-search { min-width: 0 !important; flex: 1; }
+      }
     `}</style>
   )
 }
@@ -247,6 +280,7 @@ function FadeIn({ children, delay = 0, y = 16 }) {
 }
 
 function PearlNav({ config }) {
+  const [open, setOpen] = useState(false)
   return (
     <div
       style={{
@@ -260,39 +294,100 @@ function PearlNav({ config }) {
       }}
     >
       <div
+        className="pearl-section"
         style={{
           maxWidth: 1200,
           margin: '0 auto',
-          padding: '18px 28px',
+          padding: '14px 28px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 12,
         }}
       >
         <div
           className="pearl-headline"
-          style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em' }}
+          style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em', flex: '0 0 auto' }}
         >
           {config.business_name || 'Studio'}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-          <a className="pearl-link" href="#services" style={{ fontSize: 13, fontWeight: 500 }}>
-            Services
-          </a>
-          <a className="pearl-link" href="#pricing" style={{ fontSize: 13, fontWeight: 500 }}>
-            Pricing
-          </a>
-          <a className="pearl-link" href="#reviews" style={{ fontSize: 13, fontWeight: 500 }}>
-            Reviews
-          </a>
-          <a className="pearl-link" href="#contact" style={{ fontSize: 13, fontWeight: 500 }}>
-            Contact
-          </a>
-          <button type="button" className="pearl-btn-primary" style={{ padding: '10px 20px', fontSize: 13 }}>
+        <div className="pearl-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          <a className="pearl-link" href="#services" style={{ fontSize: 13, fontWeight: 500 }}>Services</a>
+          <a className="pearl-link" href="#pricing" style={{ fontSize: 13, fontWeight: 500 }}>Pricing</a>
+          <a className="pearl-link" href="#reviews" style={{ fontSize: 13, fontWeight: 500 }}>Reviews</a>
+          <a className="pearl-link" href="#contact" style={{ fontSize: 13, fontWeight: 500 }}>Contact</a>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            className="pearl-btn-primary pearl-nav-cta"
+            style={{ padding: '10px 20px', fontSize: 13 }}
+          >
             Book Now
+          </button>
+          <button
+            type="button"
+            className="demo-mobile-only"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Toggle menu"
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(0,0,0,0.12)',
+              borderRadius: 10,
+              width: 44,
+              height: 44,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#0a0a0a',
+              fontSize: 16,
+              fontWeight: 600,
+            }}
+          >
+            {open ? '×' : '☰'}
           </button>
         </div>
       </div>
+      {open && (
+        <div
+          className="demo-mobile-only"
+          style={{
+            background: 'rgba(255,255,255,0.96)',
+            backdropFilter: 'blur(16px)',
+            borderTop: '1px solid rgba(0,0,0,0.06)',
+            padding: '12px 24px 18px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}
+        >
+          {[
+            { href: '#services', label: 'Services' },
+            { href: '#pricing', label: 'Pricing' },
+            { href: '#reviews', label: 'Reviews' },
+            { href: '#contact', label: 'Contact' },
+          ].map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              onClick={() => setOpen(false)}
+              className="pearl-link"
+              style={{
+                padding: '14px 4px',
+                fontSize: 15,
+                fontWeight: 500,
+                borderBottom: '1px solid rgba(0,0,0,0.06)',
+                minHeight: 44,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              {l.label}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -302,6 +397,7 @@ function PearlHero({ config, niche }) {
   const headline = (config.tagline || '').trim() || niche.tagline
   return (
     <section
+      className="pearl-hero pearl-section"
       style={{
         maxWidth: 1200,
         margin: '0 auto',
@@ -341,7 +437,7 @@ function PearlHero({ config, niche }) {
           </p>
         </FadeIn>
         <FadeIn delay={0.18}>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div className="pearl-hero-cta" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <button type="button" className="pearl-btn-primary">
               Get Started <ArrowRight size={14} />
             </button>
@@ -352,6 +448,7 @@ function PearlHero({ config, niche }) {
         </FadeIn>
         <FadeIn delay={0.24}>
           <div
+            className="pearl-trust"
             style={{
               marginTop: 44,
               display: 'flex',
@@ -382,6 +479,7 @@ function PearlHero({ config, niche }) {
 
       <FadeIn delay={0.1} y={24}>
         <div
+          className="pearl-hero-image"
           style={{
             position: 'relative',
             aspectRatio: '4 / 5',
@@ -464,8 +562,9 @@ function PearlHero({ config, niche }) {
 
 function PearlStats({ niche }) {
   return (
-    <section style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 28px 80px' }}>
+    <section className="pearl-section pearl-section-pad" style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 28px 80px' }}>
       <div
+        className="pearl-stats-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -499,6 +598,7 @@ function PearlServices({ config }) {
   return (
     <section
       id="services"
+      className="pearl-section pearl-section-pad"
       style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 28px 100px', position: 'relative' }}
     >
       <span
@@ -519,6 +619,7 @@ function PearlServices({ config }) {
         </h2>
       </FadeIn>
       <div
+        className="pearl-services-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
@@ -595,6 +696,7 @@ function PearlPricing({ config }) {
   return (
     <section
       id="pricing"
+      className="pearl-section pearl-section-pad"
       style={{
         background: '#f3f1ec',
         padding: '100px 28px',
@@ -620,6 +722,7 @@ function PearlPricing({ config }) {
           </h2>
         </FadeIn>
         <div
+          className="pearl-pricing-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -760,6 +863,7 @@ function PearlContact({ config }) {
   return (
     <section
       id="contact"
+      className="pearl-section pearl-section-pad"
       style={{
         background: '#0a0a0a',
         color: '#ffffff',
@@ -767,6 +871,7 @@ function PearlContact({ config }) {
       }}
     >
       <div
+        className="pearl-contact-grid"
         style={{
           maxWidth: 1100,
           margin: '0 auto',
@@ -944,6 +1049,7 @@ export function PearlWebsite({ config }) {
   const niche = getNiche(config.template)
   return (
     <div className="pearl-root">
+      <ResponsiveBase />
       <PearlGlobalCss />
       <PearlNav config={config} />
       <PearlHero config={config} niche={niche} />
@@ -963,6 +1069,7 @@ function PearlDashSidebar({ config, niche }) {
   const items = niche.dashSections
   return (
     <div
+      className="pearl-dash-sidebar"
       style={{
         width: 240,
         flexShrink: 0,
@@ -1072,10 +1179,12 @@ function PearlDashSidebar({ config, niche }) {
 function PearlDashTopbar({ config }) {
   return (
     <div
+      className="pearl-dash-topbar"
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 10,
         padding: '20px 28px',
         background: 'rgba(245,245,240,0.85)',
         backdropFilter: 'blur(10px)',
@@ -1086,6 +1195,7 @@ function PearlDashTopbar({ config }) {
       }}
     >
       <div
+        className="pearl-dash-search"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -1442,9 +1552,10 @@ export function PearlDashboard({ config }) {
         display: 'flex',
       }}
     >
+      <ResponsiveBase />
       <PearlGlobalCss />
       <PearlDashSidebar config={config} niche={niche} />
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="pearl-dash-main" style={{ flex: 1, minWidth: 0 }}>
         <PearlDashTopbar config={config} />
         <div style={{ padding: 28 }}>
           <div
@@ -1463,6 +1574,7 @@ export function PearlDashboard({ config }) {
             Here’s what’s happening with your {niche.label.toLowerCase()} business today.
           </div>
           <div
+            className="pearl-dash-stats"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -1476,6 +1588,7 @@ export function PearlDashboard({ config }) {
             <PearlStat icon={TrendingUp} label="Conversion" value="38%" change="+2.1%" />
           </div>
           <div
+            className="pearl-dash-twocol"
             style={{
               display: 'grid',
               gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)',
