@@ -3426,13 +3426,30 @@ export default function PublicDemo() {
     async function load() {
       if (!db || !slug) return
       try {
-        const rows = await db.query('SELECT * FROM demos WHERE slug = $1 LIMIT 1', [slug])
+        const data = await db.query('SELECT * FROM demos WHERE slug = $1 LIMIT 1', [slug])
         if (cancelled) return
-        const row = rows?.[0]
-        if (!row) {
+        const rawDemo = data?.[0] || data?.rows?.[0]
+        if (!rawDemo) {
           setError('Demo not found.')
           return
         }
+        let parsedConfig = rawDemo.config
+        if (typeof parsedConfig === 'string') {
+          try {
+            parsedConfig = JSON.parse(parsedConfig)
+          } catch {
+            parsedConfig = {}
+          }
+        }
+        const row = { ...rawDemo, config: parsedConfig || {} }
+        console.log(
+          'Demo loaded:',
+          row.business_name,
+          'Theme:',
+          parsedConfig?.theme,
+          'Full config:',
+          parsedConfig,
+        )
         setDemo(row)
         if (!incrementedRef.current) {
           incrementedRef.current = true
@@ -3468,14 +3485,18 @@ export default function PublicDemo() {
         cfg = {}
       }
     }
+    cfg = cfg || {}
     return {
-      business_name: cfg?.business_name || demo.business_name || 'Your Gym',
-      tagline: cfg?.tagline || 'Train hard. Look great. Feel unstoppable.',
-      primary_color: cfg?.primary_color || '#6378ff',
-      phone: cfg?.phone || null,
-      email: cfg?.email || null,
-      location: cfg?.location || null,
-      services: Array.isArray(cfg?.services) ? cfg.services : [],
+      ...cfg,
+      business_name: cfg.business_name || demo.business_name || 'Your Gym',
+      tagline: cfg.tagline || 'Train hard. Look great. Feel unstoppable.',
+      primary_color: cfg.primary_color || '#6378ff',
+      phone: cfg.phone || null,
+      email: cfg.email || null,
+      location: cfg.location || null,
+      services: Array.isArray(cfg.services) ? cfg.services : [],
+      theme: cfg.theme || cfg.style || 'eclipse',
+      template: cfg.template || demo.template || 'gym',
     }
   }, [demo])
 
@@ -3573,10 +3594,25 @@ export default function PublicDemo() {
       </div>
 
       {(() => {
-        const tplKey = (demo.template || 'gym').toLowerCase()
-        const themeRaw = (config?.theme || config?.style || 'eclipse').toLowerCase()
+        const themeRaw = String(config?.theme || config?.style || 'eclipse')
+          .toLowerCase()
+          .trim()
         const themeKey =
           themeRaw === 'premium' ? 'ember' : themeRaw === 'classic' ? 'eclipse' : themeRaw
+        const validThemes = ['eclipse', 'ember', 'pearl', 'titan', 'pulse']
+        const finalTheme = validThemes.includes(themeKey) ? themeKey : 'eclipse'
+        const tplKey = String(demo?.template || 'gym')
+          .toLowerCase()
+          .replace(/[^a-z]/g, '')
+
+        console.log('Theme routing:', {
+          raw: themeRaw,
+          key: themeKey,
+          final: finalTheme,
+          template: tplKey,
+          config,
+        })
+
         const THEME_MAP = {
           eclipse: TEMPLATE_RENDERERS,
           ember: EMBER_RENDERERS,
@@ -3584,10 +3620,38 @@ export default function PublicDemo() {
           titan: TITAN_RENDERERS,
           pulse: PULSE_RENDERERS,
         }
-        const rendererMap = THEME_MAP[themeKey] || THEME_MAP.eclipse
+        const rendererMap = THEME_MAP[finalTheme] || THEME_MAP.eclipse
         const renderer = rendererMap[tplKey] || rendererMap.gym
         const Component = tab === 'website' ? renderer.Website : renderer.Dashboard
-        return <Component config={config} accent={accent} />
+
+        return (
+          <>
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 28,
+                background: 'rgba(0,0,0,0.85)',
+                color: '#ffffff',
+                fontSize: 11,
+                textAlign: 'center',
+                lineHeight: '28px',
+                zIndex: 9999,
+                fontFamily:
+                  'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                letterSpacing: '0.04em',
+                pointerEvents: 'none',
+              }}
+            >
+              Theme: <b style={{ color: '#9be7ff' }}>{finalTheme}</b> · Template:{' '}
+              <b style={{ color: '#9be7ff' }}>{tplKey}</b> · Config theme:{' '}
+              <b style={{ color: '#9be7ff' }}>{String(config?.theme ?? '—')}</b>
+            </div>
+            <Component config={config} accent={accent} />
+          </>
+        )
       })()}
 
       <div
