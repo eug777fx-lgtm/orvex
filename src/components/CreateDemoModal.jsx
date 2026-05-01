@@ -179,7 +179,7 @@ function defaultsForTemplate(key) {
 
 const INITIAL = {
   template: 'gym',
-  style: 'classic',
+  theme: 'eclipse',
   business_name: '',
   client_name: '',
   primary_color: '#6378ff',
@@ -187,6 +187,223 @@ const INITIAL = {
   phone: '',
   email: '',
   location: '',
+}
+
+const THEME_OPTIONS = [
+  {
+    key: 'eclipse',
+    name: 'Eclipse',
+    vibe: 'Dark Glass',
+    desc: 'Clean monochrome glassmorphism',
+    accent: 'rgba(99,120,255,0.85)',
+  },
+  {
+    key: 'ember',
+    name: 'Ember',
+    vibe: 'Warm Premium',
+    desc: 'Cinematic amber with floating widgets',
+    accent: 'rgba(255,160,60,0.95)',
+  },
+  {
+    key: 'pearl',
+    name: 'Pearl',
+    vibe: 'Light Minimal',
+    desc: 'Clean Apple-style white design',
+    accent: '#0a0a0a',
+  },
+  {
+    key: 'titan',
+    name: 'Titan',
+    vibe: 'Bold Agency',
+    desc: 'Oversized type, high contrast',
+    accent: '#ffffff',
+  },
+  {
+    key: 'pulse',
+    name: 'Pulse',
+    vibe: 'Neon Cyber',
+    desc: 'Tech-forward with electric accents',
+    accent: '#00ff88',
+  },
+]
+
+function ThemePreview({ themeKey }) {
+  const base = {
+    width: '100%',
+    height: 100,
+    borderRadius: 10,
+    position: 'relative',
+    overflow: 'hidden',
+    border: '1px solid rgba(255,255,255,0.06)',
+  }
+  if (themeKey === 'eclipse') {
+    return (
+      <div style={{ ...base, background: 'linear-gradient(135deg, #0c0c0e 0%, #111114 100%)' }}>
+        {[28, 50, 72].map((top, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              top: `${top}%`,
+              left: 14,
+              width: i === 0 ? '60%' : i === 1 ? '40%' : '30%',
+              height: 3,
+              borderRadius: 2,
+              background: 'rgba(255,255,255,0.15)',
+            }}
+          />
+        ))}
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            background: 'rgba(99,120,255,0.3)',
+            filter: 'blur(2px)',
+          }}
+        />
+      </div>
+    )
+  }
+  if (themeKey === 'ember') {
+    return (
+      <div style={{ ...base, background: 'linear-gradient(135deg, #0d0a07 0%, #1a1005 100%)' }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: -20,
+            right: -20,
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            background:
+              'radial-gradient(circle, rgba(255,140,50,0.4) 0%, rgba(255,140,50,0.05) 60%, transparent 80%)',
+            filter: 'blur(8px)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: 20,
+            left: 14,
+            width: 60,
+            height: 22,
+            borderRadius: 5,
+            background: 'rgba(40,28,16,0.9)',
+            border: '1px solid rgba(255,160,60,0.25)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 18,
+            left: 28,
+            width: 70,
+            height: 22,
+            borderRadius: 5,
+            background: 'rgba(40,28,16,0.9)',
+            border: '1px solid rgba(255,160,60,0.25)',
+          }}
+        />
+      </div>
+    )
+  }
+  if (themeKey === 'pearl') {
+    return (
+      <div style={{ ...base, background: 'linear-gradient(135deg, #fafaf8 0%, #f0f0e8 100%)' }}>
+        {[28, 46, 60].map((top, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              top: `${top}%`,
+              left: 14,
+              width: i === 0 ? '50%' : i === 1 ? '70%' : '35%',
+              height: 3,
+              borderRadius: 2,
+              background: '#0a0a0a',
+            }}
+          />
+        ))}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            left: 14,
+            width: 36,
+            height: 12,
+            borderRadius: 999,
+            background: '#0a0a0a',
+          }}
+        />
+      </div>
+    )
+  }
+  if (themeKey === 'titan') {
+    return (
+      <div style={{ ...base, background: '#080808' }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: 90,
+            fontWeight: 900,
+            color: 'rgba(255,255,255,0.15)',
+            lineHeight: 1,
+            fontFamily: 'Impact, "Anton", sans-serif',
+            letterSpacing: '-0.04em',
+          }}
+        >
+          A
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 10,
+            left: 14,
+            width: 50,
+            height: 8,
+            background: '#ffffff',
+          }}
+        />
+      </div>
+    )
+  }
+  if (themeKey === 'pulse') {
+    const dotPattern =
+      'radial-gradient(rgba(0,255,136,0.18) 1px, transparent 1px)'
+    return (
+      <div style={{ ...base, background: 'linear-gradient(135deg, #060610 0%, #080818 100%)' }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: dotPattern,
+            backgroundSize: '10px 10px',
+            opacity: 0.85,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            right: 12,
+            width: 32,
+            height: 12,
+            borderRadius: 3,
+            background: '#00ff88',
+            boxShadow: '0 0 12px rgba(0,255,136,0.5)',
+          }}
+        />
+      </div>
+    )
+  }
+  return <div style={base} />
 }
 
 export default function CreateDemoModal({ open, onClose, onCreated, defaultTemplate = 'gym' }) {
@@ -258,7 +475,7 @@ export default function CreateDemoModal({ open, onClose, onCreated, defaultTempl
       email: form.email.trim() || null,
       location: form.location.trim() || null,
       services: cleanServices,
-      style: form.style === 'premium' ? 'premium' : 'classic',
+      theme: form.theme || 'eclipse',
     }
     setSubmitting(true)
     try {
@@ -343,33 +560,24 @@ export default function CreateDemoModal({ open, onClose, onCreated, defaultTempl
                 </div>
               </Field>
 
-              <Field label="Visual Style" required>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {[
-                    {
-                      key: 'classic',
-                      label: 'Classic Dark',
-                      desc: 'Monochrome glass aesthetic',
-                      preview: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
-                      accent: 'rgba(255,255,255,0.85)',
-                    },
-                    {
-                      key: 'premium',
-                      label: 'Warm Premium',
-                      desc: 'Amber glow, floating widgets',
-                      preview: 'linear-gradient(135deg, #0d0a08 0%, #1f1810 100%)',
-                      accent: 'rgba(255,160,60,0.9)',
-                    },
-                  ].map((opt) => {
-                    const active = (form.style || 'classic') === opt.key
+              <Field label="Theme" required>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                    gap: 10,
+                  }}
+                >
+                  {THEME_OPTIONS.map((opt) => {
+                    const active = (form.theme || 'eclipse') === opt.key
                     return (
                       <button
                         key={opt.key}
                         type="button"
-                        onClick={() => update('style', opt.key)}
+                        onClick={() => update('theme', opt.key)}
                         style={{
                           textAlign: 'left',
-                          padding: 12,
+                          padding: 10,
                           borderRadius: 12,
                           background: active ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
                           border: active
@@ -380,67 +588,23 @@ export default function CreateDemoModal({ open, onClose, onCreated, defaultTempl
                           flexDirection: 'column',
                           gap: 8,
                           transition: 'border-color 0.2s, background 0.2s',
+                          boxShadow: active ? `0 0 0 3px ${opt.accent}22` : 'none',
                         }}
                       >
-                        <div
-                          style={{
-                            height: 44,
-                            borderRadius: 8,
-                            background: opt.preview,
-                            border: '1px solid rgba(255,255,255,0.06)',
-                            position: 'relative',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: 6,
-                              left: 8,
-                              width: 24,
-                              height: 4,
-                              borderRadius: 2,
-                              background: opt.accent,
-                              opacity: 0.8,
-                            }}
-                          />
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: 14,
-                              left: 8,
-                              width: 40,
-                              height: 3,
-                              borderRadius: 2,
-                              background: 'rgba(255,255,255,0.2)',
-                            }}
-                          />
-                          <div
-                            style={{
-                              position: 'absolute',
-                              bottom: 8,
-                              right: 8,
-                              width: 18,
-                              height: 18,
-                              borderRadius: '50%',
-                              background: opt.accent,
-                              opacity: 0.25,
-                              filter: 'blur(6px)',
-                            }}
-                          />
-                        </div>
+                        <ThemePreview themeKey={opt.key} />
                         <div>
                           <div
                             style={{
                               fontSize: 13,
                               fontWeight: 600,
-                              color: active ? '#fff' : 'rgba(255,255,255,0.85)',
+                              color: active ? '#fff' : 'rgba(255,255,255,0.9)',
                               display: 'flex',
                               alignItems: 'center',
                               gap: 6,
+                              letterSpacing: '0.01em',
                             }}
                           >
-                            {opt.label}
+                            {opt.name}
                             {active && (
                               <span
                                 style={{
@@ -449,11 +613,31 @@ export default function CreateDemoModal({ open, onClose, onCreated, defaultTempl
                                   borderRadius: '50%',
                                   background: opt.accent,
                                   display: 'inline-block',
+                                  boxShadow: `0 0 8px ${opt.accent}`,
                                 }}
                               />
                             )}
                           </div>
-                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: opt.accent,
+                              marginTop: 2,
+                              fontWeight: 600,
+                              letterSpacing: '0.05em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            {opt.vibe}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: 'rgba(255,255,255,0.45)',
+                              marginTop: 4,
+                              lineHeight: 1.4,
+                            }}
+                          >
                             {opt.desc}
                           </div>
                         </div>

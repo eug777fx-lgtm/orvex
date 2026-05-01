@@ -39,7 +39,10 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import db from '@/lib/db'
-import { STYLE2_RENDERERS } from '../demos/Style2'
+import { EMBER_RENDERERS } from '../demos/themes/Ember'
+import { PEARL_RENDERERS } from '../demos/themes/Pearl'
+import { TITAN_RENDERERS } from '../demos/themes/Titan'
+import { PULSE_RENDERERS } from '../demos/themes/Pulse'
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -3571,8 +3574,17 @@ export default function PublicDemo() {
 
       {(() => {
         const tplKey = (demo.template || 'gym').toLowerCase()
-        const styleKey = (config?.style || 'classic').toLowerCase()
-        const rendererMap = styleKey === 'premium' ? STYLE2_RENDERERS : TEMPLATE_RENDERERS
+        const themeRaw = (config?.theme || config?.style || 'eclipse').toLowerCase()
+        const themeKey =
+          themeRaw === 'premium' ? 'ember' : themeRaw === 'classic' ? 'eclipse' : themeRaw
+        const THEME_MAP = {
+          eclipse: TEMPLATE_RENDERERS,
+          ember: EMBER_RENDERERS,
+          pearl: PEARL_RENDERERS,
+          titan: TITAN_RENDERERS,
+          pulse: PULSE_RENDERERS,
+        }
+        const rendererMap = THEME_MAP[themeKey] || THEME_MAP.eclipse
         const renderer = rendererMap[tplKey] || rendererMap.gym
         const Component = tab === 'website' ? renderer.Website : renderer.Dashboard
         return <Component config={config} accent={accent} />

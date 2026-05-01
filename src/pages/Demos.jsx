@@ -151,6 +151,44 @@ const TEMPLATES = [
   { key: 'roofing', name: 'Roofing', icon: Hammer, available: true },
 ]
 
+const THEME_BADGES = {
+  eclipse: {
+    label: 'Eclipse',
+    glyph: '\u{1F311}',
+    bg: 'rgba(99,120,255,0.10)',
+    color: 'rgba(180,195,255,0.95)',
+    border: 'rgba(99,120,255,0.22)',
+  },
+  ember: {
+    label: 'Ember',
+    glyph: '\u{1F525}',
+    bg: 'rgba(255,140,50,0.13)',
+    color: 'rgba(255,170,80,0.95)',
+    border: 'rgba(255,160,60,0.28)',
+  },
+  pearl: {
+    label: 'Pearl',
+    glyph: '\u{2B1C}',
+    bg: 'rgba(255,255,255,0.10)',
+    color: 'rgba(255,255,255,0.92)',
+    border: 'rgba(255,255,255,0.22)',
+  },
+  titan: {
+    label: 'Titan',
+    glyph: '\u{2B1B}',
+    bg: 'rgba(255,255,255,0.04)',
+    color: 'rgba(255,255,255,0.85)',
+    border: 'rgba(255,255,255,0.16)',
+  },
+  pulse: {
+    label: 'Pulse',
+    glyph: '\u{26A1}',
+    bg: 'rgba(0,255,136,0.10)',
+    color: 'rgba(0,255,136,0.95)',
+    border: 'rgba(0,255,136,0.28)',
+  },
+}
+
 function relativeTime(date) {
   if (!date) return null
   const t = new Date(date).getTime()
@@ -501,49 +539,66 @@ export default function Demos() {
                   {tpl.available ? 'Ready to use' : 'Coming soon'}
                 </div>
                 {tpl.available && (
-                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                    <div
-                      title="Classic Dark"
-                      style={{
-                        flex: 1,
-                        height: 18,
-                        borderRadius: 5,
-                        background: 'linear-gradient(135deg, #0a0a0a 0%, #1f1f24 100%)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                      }}
-                    >
+                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                    {[
+                      {
+                        key: 'eclipse',
+                        title: 'Eclipse · Dark Glass',
+                        bg: 'linear-gradient(135deg, #0a0a0a 0%, #1f1f24 100%)',
+                        border: 'rgba(99,120,255,0.18)',
+                        accent: 'radial-gradient(circle at 80% 50%, rgba(99,120,255,0.25), transparent 60%)',
+                      },
+                      {
+                        key: 'ember',
+                        title: 'Ember · Warm Premium',
+                        bg: 'linear-gradient(135deg, #0d0a08 0%, #221710 100%)',
+                        border: 'rgba(255,160,60,0.18)',
+                        accent: 'radial-gradient(circle at 80% 50%, rgba(255,140,50,0.3), transparent 60%)',
+                      },
+                      {
+                        key: 'pearl',
+                        title: 'Pearl · Light Minimal',
+                        bg: 'linear-gradient(135deg, #fafaf8 0%, #e8e6dd 100%)',
+                        border: 'rgba(0,0,0,0.15)',
+                        accent: 'radial-gradient(circle at 30% 50%, rgba(0,0,0,0.12), transparent 60%)',
+                      },
+                      {
+                        key: 'titan',
+                        title: 'Titan · Bold Agency',
+                        bg: '#080808',
+                        border: 'rgba(255,255,255,0.2)',
+                        accent: 'linear-gradient(180deg, transparent 0%, transparent 60%, rgba(255,255,255,0.4) 60%, rgba(255,255,255,0.4) 80%, transparent 80%)',
+                      },
+                      {
+                        key: 'pulse',
+                        title: 'Pulse · Neon Cyber',
+                        bg: 'linear-gradient(135deg, #060610 0%, #080820 100%)',
+                        border: 'rgba(0,255,136,0.25)',
+                        accent: 'radial-gradient(circle at 80% 50%, rgba(0,255,136,0.35), transparent 60%)',
+                      },
+                    ].map((sw) => (
                       <div
+                        key={sw.key}
+                        title={sw.title}
                         style={{
-                          position: 'absolute',
-                          inset: 0,
-                          background:
-                            'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08), transparent 60%)',
+                          flex: 1,
+                          height: 16,
+                          borderRadius: 4,
+                          background: sw.bg,
+                          border: `1px solid ${sw.border}`,
+                          position: 'relative',
+                          overflow: 'hidden',
                         }}
-                      />
-                    </div>
-                    <div
-                      title="Warm Premium"
-                      style={{
-                        flex: 1,
-                        height: 18,
-                        borderRadius: 5,
-                        background: 'linear-gradient(135deg, #0d0a08 0%, #221710 100%)',
-                        border: '1px solid rgba(255,160,60,0.15)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          background:
-                            'radial-gradient(circle at 80% 50%, rgba(255,140,50,0.25), transparent 60%)',
-                        }}
-                      />
-                    </div>
+                      >
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: sw.accent,
+                          }}
+                        />
+                      </div>
+                    ))}
                   </div>
                 )}
               </motion.div>
@@ -610,7 +665,7 @@ export default function Demos() {
                 <tr>
                   <th style={tableHeaderCell}>Business</th>
                   <th style={tableHeaderCell}>Template</th>
-                  <th style={tableHeaderCell}>Style</th>
+                  <th style={tableHeaderCell}>Theme</th>
                   <th style={tableHeaderCell}>Status</th>
                   <th style={tableHeaderCell}>Views</th>
                   <th style={{ ...tableHeaderCell, textAlign: 'right' }}>Actions</th>
@@ -675,39 +730,35 @@ export default function Demos() {
                       </td>
                       <td style={tableCellBase}>
                         {(() => {
-                          const isPremium =
-                            (demo.config?.style || 'classic').toLowerCase() === 'premium'
+                          const themeRaw = (demo.config?.theme || demo.config?.style || 'eclipse').toLowerCase()
+                          const themeKey =
+                            themeRaw === 'premium'
+                              ? 'ember'
+                              : themeRaw === 'classic'
+                                ? 'eclipse'
+                                : themeRaw
+                          const meta =
+                            THEME_BADGES[themeKey] || THEME_BADGES.eclipse
                           return (
                             <span
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: 5,
+                                gap: 6,
                                 padding: '3px 10px',
                                 borderRadius: 999,
-                                background: isPremium
-                                  ? 'rgba(255,140,50,0.15)'
-                                  : 'rgba(255,255,255,0.08)',
-                                color: isPremium ? 'rgba(255,160,60,0.95)' : 'rgba(255,255,255,0.75)',
-                                border: isPremium
-                                  ? '1px solid rgba(255,160,60,0.25)'
-                                  : '1px solid rgba(255,255,255,0.08)',
+                                background: meta.bg,
+                                color: meta.color,
+                                border: `1px solid ${meta.border}`,
                                 fontSize: 11,
                                 fontWeight: 500,
                                 letterSpacing: '0.02em',
                               }}
                             >
-                              <span
-                                style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: '50%',
-                                  background: isPremium
-                                    ? 'rgba(255,160,60,0.9)'
-                                    : 'rgba(255,255,255,0.6)',
-                                }}
-                              />
-                              {isPremium ? 'Premium' : 'Classic'}
+                              <span style={{ fontSize: 12, lineHeight: 1 }}>
+                                {meta.glyph}
+                              </span>
+                              {meta.label}
                             </span>
                           )
                         })()}
