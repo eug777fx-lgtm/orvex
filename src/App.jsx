@@ -17,6 +17,7 @@ import {
   CheckSquare,
   Upload,
   Monitor,
+  ListChecks,
 } from 'lucide-react'
 import { migrateSchema } from './utils/migrateSchema'
 import Background from './components/Background'
@@ -29,6 +30,7 @@ import Scripts from './pages/Scripts'
 import Tasks from './pages/Tasks'
 import Import from './pages/Import'
 import Demos from './pages/Demos'
+import Workflow from './pages/Workflow'
 import PublicDemo from './pages/PublicDemo'
 import Login from './pages/Login'
 import useIsMobile from './utils/useIsMobile'
@@ -40,6 +42,7 @@ const navItems = [
   { to: '/offers', label: 'Offers', icon: Package },
   { to: '/scripts', label: 'Scripts', icon: BookOpen },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { to: '/workflow', label: 'Workflow', icon: ListChecks },
   { to: '/demos', label: 'Demos', icon: Monitor },
   { to: '/import', label: 'Import', icon: Upload },
 ]
@@ -212,6 +215,7 @@ function AnimatedRoutes() {
         <Route path="/offers" element={<Offers />} />
         <Route path="/scripts" element={<Scripts />} />
         <Route path="/tasks" element={<Tasks />} />
+        <Route path="/workflow" element={<Workflow />} />
         <Route path="/demos" element={<Demos />} />
         <Route path="/import" element={<Import />} />
       </Routes>
