@@ -207,6 +207,7 @@ export default function MarketingEngine() {
   const [screenIndex, setScreenIndex] = useState(0)
   const [reviewItems, setReviewItems] = useState([])
   const [schedule, setSchedule] = useState([])
+  const [memory, setMemory] = useState([])
   const [stats, setStats] = useState({
     contentReady: 0,
     scheduled: 0,
@@ -297,6 +298,7 @@ export default function MarketingEngine() {
         avgScoreRows,
         reviewRows,
         scheduleRows,
+        memoryRows,
       ] = await Promise.all([
         db.query(
           "SELECT COUNT(*)::int AS count FROM content WHERE brand_id=$1 AND status='pending'",
@@ -331,6 +333,13 @@ export default function MarketingEngine() {
            LIMIT 8`,
           [selectedBrand.id],
         ),
+        db.query(
+          `SELECT id, memory_type, content, created_at
+             FROM brand_memory
+            WHERE brand_id = $1
+            ORDER BY created_at DESC`,
+          [selectedBrand.id],
+        ),
       ])
       setStats({
         contentReady: cReadyRows?.[0]?.count ?? 0,
@@ -342,6 +351,7 @@ export default function MarketingEngine() {
       })
       setReviewItems(reviewRows || [])
       setSchedule(scheduleRows || [])
+      setMemory(memoryRows || [])
     } catch (e) {
       console.error('fetch brand data failed', e)
     } finally {
@@ -432,6 +442,11 @@ export default function MarketingEngine() {
             showToast={showToast}
           />
           <ScheduleStrip schedule={schedule} />
+          <BrandMemory
+            brand={selectedBrand}
+            memory={memory}
+            onRefresh={refreshBrandData}
+          />
         </div>
       </div>
 
@@ -1481,6 +1496,349 @@ function ScheduleStrip({ schedule }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ===== Brand Memory =====
+const MEMORY_TYPES = [
+  { key: 'voice_rules', title: 'Voice Rules', color: '#a855f7', tint: 'rgba(168,85,247,0.12)' },
+  { key: 'audience', title: 'Audience', color: '#06b6d4', tint: 'rgba(6,182,212,0.12)' },
+  { key: 'top_performers', title: 'Top Performers', color: '#10b981', tint: 'rgba(16,185,129,0.12)' },
+  { key: 'campaign_history', title: 'Campaign History', color: '#f59e0b', tint: 'rgba(245,158,11,0.12)' },
+]
+
+function BrandMemory({ brand, memory, onRefresh }) {
+  const [adding, setAdding] = useState(false)
+  const [memoryType, setMemoryType] = useState('voice_rules')
+  const [content, setContent] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const grouped = MEMORY_TYPES.reduce((acc, t) => {
+    acc[t.key] = (memory || []).filter((m) => m.memory_type === t.key)
+    return acc
+  }, {})
+
+  async function save() {
+    const trimmed = content.trim()
+    if (!brand || !trimmed) return
+    setSaving(true)
+    try {
+      await db.query(
+        'INSERT INTO brand_memory (brand_id, memory_type, content) VALUES ($1, $2, $3)',
+        [brand.id, memoryType, trimmed],
+      )
+      setContent('')
+      setAdding(false)
+      onRefresh?.()
+    } catch (e) {
+      console.error('memory insert failed', e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        background: CARD_BG,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: CARD_BORDER,
+        borderRadius: 16,
+        padding: 16,
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <Brain size={13} color="#a855f7" />
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 6,
+              }}
+            >
+              Brand Memory
+              <span
+                style={{
+                  fontSize: 10,
+                  color: TEXT_FAINT,
+                  fontWeight: 500,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                · {(memory || []).length} {memory.length === 1 ? 'entry' : 'entries'}
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 1 }}>
+              What the AI knows about this brand
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAdding((a) => !a)}
+          style={{
+            fontSize: 10.5,
+            padding: '4px 10px',
+            borderRadius: 999,
+            border: '0.5px solid rgba(255,255,255,0.12)',
+            background: 'transparent',
+            color: 'rgba(255,255,255,0.7)',
+            cursor: 'pointer',
+            letterSpacing: '0.04em',
+            fontWeight: 500,
+          }}
+        >
+          {adding ? 'Close' : 'Edit'}
+        </button>
+      </div>
+
+      {(memory || []).length === 0 ? (
+        <div
+          style={{
+            padding: 18,
+            textAlign: 'center',
+            color: TEXT_MUTED,
+            fontSize: 12,
+            background: 'rgba(255,255,255,0.02)',
+            borderRadius: 10,
+            border: '0.5px dashed rgba(255,255,255,0.08)',
+          }}
+        >
+          No memory yet — run the Strategy Agent to start building.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: 10,
+          }}
+        >
+          {MEMORY_TYPES.map((t) => {
+            const items = grouped[t.key] || []
+            const preview = items[0]?.content || ''
+            return (
+              <div
+                key={t.key}
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  background: t.tint,
+                  border: `0.5px solid ${t.color}33`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: 84,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      color: t.color,
+                      fontWeight: 600,
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {t.title}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: 'rgba(255,255,255,0.4)',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {items.length}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: 'rgba(255,255,255,0.78)',
+                    lineHeight: 1.45,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    flex: 1,
+                  }}
+                >
+                  {preview || (
+                    <span style={{ color: TEXT_FAINT, fontStyle: 'italic' }}>
+                      empty
+                    </span>
+                  )}
+                </div>
+                {items.length > 1 && (
+                  <span
+                    style={{
+                      marginTop: 6,
+                      fontSize: 10,
+                      color: t.color,
+                      letterSpacing: '0.04em',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    View all →
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            disabled={!brand}
+            style={{
+              alignSelf: 'flex-start',
+              fontSize: 11,
+              padding: '5px 12px',
+              borderRadius: 999,
+              border: '0.5px dashed rgba(255,255,255,0.18)',
+              background: 'transparent',
+              color: brand ? TEXT_MUTED : TEXT_FAINT,
+              cursor: brand ? 'pointer' : 'not-allowed',
+              fontWeight: 500,
+              letterSpacing: '0.02em',
+            }}
+          >
+            + Add Memory
+          </button>
+        )}
+
+        <AnimatePresence>
+          {adding && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                padding: 12,
+                background: 'rgba(255,255,255,0.025)',
+                border: '0.5px solid rgba(255,255,255,0.07)',
+                borderRadius: 10,
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 11, color: TEXT_MUTED, minWidth: 60 }}>
+                  Type
+                </span>
+                <select
+                  value={memoryType}
+                  onChange={(e) => setMemoryType(e.target.value)}
+                  style={{
+                    flex: 1,
+                    fontSize: 12,
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    border: '0.5px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(0,0,0,0.3)',
+                    color: '#fff',
+                    outline: 'none',
+                  }}
+                >
+                  {MEMORY_TYPES.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Add a fact, rule, or insight the agents should remember..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  fontSize: 12,
+                  padding: 10,
+                  borderRadius: 8,
+                  border: '0.5px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(0,0,0,0.3)',
+                  color: '#fff',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={saving || !content.trim() || !brand}
+                  style={{
+                    fontSize: 11,
+                    padding: '6px 14px',
+                    borderRadius: 8,
+                    border: '0.5px solid rgba(74,222,128,0.4)',
+                    background: 'rgba(74,222,128,0.12)',
+                    color: '#4ade80',
+                    fontWeight: 600,
+                    cursor: saving || !content.trim() ? 'not-allowed' : 'pointer',
+                    opacity: saving || !content.trim() ? 0.55 : 1,
+                  }}
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdding(false)
+                    setContent('')
+                  }}
+                  style={{
+                    fontSize: 11,
+                    padding: '6px 14px',
+                    borderRadius: 8,
+                    border: '0.5px solid rgba(255,255,255,0.1)',
+                    background: 'transparent',
+                    color: TEXT_MUTED,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
