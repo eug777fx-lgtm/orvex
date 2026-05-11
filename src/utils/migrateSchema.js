@@ -1,4 +1,5 @@
 import db from '@/lib/db'
+import { setupMarketingDB } from './setupMarketingDB'
 
 let migratePromise = null
 
@@ -252,6 +253,8 @@ export function migrateSchema() {
            ON CONFLICT (key) DO NOTHING`,
         )
       }
+
+      await setupMarketingDB()
 
       return true
     } catch (err) {
