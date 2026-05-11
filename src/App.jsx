@@ -18,6 +18,7 @@ import {
   Upload,
   Monitor,
   ListChecks,
+  Sparkles,
 } from 'lucide-react'
 import { migrateSchema } from './utils/migrateSchema'
 import Background from './components/Background'
@@ -33,6 +34,7 @@ import Demos from './pages/Demos'
 import Workflow from './pages/Workflow'
 import PublicDemo from './pages/PublicDemo'
 import Login from './pages/Login'
+import MarketingEngine from './pages/MarketingEngine'
 import useIsMobile from './utils/useIsMobile'
 
 const navItems = [
@@ -43,6 +45,7 @@ const navItems = [
   { to: '/scripts', label: 'Scripts', icon: BookOpen },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/workflow', label: 'Workflow', icon: ListChecks },
+  { to: '/marketing', label: 'AI Office', icon: Sparkles },
   { to: '/demos', label: 'Demos', icon: Monitor },
   { to: '/import', label: 'Import', icon: Upload },
 ]
@@ -216,6 +219,7 @@ function AnimatedRoutes() {
         <Route path="/scripts" element={<Scripts />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/workflow" element={<Workflow />} />
+        <Route path="/marketing" element={<MarketingEngine />} />
         <Route path="/demos" element={<Demos />} />
         <Route path="/import" element={<Import />} />
       </Routes>
