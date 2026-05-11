@@ -13,17 +13,19 @@ import {
   Pencil,
   Sparkles,
   TrendingUp,
-  CheckCircle2,
   CalendarClock,
   Star,
 } from 'lucide-react'
 
-const cardBg = 'rgba(17,17,20,0.8)'
-const cardBlur = 'blur(12px)'
-const border = '0.5px solid rgba(255,255,255,0.08)'
-const textMuted = 'rgba(255,255,255,0.45)'
-const textFaint = 'rgba(255,255,255,0.3)'
+// ===== Design tokens =====
+const CARD_BG = 'rgba(17,17,20,0.8)'
+const CARD_BORDER = '0.5px solid rgba(255,255,255,0.08)'
+const SOFT_BORDER = '0.5px solid rgba(255,255,255,0.07)'
+const TEXT_MUTED = 'rgba(255,255,255,0.5)'
+const TEXT_FAINT = 'rgba(255,255,255,0.35)'
+const MONO = "ui-monospace, 'SFMono-Regular', Menlo, monospace"
 
+// ===== Data =====
 const BRANDS = [
   { name: 'LIMITLESS', color: '#a855f7' },
   { name: 'AWATEC', color: '#10b981' },
@@ -35,6 +37,7 @@ const AGENTS = [
     name: 'Strategy',
     color: '#a855f7',
     icon: Brain,
+    pos: { left: '5%', top: '10%' },
     statuses: [
       ['Analyzing comps', '3 gaps found'],
       ['Trend scan running', 'ICT +38%'],
@@ -46,6 +49,7 @@ const AGENTS = [
     name: 'Writer',
     color: '#06b6d4',
     icon: PenLine,
+    pos: { left: '35%', top: '10%' },
     statuses: [
       ['Polishing copy', 'Tone: confident'],
       ['Hook batch ready', '6 generated'],
@@ -57,9 +61,10 @@ const AGENTS = [
     name: 'Video Director',
     color: '#f59e0b',
     icon: Video,
+    pos: { left: '65%', top: '10%' },
     statuses: [
       ['Sourcing B-roll', 'Stock library'],
-      ['Building Runway brief...', ''],
+      ['Building Runway brief', ''],
       ['ElevenLabs script ready', ''],
     ],
   },
@@ -68,6 +73,7 @@ const AGENTS = [
     name: 'Distribution',
     color: '#10b981',
     icon: Send,
+    pos: { left: '15%', top: '55%' },
     statuses: [
       ['Queue: 4 pending', 'Auto-post on'],
       ['Posted to Instagram', '9:00 AM'],
@@ -79,6 +85,7 @@ const AGENTS = [
     name: 'Analytics',
     color: '#ef4444',
     icon: BarChart3,
+    pos: { left: '55%', top: '55%' },
     statuses: [
       ['Top: Reel #14', 'Score 92'],
       ['Scoring 7 posts', 'avg 84'],
@@ -89,21 +96,10 @@ const AGENTS = [
 
 const AGENT_COLOR = Object.fromEntries(AGENTS.map((a) => [a.name, a.color]))
 
-const LOG_FEED = [
-  { agent: 'Strategy', action: 'completed trend scan — ICT angle prioritized' },
-  { agent: 'Writer', action: 'generated hook batch for LIMITLESS — 6 hooks ready' },
-  { agent: 'Distribution', action: 'posted to Instagram — engagement tracking started' },
-  { agent: 'Analytics', action: 'scored Reel #14 — 92/100 added to memory' },
-  { agent: 'Writer', action: 'added 3 items to review queue' },
-  { agent: 'Strategy', action: 'updated weekly brief — new campaign angle found' },
-  { agent: 'Distribution', action: 'scheduled TikTok for 3:00 PM' },
-  { agent: 'Analytics', action: 'updated brand memory with new top performer' },
-]
-
 const SCHEDULE = [
   { time: '7:00', task: 'Trend scan', agent: 'Strategy', color: '#a855f7', status: 'done' },
   { time: '8:00', task: 'Write hooks', agent: 'Writer', color: '#06b6d4', status: 'done' },
-  { time: '9:00', task: 'Post to Instagram', agent: 'Distribution', color: '#10b981', status: 'active' },
+  { time: '9:00', task: 'Post Instagram', agent: 'Distribution', color: '#10b981', status: 'active' },
   { time: '12:00', task: 'Video briefs', agent: 'Video', color: '#f59e0b', status: 'pending' },
   { time: '3:00', task: 'Post TikTok', agent: 'Distribution', color: '#10b981', status: 'pending' },
   { time: '8:00', task: 'Score posts', agent: 'Analytics', color: '#ef4444', status: 'pending' },
@@ -126,17 +122,28 @@ const INITIAL_REVIEW = [
     id: 'r3',
     type: 'Script',
     brand: 'LIMITLESS',
-    text: 'Open on phone screen — 47 unread DMs. Voiceover: "If you\'re reading every message, you\'ve already lost."',
+    text: 'Open on phone screen — 47 unread DMs. "If you\'re reading every message, you\'ve already lost."',
   },
 ]
 
 const LIVE_LOG = [
   { time: '09:14', agent: 'Distribution', action: 'Posted reel to Instagram · 234 likes in 14 min' },
-  { time: '09:08', agent: 'Analytics', action: 'Trend velocity dropping on "morning routine" — pivot suggested' },
+  { time: '09:08', agent: 'Analytics', action: 'Trend velocity dropping on "morning routine"' },
   { time: '08:52', agent: 'Writer', action: 'Generated 8 hook variations for Reel #15' },
   { time: '08:31', agent: 'Strategy', action: 'Brief approved — sent to Writer queue' },
-  { time: '08:12', agent: 'Video Director', action: 'Storyboard ready for "first 90 seconds" reel' },
+  { time: '08:12', agent: 'Video Director', action: 'Storyboard ready for "first 90 seconds"' },
   { time: '07:04', agent: 'Strategy', action: 'Daily trend scan complete · 23 topics scored' },
+]
+
+const LOG_FEED = [
+  { agent: 'Strategy', action: 'completed trend scan — ICT angle prioritized' },
+  { agent: 'Writer', action: 'generated hook batch for LIMITLESS — 6 hooks ready' },
+  { agent: 'Distribution', action: 'posted to Instagram — engagement tracking started' },
+  { agent: 'Analytics', action: 'scored Reel #14 — 92/100 added to memory' },
+  { agent: 'Writer', action: 'added 3 items to review queue' },
+  { agent: 'Strategy', action: 'updated weekly brief — new campaign angle found' },
+  { agent: 'Distribution', action: 'scheduled TikTok for 3:00 PM' },
+  { agent: 'Analytics', action: 'updated brand memory with new top performer' },
 ]
 
 const TOP_PERFORMERS = [
@@ -145,7 +152,7 @@ const TOP_PERFORMERS = [
   { title: 'Hook · Motion vs progress', score: 87 },
 ]
 
-function formatTime(date) {
+function formatClock(date) {
   return date.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
@@ -153,6 +160,12 @@ function formatTime(date) {
   })
 }
 
+function nowHHMM() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// ===== Page =====
 export default function MarketingEngine() {
   const [selectedBrand, setSelectedBrand] = useState('LIMITLESS')
   const [activeTab, setActiveTab] = useState('review')
@@ -189,9 +202,9 @@ export default function MarketingEngine() {
     let i = 0
     const id = setInterval(() => {
       const item = LOG_FEED[i % LOG_FEED.length]
-      const d = new Date()
-      const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-      setLiveLog((log) => [{ time, agent: item.agent, action: item.action }, ...log].slice(0, 20))
+      setLiveLog((log) =>
+        [{ time: nowHHMM(), agent: item.agent, action: item.action }, ...log].slice(0, 20),
+      )
       i += 1
     }, 8000)
     return () => clearInterval(id)
@@ -206,85 +219,108 @@ export default function MarketingEngine() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 24 }}
+      transition={{ duration: 0.2 }}
+      style={{
+        // Escape Shell's main padding for full-bleed
+        margin: '-2rem',
+        display: 'grid',
+        gridTemplateColumns: '1fr 280px',
+        height: 'calc(100vh - 56px)',
+        color: '#fff',
+        overflow: 'hidden',
+      }}
     >
-      <Header now={now} />
-      <BrandSelector selected={selectedBrand} onSelect={setSelectedBrand} />
-      <StatsRow />
-
+      {/* ===== LEFT MAIN AREA ===== */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)',
-          gap: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+          overflow: 'hidden',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
+        <PageHeader now={now} />
+        <BrandSelector selected={selectedBrand} onSelect={setSelectedBrand} />
+        <StatsRow />
+
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            padding: '12px 20px 20px',
+            minHeight: 0,
+            overflow: 'auto',
+          }}
+        >
           <AgentOffice screenIndex={screenIndex} meetingAgents={meetingAgents} />
           <ScheduleStrip />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
-          <Tabs active={activeTab} onChange={setActiveTab} />
+      </div>
+
+      {/* ===== RIGHT PANEL ===== */}
+      <aside
+        style={{
+          borderLeft: SOFT_BORDER,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          overflow: 'hidden',
+          background: 'rgba(10,10,12,0.4)',
+        }}
+      >
+        <Tabs active={activeTab} onChange={setActiveTab} />
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '12px 14px 20px',
+          }}
+        >
           {activeTab === 'review' && (
             <ReviewPanel items={reviewItems} onApprove={approve} onReject={reject} />
           )}
           {activeTab === 'log' && <LogPanel entries={liveLog} />}
           {activeTab === 'stats' && <StatsPanel />}
         </div>
-      </div>
+      </aside>
     </motion.div>
   )
 }
 
-function Header({ now }) {
+// ===== Page Header =====
+function PageHeader({ now }) {
   return (
     <div
       style={{
+        padding: '16px 20px',
+        borderBottom: SOFT_BORDER,
         display: 'flex',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 16,
-        flexWrap: 'wrap',
+        gap: 12,
       }}
     >
       <div>
-        <h1
+        <div
           style={{
-            margin: 0,
-            fontSize: 28,
-            fontWeight: 600,
-            letterSpacing: '-0.02em',
+            fontSize: 15,
+            fontWeight: 500,
             color: '#fff',
+            letterSpacing: '-0.01em',
           }}
         >
           AI Office
-        </h1>
-        <p
-          style={{
-            margin: '6px 0 0',
-            fontSize: 13.5,
-            color: textMuted,
-            letterSpacing: '0.01em',
-          }}
-        >
-          Your autonomous marketing team — always working
-        </p>
+        </div>
+        <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2 }}>
+          5 agents working · always on
+        </div>
       </div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '6px 12px 6px 10px',
-          borderRadius: 999,
-          background: 'rgba(16,185,129,0.08)',
-          border: '0.5px solid rgba(16,185,129,0.25)',
-        }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <motion.span
           animate={{ scale: [1, 1.3, 1], opacity: [1, 0.55, 1] }}
           transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
@@ -298,38 +334,39 @@ function Header({ now }) {
         />
         <span
           style={{
-            fontSize: 11.5,
+            fontSize: 11,
             fontWeight: 600,
             color: '#10b981',
-            letterSpacing: '0.08em',
+            letterSpacing: '0.06em',
           }}
         >
           LIVE
         </span>
-        <span style={{ width: 1, height: 12, background: 'rgba(16,185,129,0.25)' }} />
         <span
           style={{
-            fontSize: 12,
-            color: 'rgba(255,255,255,0.7)',
+            fontSize: 11.5,
+            color: TEXT_FAINT,
+            fontFamily: MONO,
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          {formatTime(now)}
+          {formatClock(now)}
         </span>
       </div>
     </div>
   )
 }
 
+// ===== Brand Selector =====
 function BrandSelector({ selected, onSelect }) {
   return (
     <div
       style={{
+        padding: '12px 20px',
         display: 'flex',
         alignItems: 'center',
         gap: 8,
         overflowX: 'auto',
-        paddingBottom: 4,
       }}
     >
       {BRANDS.map((b) => {
@@ -342,30 +379,30 @@ function BrandSelector({ selected, onSelect }) {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 8,
-              padding: '7px 14px',
+              gap: 7,
+              padding: '6px 12px',
               borderRadius: 999,
-              background: active ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+              background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
               border: active
-                ? '0.5px solid rgba(255,255,255,0.4)'
-                : border,
+                ? '0.5px solid rgba(255,255,255,0.35)'
+                : '0.5px solid rgba(255,255,255,0.08)',
               color: active ? '#fff' : 'rgba(255,255,255,0.65)',
-              fontSize: 12.5,
+              fontSize: 12,
               fontWeight: 500,
-              letterSpacing: '0.01em',
+              letterSpacing: '0.02em',
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
               whiteSpace: 'nowrap',
               flexShrink: 0,
+              transition: 'all 0.15s ease',
             }}
           >
             <span
               style={{
-                width: 7,
-                height: 7,
+                width: 6,
+                height: 6,
                 borderRadius: '50%',
                 background: b.color,
-                boxShadow: `0 0 8px ${b.color}80`,
+                boxShadow: `0 0 6px ${b.color}80`,
               }}
             />
             {b.name}
@@ -377,26 +414,26 @@ function BrandSelector({ selected, onSelect }) {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '7px 12px',
+          gap: 5,
+          padding: '6px 11px',
           borderRadius: 999,
           background: 'transparent',
           border: '0.5px dashed rgba(255,255,255,0.18)',
-          color: textMuted,
-          fontSize: 12.5,
+          color: TEXT_MUTED,
+          fontSize: 12,
           fontWeight: 500,
           cursor: 'pointer',
           whiteSpace: 'nowrap',
           flexShrink: 0,
         }}
       >
-        <Plus size={12} />
-        Add Brand
+        <Plus size={11} /> Add Brand
       </button>
     </div>
   )
 }
 
+// ===== Stats Row =====
 function StatsRow() {
   const stats = [
     { label: 'Content Ready', value: 14, sub: 'awaiting approval', accent: '#a855f7' },
@@ -407,21 +444,22 @@ function StatsRow() {
   return (
     <div
       style={{
+        padding: '0 20px',
         display: 'grid',
         gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-        gap: 12,
+        gap: 10,
       }}
     >
       {stats.map((s) => (
         <div
           key={s.label}
           style={{
-            background: cardBg,
-            backdropFilter: cardBlur,
-            WebkitBackdropFilter: cardBlur,
-            border,
-            borderRadius: 16,
-            padding: 16,
+            background: CARD_BG,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: CARD_BORDER,
+            borderRadius: 12,
+            padding: 14,
             position: 'relative',
             overflow: 'hidden',
           }}
@@ -431,7 +469,7 @@ function StatsRow() {
               position: 'absolute',
               top: 0,
               left: 0,
-              width: 24,
+              width: 22,
               height: 2,
               background: s.accent,
               borderRadius: 999,
@@ -439,10 +477,10 @@ function StatsRow() {
           />
           <div
             style={{
-              fontSize: 11,
-              color: textMuted,
-              letterSpacing: '0.08em',
+              fontSize: 10,
+              color: TEXT_MUTED,
               textTransform: 'uppercase',
+              letterSpacing: '0.08em',
               fontWeight: 500,
             }}
           >
@@ -450,35 +488,35 @@ function StatsRow() {
           </div>
           <div
             style={{
-              fontSize: 30,
-              fontWeight: 600,
+              fontSize: 22,
+              fontWeight: 500,
               color: '#fff',
-              marginTop: 8,
+              marginTop: 6,
               letterSpacing: '-0.02em',
               fontVariantNumeric: 'tabular-nums',
             }}
           >
             {s.value}
           </div>
-          <div style={{ fontSize: 11.5, color: textFaint, marginTop: 4 }}>{s.sub}</div>
+          <div style={{ fontSize: 11, color: TEXT_FAINT, marginTop: 2 }}>{s.sub}</div>
         </div>
       ))}
     </div>
   )
 }
 
+// ===== Agent Office =====
 function AgentOffice({ screenIndex, meetingAgents }) {
   return (
     <div
       style={{
-        background: cardBg,
-        backdropFilter: cardBlur,
-        WebkitBackdropFilter: cardBlur,
-        border,
+        background: CARD_BG,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: CARD_BORDER,
         borderRadius: 16,
-        padding: 18,
-        position: 'relative',
-        overflow: 'hidden',
+        padding: 16,
+        flexShrink: 0,
       }}
     >
       <div
@@ -486,29 +524,21 @@ function AgentOffice({ screenIndex, meetingAgents }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 14,
+          marginBottom: 12,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 14,
-              fontWeight: 600,
-              color: '#fff',
-              letterSpacing: '-0.01em',
-            }}
-          >
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
             Agent Console
-          </h2>
+          </span>
           <span
             style={{
-              fontSize: 10.5,
+              fontSize: 10,
               padding: '2px 8px',
               borderRadius: 999,
               background: 'rgba(16,185,129,0.1)',
+              border: '0.5px solid rgba(16,185,129,0.25)',
               color: '#10b981',
-              border: '0.5px solid rgba(16,185,129,0.2)',
               letterSpacing: '0.06em',
               fontWeight: 600,
             }}
@@ -516,56 +546,67 @@ function AgentOffice({ screenIndex, meetingAgents }) {
             5 ACTIVE
           </span>
         </div>
-        <Activity size={14} color={textMuted} />
+        <Activity size={13} color={TEXT_MUTED} />
       </div>
 
       <div
         style={{
           position: 'relative',
-          padding: 14,
+          minHeight: 280,
           borderRadius: 12,
-          background: 'rgba(0,0,0,0.25)',
+          background: 'rgba(0,0,0,0.2)',
           border: '0.5px solid rgba(255,255,255,0.04)',
           backgroundImage:
-            'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
+            'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
           backgroundSize: '24px 24px',
           backgroundPosition: '0 0',
+          overflow: 'hidden',
         }}
       >
+        {/* Meeting table */}
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 10,
+            position: 'absolute',
+            left: '50%',
+            top: '40%',
+            transform: 'translateX(-50%)',
+            width: 80,
+            height: 40,
+            borderRadius: 999,
+            background: 'rgba(255,255,255,0.025)',
+            border: '0.5px solid rgba(255,255,255,0.05)',
           }}
-        >
-          {AGENTS.map((agent, i) => (
-            <AgentDesk
-              key={agent.key}
-              agent={agent}
-              screenIndex={screenIndex}
-              index={i}
-              inMeeting={meetingAgents.includes(agent.key)}
-            />
-          ))}
-        </div>
+        />
+
+        {AGENTS.map((agent, i) => (
+          <AgentStation
+            key={agent.key}
+            agent={agent}
+            index={i}
+            screenIndex={screenIndex}
+            inMeeting={meetingAgents.includes(agent.key)}
+          />
+        ))}
       </div>
     </div>
   )
 }
 
-function AgentDesk({ agent, screenIndex, index, inMeeting }) {
-  const Icon = agent.icon
+function AgentStation({ agent, index, screenIndex, inMeeting }) {
   const status = agent.statuses[screenIndex % agent.statuses.length]
   return (
     <div
       style={{
+        position: 'absolute',
+        left: agent.pos.left,
+        top: agent.pos.top,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
       }}
     >
+      {/* Character */}
       <motion.div
         animate={{ y: [0, -4, 0] }}
         transition={{
@@ -588,7 +629,7 @@ function AgentDesk({ agent, screenIndex, index, inMeeting }) {
             height: 10,
             borderRadius: '50%',
             background: agent.color,
-            boxShadow: `0 0 8px ${agent.color}80`,
+            boxShadow: `0 0 8px ${agent.color}99`,
           }}
         />
         <div
@@ -601,54 +642,34 @@ function AgentDesk({ agent, screenIndex, index, inMeeting }) {
           }}
         />
       </motion.div>
+
+      {/* Desk card */}
       <div
         style={{
-          position: 'relative',
-          background: 'rgba(255,255,255,0.025)',
+          background: 'rgba(255,255,255,0.04)',
           border: inMeeting
-            ? '0.5px solid rgba(255,255,255,0.3)'
-            : '0.5px solid rgba(255,255,255,0.06)',
-          boxShadow: inMeeting
-            ? '0 0 16px rgba(255,255,255,0.18)'
-            : 'none',
-          borderRadius: 12,
-          padding: 12,
-          minHeight: 110,
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
+            ? '0.5px solid rgba(255,255,255,0.35)'
+            : '0.5px solid rgba(255,255,255,0.08)',
+          boxShadow: inMeeting ? '0 0 14px rgba(255,255,255,0.18)' : 'none',
+          borderRadius: 10,
+          padding: '10px 12px',
+          minWidth: 130,
           transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: 6,
-              background: `${agent.color}1a`,
-              border: `0.5px solid ${agent.color}40`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: agent.color,
-              flexShrink: 0,
-            }}
-          >
-            <Icon size={12} />
-          </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            marginBottom: 4,
+          }}
+        >
           <span
             style={{
-              fontSize: 11.5,
-              fontWeight: 600,
+              fontSize: 12,
+              fontWeight: 500,
               color: '#fff',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -657,54 +678,38 @@ function AgentDesk({ agent, screenIndex, index, inMeeting }) {
           >
             {agent.name}
           </span>
+          <motion.span
+            animate={{ opacity: [1, 0.4, 1] }}
+            transition={{
+              duration: 1.6,
+              repeat: Infinity,
+              ease: 'easeInOut',
+              delay: index * 0.2,
+            }}
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: agent.color,
+              boxShadow: `0 0 6px ${agent.color}cc`,
+              flexShrink: 0,
+            }}
+          />
         </div>
-        <motion.span
-          animate={{ y: [0, -3, 0], x: [0, 2, 0] }}
-          transition={{
-            duration: 2 + index * 0.35,
-            repeat: Infinity,
-            repeatType: 'mirror',
-            ease: 'easeInOut',
-          }}
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: '50%',
-            background: agent.color,
-            boxShadow: `0 0 8px ${agent.color}cc`,
-            flexShrink: 0,
-          }}
-        />
-      </div>
-
-      <div
-        style={{
-          flex: 1,
-          background: 'rgba(0,0,0,0.5)',
-          border: '0.5px solid rgba(255,255,255,0.05)',
-          borderRadius: 6,
-          padding: '8px 10px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          gap: 3,
-          overflow: 'hidden',
-        }}
-      >
         <AnimatePresence mode="wait">
           <motion.div
             key={screenIndex % agent.statuses.length}
-            initial={{ opacity: 0, y: 4 }}
+            initial={{ opacity: 0, y: 3 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.3 }}
+            exit={{ opacity: 0, y: -3 }}
+            transition={{ duration: 0.25 }}
           >
             <div
               style={{
-                fontSize: 10.5,
-                color: agent.color,
-                fontWeight: 600,
-                letterSpacing: '0.02em',
+                fontSize: 10,
+                color: 'rgba(255,255,255,0.55)',
+                fontFamily: MONO,
+                lineHeight: 1.4,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -715,10 +720,13 @@ function AgentDesk({ agent, screenIndex, index, inMeeting }) {
             <div
               style={{
                 fontSize: 10,
-                color: 'rgba(255,255,255,0.55)',
+                color: 'rgba(255,255,255,0.4)',
+                fontFamily: MONO,
+                lineHeight: 1.4,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                minHeight: 14,
               }}
             >
               {status[1]}
@@ -726,38 +734,45 @@ function AgentDesk({ agent, screenIndex, index, inMeeting }) {
           </motion.div>
         </AnimatePresence>
       </div>
-      </div>
     </div>
   )
 }
 
+// ===== Schedule Strip =====
 function ScheduleStrip() {
   return (
     <div
       style={{
-        background: cardBg,
-        backdropFilter: cardBlur,
-        WebkitBackdropFilter: cardBlur,
-        border,
+        background: CARD_BG,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: CARD_BORDER,
         borderRadius: 16,
-        padding: 18,
+        padding: 16,
+        flexShrink: 0,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <CalendarClock size={14} color={textMuted} />
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#fff',
-            letterSpacing: '-0.01em',
-          }}
-        >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 12,
+        }}
+      >
+        <CalendarClock size={13} color={TEXT_MUTED} />
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
           Today's Schedule
-        </h2>
+        </span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          overflowX: 'auto',
+          paddingBottom: 4,
+        }}
+      >
         {SCHEDULE.map((row, i) => {
           const done = row.status === 'done'
           const active = row.status === 'active'
@@ -765,35 +780,38 @@ function ScheduleStrip() {
             <div
               key={i}
               style={{
-                display: 'grid',
-                gridTemplateColumns: '52px 1fr auto',
-                alignItems: 'center',
-                gap: 12,
-                padding: '8px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                padding: '10px 12px',
+                minWidth: 140,
                 borderRadius: 10,
-                background: active ? 'rgba(16,185,129,0.06)' : 'transparent',
+                background: active
+                  ? 'rgba(74,222,128,0.04)'
+                  : 'rgba(255,255,255,0.02)',
                 border: active
-                  ? '0.5px solid rgba(16,185,129,0.35)'
-                  : '0.5px solid transparent',
+                  ? '0.5px solid rgba(74,222,128,0.3)'
+                  : '0.5px solid rgba(255,255,255,0.06)',
                 opacity: done ? 0.4 : 1,
-                transition: 'all 0.15s ease',
+                flexShrink: 0,
               }}
             >
               <span
                 style={{
-                  fontSize: 11.5,
-                  color: active ? '#10b981' : textMuted,
+                  fontSize: 10.5,
+                  color: active ? '#4ade80' : TEXT_MUTED,
+                  fontFamily: MONO,
                   fontVariantNumeric: 'tabular-nums',
-                  fontWeight: 600,
-                  letterSpacing: '0.02em',
+                  letterSpacing: '0.04em',
                 }}
               >
                 {row.time}
               </span>
               <span
                 style={{
-                  fontSize: 13,
-                  color: active ? '#fff' : 'rgba(255,255,255,0.75)',
+                  fontSize: 12,
+                  color: '#fff',
+                  fontWeight: 500,
                   textDecoration: done ? 'line-through' : 'none',
                 }}
               >
@@ -803,21 +821,22 @@ function ScheduleStrip() {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
-                  padding: '3px 9px',
+                  gap: 5,
+                  padding: '2px 8px',
                   borderRadius: 999,
-                  background: `${row.color}15`,
-                  border: `0.5px solid ${row.color}35`,
+                  background: `${row.color}14`,
+                  border: `0.5px solid ${row.color}33`,
                   color: row.color,
-                  fontSize: 10.5,
+                  fontSize: 10,
                   fontWeight: 600,
                   letterSpacing: '0.04em',
+                  alignSelf: 'flex-start',
                 }}
               >
                 <span
                   style={{
-                    width: 5,
-                    height: 5,
+                    width: 4,
+                    height: 4,
                     borderRadius: '50%',
                     background: row.color,
                   }}
@@ -832,6 +851,7 @@ function ScheduleStrip() {
   )
 }
 
+// ===== Right: Tabs =====
 function Tabs({ active, onChange }) {
   const tabs = [
     { key: 'review', label: 'Review' },
@@ -841,14 +861,9 @@ function Tabs({ active, onChange }) {
   return (
     <div
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 2,
-        background: 'rgba(255,255,255,0.03)',
-        border,
-        padding: 3,
-        borderRadius: 999,
-        alignSelf: 'flex-start',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        borderBottom: SOFT_BORDER,
       }}
     >
       {tabs.map((t) => {
@@ -859,32 +874,22 @@ function Tabs({ active, onChange }) {
             type="button"
             onClick={() => onChange(t.key)}
             style={{
-              position: 'relative',
-              padding: '6px 16px',
-              borderRadius: 999,
-              fontSize: 12.5,
-              fontWeight: 500,
-              letterSpacing: '0.01em',
-              color: isActive ? '#000' : 'rgba(255,255,255,0.5)',
+              padding: '14px 8px',
               background: 'transparent',
               border: 'none',
+              borderBottom: isActive
+                ? '1.5px solid #ffffff'
+                : '1.5px solid transparent',
+              marginBottom: '-0.5px',
+              color: isActive ? '#fff' : 'rgba(255,255,255,0.35)',
+              fontSize: 12,
+              fontWeight: 500,
+              letterSpacing: '0.02em',
               cursor: 'pointer',
+              transition: 'color 0.15s ease, border-color 0.15s ease',
             }}
           >
-            {isActive && (
-              <motion.div
-                layoutId="marketingEngineTab"
-                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: '#fff',
-                  borderRadius: 999,
-                  zIndex: 0,
-                }}
-              />
-            )}
-            <span style={{ position: 'relative', zIndex: 1 }}>{t.label}</span>
+            {t.label}
           </button>
         )
       })}
@@ -892,233 +897,211 @@ function Tabs({ active, onChange }) {
   )
 }
 
+// ===== Right: Review =====
 function ReviewPanel({ items, onApprove, onReject }) {
   return (
-    <div
-      style={{
-        background: cardBg,
-        backdropFilter: cardBlur,
-        WebkitBackdropFilter: cardBlur,
-        border,
-        borderRadius: 16,
-        padding: 18,
-      }}
-    >
+    <div>
       <div
-        style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 10,
+        }}
       >
-        <Sparkles size={13} color="#a855f7" />
-        <span style={{ fontSize: 12.5, color: textMuted, letterSpacing: '0.01em' }}>
+        <Sparkles size={11} color="#a855f7" />
+        <span style={{ fontSize: 11, color: TEXT_MUTED }}>
           Generated overnight · needs your approval
         </span>
       </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <AnimatePresence>
-          {items.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+      <AnimatePresence>
+        {items.map((it) => (
+          <motion.div
+            key={it.id}
+            layout
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
+            transition={{ duration: 0.22 }}
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '0.5px solid rgba(255,255,255,0.07)',
+              borderRadius: 10,
+              padding: 12,
+              marginBottom: 8,
+            }}
+          >
+            <div
               style={{
-                padding: 28,
-                textAlign: 'center',
-                color: textMuted,
-                fontSize: 13,
-                background: 'rgba(255,255,255,0.02)',
-                borderRadius: 12,
-                border: '0.5px dashed rgba(255,255,255,0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 8,
               }}
             >
-              <CheckCircle2
-                size={20}
-                color="#10b981"
-                style={{ marginBottom: 8 }}
-              />
-              <div>All caught up — agents are drafting more.</div>
-            </motion.div>
-          )}
-          {items.map((it) => (
-            <motion.div
-              key={it.id}
-              layout
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: 40, transition: { duration: 0.25 } }}
-              transition={{ duration: 0.25 }}
-              style={{
-                background: 'rgba(255,255,255,0.025)',
-                border: '0.5px solid rgba(255,255,255,0.06)',
-                borderRadius: 12,
-                padding: 14,
-              }}
-            >
-              <div
+              <span
                 style={{
-                  display: 'flex',
+                  fontSize: 9.5,
+                  padding: '2px 7px',
+                  borderRadius: 999,
+                  background: 'rgba(168,85,247,0.12)',
+                  border: '0.5px solid rgba(168,85,247,0.3)',
+                  color: '#c084fc',
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                }}
+              >
+                {it.type.toUpperCase()}
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  color: TEXT_FAINT,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                {it.brand}
+              </span>
+            </div>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: 'rgba(255,255,255,0.85)',
+                lineHeight: 1.5,
+              }}
+            >
+              {it.text}
+            </p>
+            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <button
+                type="button"
+                onClick={() => onApprove(it.id)}
+                style={{
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 10,
+                  gap: 4,
+                  padding: '5px 9px',
+                  borderRadius: 7,
+                  background: 'rgba(16,185,129,0.1)',
+                  border: '0.5px solid rgba(16,185,129,0.4)',
+                  color: '#10b981',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
                 }}
               >
-                <span
-                  style={{
-                    fontSize: 10.5,
-                    padding: '3px 9px',
-                    borderRadius: 999,
-                    background: 'rgba(168,85,247,0.12)',
-                    border: '0.5px solid rgba(168,85,247,0.3)',
-                    color: '#c084fc',
-                    fontWeight: 600,
-                    letterSpacing: '0.06em',
-                  }}
-                >
-                  {it.type.toUpperCase()}
-                </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: textFaint,
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {it.brand}
-                </span>
-              </div>
-              <p
+                <Check size={10} /> Approve
+              </button>
+              <button
+                type="button"
                 style={{
-                  margin: 0,
-                  fontSize: 13.5,
-                  color: 'rgba(255,255,255,0.88)',
-                  lineHeight: 1.5,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '5px 9px',
+                  borderRadius: 7,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '0.5px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.7)',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: 'pointer',
                 }}
               >
-                {it.text}
-              </p>
-              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => onApprove(it.id)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    background: 'rgba(16,185,129,0.12)',
-                    border: '0.5px solid rgba(16,185,129,0.4)',
-                    color: '#10b981',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Check size={12} /> Approve
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    background: 'rgba(255,255,255,0.04)',
-                    border,
-                    color: 'rgba(255,255,255,0.75)',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Pencil size={12} /> Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onReject(it.id)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    background: 'transparent',
-                    border: '0.5px solid rgba(255,255,255,0.08)',
-                    color: textMuted,
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    marginLeft: 'auto',
-                  }}
-                >
-                  <X size={12} /> Reject
-                </button>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+                <Pencil size={10} /> Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => onReject(it.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '5px 9px',
+                  borderRadius: 7,
+                  background: 'transparent',
+                  border: '0.5px solid rgba(255,255,255,0.08)',
+                  color: TEXT_MUTED,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  marginLeft: 'auto',
+                }}
+              >
+                <X size={10} /> Reject
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+      {items.length === 0 && (
+        <div
+          style={{
+            padding: 24,
+            textAlign: 'center',
+            color: TEXT_MUTED,
+            fontSize: 12,
+            background: 'rgba(255,255,255,0.02)',
+            borderRadius: 10,
+            border: '0.5px dashed rgba(255,255,255,0.08)',
+          }}
+        >
+          All caught up — agents are drafting more.
+        </div>
+      )}
     </div>
   )
 }
 
+// ===== Right: Log =====
 function LogPanel({ entries }) {
   return (
-    <div
-      style={{
-        background: cardBg,
-        backdropFilter: cardBlur,
-        WebkitBackdropFilter: cardBlur,
-        border,
-        borderRadius: 16,
-        padding: 18,
-      }}
-    >
-      <div
-        style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}
-      >
-        <Activity size={13} color="#10b981" />
-        <span style={{ fontSize: 12.5, color: textMuted, letterSpacing: '0.01em' }}>
-          Real-time agent activity
-        </span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 420, overflowY: 'auto' }}>
-        <AnimatePresence initial={false}>
-          {entries.map((entry, i) => {
-            const color = AGENT_COLOR[entry.agent] || '#fff'
-            return (
-              <motion.div
-                key={`${entry.time}-${i}-${entry.action.slice(0, 12)}`}
-                layout
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25 }}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <AnimatePresence initial={false}>
+        {entries.map((entry, i) => {
+          const color = AGENT_COLOR[entry.agent] || '#fff'
+          return (
+            <motion.div
+              key={`${entry.time}-${i}-${entry.action.slice(0, 16)}`}
+              layout
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22 }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '38px 1fr',
+                gap: 8,
+                padding: '9px 2px',
+                borderBottom:
+                  i === entries.length - 1
+                    ? 'none'
+                    : '0.5px solid rgba(255,255,255,0.04)',
+                alignItems: 'baseline',
+              }}
+            >
+              <span
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '52px 130px 1fr',
-                  gap: 12,
-                  padding: '10px 4px',
-                  borderBottom:
-                    i === entries.length - 1
-                      ? 'none'
-                      : '0.5px solid rgba(255,255,255,0.04)',
-                  alignItems: 'baseline',
+                  fontSize: 10,
+                  color: TEXT_FAINT,
+                  fontFamily: MONO,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {entry.time}
+              </span>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  minWidth: 0,
                 }}
               >
                 <span
                   style={{
-                    fontSize: 11,
-                    color: textFaint,
-                    fontVariantNumeric: 'tabular-nums',
-                    fontFamily: 'ui-monospace, monospace',
-                  }}
-                >
-                  {entry.time}
-                </span>
-                <span
-                  style={{
-                    fontSize: 12,
+                    fontSize: 11.5,
                     color,
                     fontWeight: 600,
                     letterSpacing: '0.02em',
@@ -1128,58 +1111,47 @@ function LogPanel({ entries }) {
                 </span>
                 <span
                   style={{
-                    fontSize: 12.5,
-                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 11,
+                    color: TEXT_MUTED,
                     lineHeight: 1.4,
                   }}
                 >
                   {entry.action}
                 </span>
-              </motion.div>
-            )
-          })}
-        </AnimatePresence>
-      </div>
+              </div>
+            </motion.div>
+          )
+        })}
+      </AnimatePresence>
     </div>
   )
 }
 
+// ===== Right: Stats =====
 function StatsPanel() {
   const cells = [
-    { label: 'Engagement', value: '12.4%', sub: '+2.1% vs last week', accent: '#a855f7' },
-    { label: 'Reach', value: '184K', sub: '7-day total', accent: '#06b6d4' },
-    { label: 'Saves', value: '2,341', sub: 'per 1K views', accent: '#f59e0b' },
+    { label: 'Engagement', value: '12.4%', sub: '+2.1% wk', accent: '#a855f7' },
+    { label: 'Reach', value: '184K', sub: '7-day', accent: '#06b6d4' },
+    { label: 'Saves', value: '2.3K', sub: '/1K views', accent: '#f59e0b' },
     { label: 'Followers', value: '+312', sub: 'this week', accent: '#10b981' },
   ]
   return (
-    <div
-      style={{
-        background: cardBg,
-        backdropFilter: cardBlur,
-        WebkitBackdropFilter: cardBlur,
-        border,
-        borderRadius: 16,
-        padding: 18,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
-      }}
-    >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-          gap: 10,
+          gap: 8,
         }}
       >
         {cells.map((c) => (
           <div
             key={c.label}
             style={{
-              padding: 14,
-              borderRadius: 12,
-              background: 'rgba(255,255,255,0.025)',
-              border: '0.5px solid rgba(255,255,255,0.06)',
+              padding: 12,
+              borderRadius: 10,
+              background: 'rgba(255,255,255,0.03)',
+              border: '0.5px solid rgba(255,255,255,0.07)',
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -1189,7 +1161,7 @@ function StatsPanel() {
                 position: 'absolute',
                 top: 0,
                 left: 0,
-                width: 20,
+                width: 18,
                 height: 2,
                 background: c.accent,
                 borderRadius: 999,
@@ -1197,10 +1169,10 @@ function StatsPanel() {
             />
             <div
               style={{
-                fontSize: 10.5,
-                color: textMuted,
-                letterSpacing: '0.08em',
+                fontSize: 9.5,
+                color: TEXT_MUTED,
                 textTransform: 'uppercase',
+                letterSpacing: '0.08em',
                 fontWeight: 500,
               }}
             >
@@ -1208,17 +1180,17 @@ function StatsPanel() {
             </div>
             <div
               style={{
-                fontSize: 22,
+                fontSize: 18,
                 color: '#fff',
-                fontWeight: 600,
-                marginTop: 6,
+                fontWeight: 500,
+                marginTop: 4,
                 letterSpacing: '-0.02em',
                 fontVariantNumeric: 'tabular-nums',
               }}
             >
               {c.value}
             </div>
-            <div style={{ fontSize: 11, color: textFaint, marginTop: 2 }}>
+            <div style={{ fontSize: 10, color: TEXT_FAINT, marginTop: 2 }}>
               {c.sub}
             </div>
           </div>
@@ -1230,14 +1202,12 @@ function StatsPanel() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            marginBottom: 8,
+            gap: 6,
+            marginBottom: 6,
           }}
         >
-          <TrendingUp size={13} color="#f59e0b" />
-          <span style={{ fontSize: 12, color: textMuted, letterSpacing: '0.01em' }}>
-            Top performers
-          </span>
+          <TrendingUp size={11} color="#f59e0b" />
+          <span style={{ fontSize: 11, color: TEXT_MUTED }}>Top performers</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {TOP_PERFORMERS.map((p, i) => (
@@ -1247,8 +1217,8 @@ function StatsPanel() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 12,
-                padding: '10px 4px',
+                gap: 10,
+                padding: '8px 2px',
                 borderBottom:
                   i === TOP_PERFORMERS.length - 1
                     ? 'none'
@@ -1259,14 +1229,14 @@ function StatsPanel() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 10,
+                  gap: 8,
                   minWidth: 0,
                 }}
               >
-                <Star size={12} color="#f59e0b" fill="#f59e0b" />
+                <Star size={10} color="#f59e0b" fill="#f59e0b" />
                 <span
                   style={{
-                    fontSize: 13,
+                    fontSize: 11.5,
                     color: '#fff',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -1278,7 +1248,7 @@ function StatsPanel() {
               </div>
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: 11,
                   color: '#10b981',
                   fontWeight: 600,
                   fontVariantNumeric: 'tabular-nums',
