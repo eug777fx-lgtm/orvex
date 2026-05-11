@@ -216,6 +216,17 @@ export default function MarketingEngine() {
   const [loading, setLoading] = useState(true)
   const [meetingAgents, setMeetingAgents] = useState([])
   const [liveLog, setLiveLog] = useState(LIVE_LOG)
+  const [toast, setToast] = useState(null)
+
+  const showToast = useCallback((message, kind = 'info') => {
+    setToast({ id: Date.now(), message, kind })
+  }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(id)
+  }, [toast])
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000)
@@ -350,8 +361,10 @@ export default function MarketingEngine() {
         ...s,
         contentReady: Math.max(0, s.contentReady - 1),
       }))
+      showToast('Content approved — added to schedule')
     } catch (e) {
       console.error('approve failed', e)
+      showToast('Approve failed', 'error')
     }
   }
 
@@ -411,7 +424,13 @@ export default function MarketingEngine() {
             overflow: 'auto',
           }}
         >
-          <AgentOffice screenIndex={screenIndex} meetingAgents={meetingAgents} />
+          <AgentOffice
+            screenIndex={screenIndex}
+            meetingAgents={meetingAgents}
+            brand={selectedBrand}
+            onRefresh={refreshBrandData}
+            showToast={showToast}
+          />
           <ScheduleStrip schedule={schedule} />
         </div>
       </div>
@@ -447,7 +466,51 @@ export default function MarketingEngine() {
           {activeTab === 'stats' && <StatsPanel />}
         </div>
       </aside>
+
+      <Toast toast={toast} />
     </motion.div>
+  )
+}
+
+function Toast({ toast }) {
+  return (
+    <AnimatePresence>
+      {toast && (
+        <motion.div
+          key={toast.id}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 32,
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            padding: '10px 18px',
+            borderRadius: 999,
+            background: 'rgba(20,20,24,0.92)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border:
+              toast.kind === 'error'
+                ? '0.5px solid rgba(239,68,68,0.45)'
+                : '0.5px solid rgba(255,255,255,0.15)',
+            color: toast.kind === 'error' ? '#fca5a5' : 'rgba(255,255,255,0.92)',
+            fontSize: 12.5,
+            fontWeight: 500,
+            letterSpacing: '0.01em',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            pointerEvents: 'none',
+            maxWidth: 480,
+            textAlign: 'center',
+          }}
+        >
+          {toast.message}
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
@@ -677,13 +740,55 @@ const ALL_HANDS_TARGETS = {
   analytics: { left: 58, top: 55 },
 }
 
-function AgentOffice({ screenIndex, meetingAgents }) {
+async function callAgent(brandId, agentType) {
+  const res = await fetch('/api/agents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ brand_id: brandId, agent_type: agentType }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'agent_failed' }))
+    throw new Error(err.error || 'agent_failed')
+  }
+  return res.json()
+}
+
+function countItemsAdded(data) {
+  const o = data?.output
+  if (!o) return 0
+  const hooks = Array.isArray(o.hooks) ? o.hooks.length : 0
+  const captions = Array.isArray(o.captions) ? o.captions.length : 0
+  return hooks + captions
+}
+
+function AgentOffice({ screenIndex, meetingAgents, brand, onRefresh, showToast }) {
   const [allHands, setAllHands] = useState(false)
+  const [runAllStep, setRunAllStep] = useState(null)
 
   function triggerAllHands() {
     if (allHands) return
     setAllHands(true)
     setTimeout(() => setAllHands(false), 4000)
+  }
+
+  async function handleRunAll() {
+    if (!brand || runAllStep) return
+    try {
+      setRunAllStep('strategy')
+      await callAgent(brand.id, 'strategy')
+      showToast?.('Strategy Agent finished')
+      await new Promise((r) => setTimeout(r, 2000))
+      setRunAllStep('writer')
+      const writerData = await callAgent(brand.id, 'writer')
+      const added = countItemsAdded(writerData)
+      showToast?.(`Writer Agent finished — ${added} items added to queue`)
+      setRunAllStep(null)
+      onRefresh?.()
+    } catch (e) {
+      console.error('run all failed', e)
+      showToast?.('Run All failed', 'error')
+      setRunAllStep(null)
+    }
   }
 
   return (
@@ -724,6 +829,11 @@ function AgentOffice({ screenIndex, meetingAgents }) {
           >
             5 ACTIVE
           </span>
+          <RunAllButton
+            disabled={!brand || !!runAllStep}
+            step={runAllStep}
+            onClick={handleRunAll}
+          />
         </div>
         <Activity size={13} color={TEXT_MUTED} />
       </div>
@@ -880,6 +990,9 @@ function AgentOffice({ screenIndex, meetingAgents }) {
             screenIndex={screenIndex}
             inMeeting={meetingAgents.includes(agent.key)}
             allHands={allHands}
+            brand={brand}
+            onRefresh={onRefresh}
+            showToast={showToast}
           />
         ))}
       </div>
@@ -887,9 +1000,97 @@ function AgentOffice({ screenIndex, meetingAgents }) {
   )
 }
 
-function AgentStation({ agent, index, screenIndex, inMeeting, allHands }) {
+function RunAllButton({ disabled, step, onClick }) {
+  const [hover, setHover] = useState(false)
+  const running = !!step
+  const label = running
+    ? step === 'strategy'
+      ? 'Running 1/2 · Strategy'
+      : 'Running 2/2 · Writer'
+    : 'Run All'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      disabled={disabled}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        fontSize: 10,
+        padding: '3px 10px',
+        borderRadius: 999,
+        border: '0.5px solid rgba(255,255,255,0.18)',
+        background: hover && !disabled ? 'rgba(255,255,255,0.06)' : 'transparent',
+        color: disabled ? 'rgba(255,255,255,0.3)' : hover ? '#fff' : 'rgba(255,255,255,0.65)',
+        letterSpacing: '0.04em',
+        fontWeight: 600,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'all 0.15s ease',
+      }}
+    >
+      {running && (
+        <motion.span
+          animate={{ opacity: [1, 0.4, 1] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: '#10b981',
+            boxShadow: '0 0 6px rgba(16,185,129,0.6)',
+          }}
+        />
+      )}
+      {label}
+    </button>
+  )
+}
+
+function RunButton({ disabled, running, onClick }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        fontSize: 9,
+        padding: '3px 8px',
+        borderRadius: 999,
+        border: '0.5px solid rgba(255,255,255,0.15)',
+        background: hover && !disabled ? 'rgba(255,255,255,0.06)' : 'transparent',
+        color: disabled ? 'rgba(255,255,255,0.25)' : hover ? '#fff' : 'rgba(255,255,255,0.5)',
+        letterSpacing: '0.04em',
+        fontWeight: 500,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        marginTop: 4,
+        alignSelf: 'flex-start',
+        transition: 'all 0.15s ease',
+      }}
+    >
+      {running ? 'Running' : 'Run'}
+    </button>
+  )
+}
+
+function AgentStation({
+  agent,
+  index,
+  screenIndex,
+  inMeeting,
+  allHands,
+  brand,
+  onRefresh,
+  showToast,
+}) {
   const status = agent.statuses[screenIndex % agent.statuses.length]
   const [walk, setWalk] = useState({ x: 0, y: 0 })
+  const [runStatus, setRunStatus] = useState('idle') // idle | running | success | error
 
   useEffect(() => {
     if (allHands) {
@@ -915,6 +1116,76 @@ function AgentStation({ agent, index, screenIndex, inMeeting, allHands }) {
   const target = allHands
     ? ALL_HANDS_TARGETS[agent.key]
     : { left: baseLeft + walk.x, top: baseTop + walk.y }
+
+  async function handleRun() {
+    if (!brand || runStatus === 'running') return
+    setRunStatus('running')
+    try {
+      const data = await callAgent(brand.id, agent.key)
+      setRunStatus('success')
+      const added = countItemsAdded(data)
+      showToast?.(
+        added > 0
+          ? `${agent.name} Agent finished — ${added} items added to queue`
+          : `${agent.name} Agent finished`,
+      )
+      if (agent.key === 'writer' || agent.key === 'strategy') {
+        onRefresh?.()
+      }
+      setTimeout(() => setRunStatus('idle'), 3000)
+    } catch (e) {
+      console.error(`${agent.key} run failed`, e)
+      setRunStatus('error')
+      showToast?.(`${agent.name} Agent failed — retry`, 'error')
+      setTimeout(() => setRunStatus('idle'), 3000)
+    }
+  }
+
+  const isRunning = runStatus === 'running'
+  const isSuccess = runStatus === 'success'
+  const isError = runStatus === 'error'
+
+  let borderColor = 'rgba(255,255,255,0.08)'
+  let shadow = 'none'
+  if (isError) {
+    borderColor = 'rgba(239,68,68,0.6)'
+    shadow = '0 0 14px rgba(239,68,68,0.3)'
+  } else if (isSuccess) {
+    borderColor = 'rgba(74,222,128,0.6)'
+    shadow = '0 0 14px rgba(74,222,128,0.3)'
+  } else if (inMeeting) {
+    borderColor = 'rgba(255,255,255,0.35)'
+    shadow = '0 0 14px rgba(255,255,255,0.18)'
+  }
+
+  const cardAnimate = isRunning
+    ? {
+        borderColor: [
+          'rgba(255,255,255,0.1)',
+          'rgba(255,255,255,0.45)',
+          'rgba(255,255,255,0.1)',
+        ],
+        boxShadow: [
+          '0 0 0px rgba(255,255,255,0)',
+          '0 0 12px rgba(255,255,255,0.15)',
+          '0 0 0px rgba(255,255,255,0)',
+        ],
+      }
+    : { borderColor, boxShadow: shadow }
+
+  const line1 = isRunning
+    ? 'Running...'
+    : isSuccess
+    ? 'Complete ✓'
+    : isError
+    ? 'Error — retry'
+    : status[0]
+  const line2 = isRunning || isSuccess || isError ? '' : status[1]
+  const line1Color = isSuccess
+    ? '#4ade80'
+    : isError
+    ? '#fca5a5'
+    : 'rgba(255,255,255,0.55)'
 
   return (
     <motion.div
@@ -967,18 +1238,22 @@ function AgentStation({ agent, index, screenIndex, inMeeting, allHands }) {
       </motion.div>
 
       {/* Desk card */}
-      <div
+      <motion.div
+        animate={cardAnimate}
+        transition={
+          isRunning
+            ? { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }
+            : { duration: 0.3 }
+        }
         style={{
           background: 'rgba(255,255,255,0.04)',
-          border: inMeeting
-            ? '0.5px solid rgba(255,255,255,0.35)'
-            : '0.5px solid rgba(255,255,255,0.08)',
-          boxShadow: inMeeting ? '0 0 14px rgba(255,255,255,0.18)' : 'none',
+          border: '0.5px solid rgba(255,255,255,0.08)',
           borderRadius: 10,
           padding: '8px 10px',
           width: 120,
           maxWidth: 120,
-          transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         <div
@@ -1022,7 +1297,15 @@ function AgentStation({ agent, index, screenIndex, inMeeting, allHands }) {
         </div>
         <AnimatePresence mode="wait">
           <motion.div
-            key={screenIndex % agent.statuses.length}
+            key={
+              isRunning
+                ? 'run'
+                : isSuccess
+                ? 'ok'
+                : isError
+                ? 'err'
+                : `s-${screenIndex % agent.statuses.length}`
+            }
             initial={{ opacity: 0, y: 3 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -3 }}
@@ -1031,15 +1314,16 @@ function AgentStation({ agent, index, screenIndex, inMeeting, allHands }) {
             <div
               style={{
                 fontSize: 9,
-                color: 'rgba(255,255,255,0.55)',
+                color: line1Color,
                 fontFamily: MONO,
                 lineHeight: 1.4,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                fontWeight: isSuccess || isError ? 600 : 400,
               }}
             >
-              {status[0]}
+              {line1}
             </div>
             <div
               style={{
@@ -1053,11 +1337,16 @@ function AgentStation({ agent, index, screenIndex, inMeeting, allHands }) {
                 minHeight: 13,
               }}
             >
-              {status[1]}
+              {line2}
             </div>
           </motion.div>
         </AnimatePresence>
-      </div>
+        <RunButton
+          disabled={!brand || isRunning}
+          running={isRunning}
+          onClick={handleRun}
+        />
+      </motion.div>
     </motion.div>
   )
 }
