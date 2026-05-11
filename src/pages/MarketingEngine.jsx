@@ -37,7 +37,7 @@ const AGENTS = [
     name: 'Strategy',
     color: '#a855f7',
     icon: Brain,
-    pos: { left: '8%', top: '12%' },
+    pos: { left: '5%', top: '8%' },
     statuses: [
       ['Analyzing comps', '3 gaps found'],
       ['Trend scan running', 'ICT +38%'],
@@ -49,7 +49,7 @@ const AGENTS = [
     name: 'Writer',
     color: '#06b6d4',
     icon: PenLine,
-    pos: { left: '38%', top: '12%' },
+    pos: { left: '36%', top: '8%' },
     statuses: [
       ['Polishing copy', 'Tone: confident'],
       ['Hook batch ready', '6 generated'],
@@ -61,7 +61,7 @@ const AGENTS = [
     name: 'Video Director',
     color: '#f59e0b',
     icon: Video,
-    pos: { left: '66%', top: '12%' },
+    pos: { left: '67%', top: '8%' },
     statuses: [
       ['Sourcing B-roll', 'Stock library'],
       ['Building Runway brief', ''],
@@ -73,7 +73,7 @@ const AGENTS = [
     name: 'Distribution',
     color: '#10b981',
     icon: Send,
-    pos: { left: '8%', top: '58%' },
+    pos: { left: '14%', top: '60%' },
     statuses: [
       ['Queue: 4 pending', 'Auto-post on'],
       ['Posted to Instagram', '9:00 AM'],
@@ -85,7 +85,7 @@ const AGENTS = [
     name: 'Analytics',
     color: '#ef4444',
     icon: BarChart3,
-    pos: { left: '66%', top: '58%' },
+    pos: { left: '58%', top: '60%' },
     statuses: [
       ['Top: Reel #14', 'Score 92'],
       ['Scoring 7 posts', 'avg 84'],
@@ -506,7 +506,23 @@ function StatsRow() {
 }
 
 // ===== Agent Office =====
+const ALL_HANDS_TARGETS = {
+  strategy: { left: 30, top: 30 },
+  writer: { left: 44, top: 24 },
+  video: { left: 58, top: 30 },
+  distribution: { left: 30, top: 55 },
+  analytics: { left: 58, top: 55 },
+}
+
 function AgentOffice({ screenIndex, meetingAgents }) {
+  const [allHands, setAllHands] = useState(false)
+
+  function triggerAllHands() {
+    if (allHands) return
+    setAllHands(true)
+    setTimeout(() => setAllHands(false), 4000)
+  }
+
   return (
     <div
       style={{
@@ -552,7 +568,7 @@ function AgentOffice({ screenIndex, meetingAgents }) {
       <div
         style={{
           position: 'relative',
-          minHeight: 340,
+          minHeight: 320,
           borderRadius: 12,
           background: 'rgba(0,0,0,0.2)',
           border: '0.5px solid rgba(255,255,255,0.07)',
@@ -642,19 +658,56 @@ function AgentOffice({ screenIndex, meetingAgents }) {
           />
         ))}
 
-        {/* Meeting table */}
-        <div
+        {/* Meeting table (clickable, triggers all-hands) */}
+        <motion.div
+          onClick={triggerAllHands}
+          animate={{
+            boxShadow: allHands
+              ? '0 0 20px rgba(255,255,255,0.15)'
+              : '0 0 0px rgba(255,255,255,0)',
+          }}
+          transition={{ duration: 0.3 }}
           style={{
             position: 'absolute',
-            left: '38%',
-            top: '50%',
-            width: 120,
-            height: 60,
+            left: '50%',
+            top: '44%',
+            transform: 'translate(-50%, -50%)',
+            width: 100,
+            height: 48,
             borderRadius: 999,
-            background: 'rgba(255,255,255,0.025)',
-            border: '0.5px solid rgba(255,255,255,0.05)',
+            background: allHands ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.025)',
+            border: allHands
+              ? '0.5px solid rgba(255,255,255,0.3)'
+              : '0.5px solid rgba(255,255,255,0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 1,
+            transition: 'background 0.3s ease, border-color 0.3s ease',
           }}
-        />
+        >
+          <AnimatePresence>
+            {allHands && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.9)',
+                  fontWeight: 600,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  pointerEvents: 'none',
+                }}
+              >
+                All hands
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
         {AGENTS.map((agent, i) => (
           <AgentStation
@@ -663,6 +716,7 @@ function AgentOffice({ screenIndex, meetingAgents }) {
             index={i}
             screenIndex={screenIndex}
             inMeeting={meetingAgents.includes(agent.key)}
+            allHands={allHands}
           />
         ))}
       </div>
@@ -670,21 +724,49 @@ function AgentOffice({ screenIndex, meetingAgents }) {
   )
 }
 
-function AgentStation({ agent, index, screenIndex, inMeeting }) {
+function AgentStation({ agent, index, screenIndex, inMeeting, allHands }) {
   const status = agent.statuses[screenIndex % agent.statuses.length]
+  const [walk, setWalk] = useState({ x: 0, y: 0 })
+
+  useEffect(() => {
+    if (allHands) {
+      setWalk({ x: 0, y: 0 })
+      return
+    }
+    let returnId
+    const id = setInterval(() => {
+      setWalk({
+        x: (Math.random() - 0.5) * 6,
+        y: (Math.random() - 0.5) * 6,
+      })
+      returnId = setTimeout(() => setWalk({ x: 0, y: 0 }), 1400)
+    }, 6000)
+    return () => {
+      clearInterval(id)
+      if (returnId) clearTimeout(returnId)
+    }
+  }, [allHands])
+
+  const baseLeft = parseFloat(agent.pos.left)
+  const baseTop = parseFloat(agent.pos.top)
+  const target = allHands
+    ? ALL_HANDS_TARGETS[agent.key]
+    : { left: baseLeft + walk.x, top: baseTop + walk.y }
+
   return (
-    <div
+    <motion.div
+      animate={{ left: `${target.left}%`, top: `${target.top}%` }}
+      transition={{ duration: allHands ? 0.9 : 0.6, ease: 'easeInOut' }}
       style={{
         position: 'absolute',
-        left: agent.pos.left,
-        top: agent.pos.top,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         gap: 4,
+        zIndex: 2,
       }}
     >
-      {/* Character */}
+      {/* Character (bobbing) */}
       <motion.div
         animate={{ y: [0, -4, 0] }}
         transition={{
@@ -703,18 +785,18 @@ function AgentStation({ agent, index, screenIndex, inMeeting }) {
       >
         <div
           style={{
-            width: 10,
-            height: 10,
+            width: 8,
+            height: 8,
             borderRadius: '50%',
             background: agent.color,
-            boxShadow: `0 0 8px ${agent.color}99`,
+            boxShadow: `0 0 6px ${agent.color}99`,
           }}
         />
         <div
           style={{
-            width: 14,
-            height: 8,
-            borderRadius: 4,
+            width: 10,
+            height: 6,
+            borderRadius: 3,
             background: agent.color,
             opacity: 0.5,
           }}
@@ -730,8 +812,9 @@ function AgentStation({ agent, index, screenIndex, inMeeting }) {
             : '0.5px solid rgba(255,255,255,0.08)',
           boxShadow: inMeeting ? '0 0 14px rgba(255,255,255,0.18)' : 'none',
           borderRadius: 10,
-          padding: '10px 12px',
-          minWidth: 130,
+          padding: '8px 10px',
+          width: 120,
+          maxWidth: 120,
           transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
@@ -740,13 +823,13 @@ function AgentStation({ agent, index, screenIndex, inMeeting }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: 8,
-            marginBottom: 4,
+            gap: 6,
+            marginBottom: 3,
           }}
         >
           <span
             style={{
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: 500,
               color: '#fff',
               overflow: 'hidden',
@@ -765,8 +848,8 @@ function AgentStation({ agent, index, screenIndex, inMeeting }) {
               delay: index * 0.2,
             }}
             style={{
-              width: 6,
-              height: 6,
+              width: 5,
+              height: 5,
               borderRadius: '50%',
               background: agent.color,
               boxShadow: `0 0 6px ${agent.color}cc`,
@@ -784,7 +867,7 @@ function AgentStation({ agent, index, screenIndex, inMeeting }) {
           >
             <div
               style={{
-                fontSize: 10,
+                fontSize: 9,
                 color: 'rgba(255,255,255,0.55)',
                 fontFamily: MONO,
                 lineHeight: 1.4,
@@ -797,14 +880,14 @@ function AgentStation({ agent, index, screenIndex, inMeeting }) {
             </div>
             <div
               style={{
-                fontSize: 10,
+                fontSize: 9,
                 color: 'rgba(255,255,255,0.4)',
                 fontFamily: MONO,
                 lineHeight: 1.4,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                minHeight: 14,
+                minHeight: 13,
               }}
             >
               {status[1]}
@@ -812,7 +895,7 @@ function AgentStation({ agent, index, screenIndex, inMeeting }) {
           </motion.div>
         </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
