@@ -36,9 +36,9 @@ const AGENTS = [
     color: '#a855f7',
     icon: Brain,
     statuses: [
-      ['Scanning trends', '23 hot topics'],
       ['Analyzing comps', '3 gaps found'],
-      ['Brief ready', 'Sent to Writer'],
+      ['Trend scan running', 'ICT +38%'],
+      ['Writing weekly brief...', ''],
     ],
   },
   {
@@ -47,9 +47,9 @@ const AGENTS = [
     color: '#06b6d4',
     icon: PenLine,
     statuses: [
-      ['Drafting hooks', '8 variations'],
       ['Polishing copy', 'Tone: confident'],
-      ['Caption done', 'Awaiting review'],
+      ['Hook batch ready', '6 generated'],
+      ['Caption writing', 'Brand voice on'],
     ],
   },
   {
@@ -58,9 +58,9 @@ const AGENTS = [
     color: '#f59e0b',
     icon: Video,
     statuses: [
-      ['Storyboarding', 'Scene 2 of 5'],
       ['Sourcing B-roll', 'Stock library'],
-      ['Brief ready', 'Editor queued'],
+      ['Building Runway brief...', ''],
+      ['ElevenLabs script ready', ''],
     ],
   },
   {
@@ -69,9 +69,9 @@ const AGENTS = [
     color: '#10b981',
     icon: Send,
     statuses: [
-      ['Scheduling IG', '9:00 AM slot'],
       ['Queue: 4 pending', 'Auto-post on'],
-      ['Posted reel', '234 likes'],
+      ['Posted to Instagram', '9:00 AM'],
+      ['TikTok scheduled', '3:00 PM'],
     ],
   },
   {
@@ -80,11 +80,24 @@ const AGENTS = [
     color: '#ef4444',
     icon: BarChart3,
     statuses: [
-      ['Scoring posts', 'Avg: 84'],
       ['Top: Reel #14', 'Score 92'],
-      ['Trend dropping', 'Pivot in 2d'],
+      ['Scoring 7 posts', 'avg 84'],
+      ['Memory updated', 'Loop complete'],
     ],
   },
+]
+
+const AGENT_COLOR = Object.fromEntries(AGENTS.map((a) => [a.name, a.color]))
+
+const LOG_FEED = [
+  { agent: 'Strategy', action: 'completed trend scan — ICT angle prioritized' },
+  { agent: 'Writer', action: 'generated hook batch for LIMITLESS — 6 hooks ready' },
+  { agent: 'Distribution', action: 'posted to Instagram — engagement tracking started' },
+  { agent: 'Analytics', action: 'scored Reel #14 — 92/100 added to memory' },
+  { agent: 'Writer', action: 'added 3 items to review queue' },
+  { agent: 'Strategy', action: 'updated weekly brief — new campaign angle found' },
+  { agent: 'Distribution', action: 'scheduled TikTok for 3:00 PM' },
+  { agent: 'Analytics', action: 'updated brand memory with new top performer' },
 ]
 
 const SCHEDULE = [
@@ -146,6 +159,8 @@ export default function MarketingEngine() {
   const [now, setNow] = useState(new Date())
   const [screenIndex, setScreenIndex] = useState(0)
   const [reviewItems, setReviewItems] = useState(INITIAL_REVIEW)
+  const [meetingAgents, setMeetingAgents] = useState([])
+  const [liveLog, setLiveLog] = useState(LIVE_LOG)
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000)
@@ -153,7 +168,32 @@ export default function MarketingEngine() {
   }, [])
 
   useEffect(() => {
-    const id = setInterval(() => setScreenIndex((i) => i + 1), 4000)
+    const id = setInterval(() => setScreenIndex((i) => i + 1), 3000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    let clearId
+    const id = setInterval(() => {
+      const shuffled = [...AGENTS].sort(() => Math.random() - 0.5)
+      setMeetingAgents([shuffled[0].key, shuffled[1].key])
+      clearId = setTimeout(() => setMeetingAgents([]), 3000)
+    }, 20000)
+    return () => {
+      clearInterval(id)
+      if (clearId) clearTimeout(clearId)
+    }
+  }, [])
+
+  useEffect(() => {
+    let i = 0
+    const id = setInterval(() => {
+      const item = LOG_FEED[i % LOG_FEED.length]
+      const d = new Date()
+      const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      setLiveLog((log) => [{ time, agent: item.agent, action: item.action }, ...log].slice(0, 20))
+      i += 1
+    }, 8000)
     return () => clearInterval(id)
   }, [])
 
@@ -184,7 +224,7 @@ export default function MarketingEngine() {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
-          <AgentOffice screenIndex={screenIndex} />
+          <AgentOffice screenIndex={screenIndex} meetingAgents={meetingAgents} />
           <ScheduleStrip />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
@@ -192,7 +232,7 @@ export default function MarketingEngine() {
           {activeTab === 'review' && (
             <ReviewPanel items={reviewItems} onApprove={approve} onReject={reject} />
           )}
-          {activeTab === 'log' && <LogPanel />}
+          {activeTab === 'log' && <LogPanel entries={liveLog} />}
           {activeTab === 'stats' && <StatsPanel />}
         </div>
       </div>
@@ -427,7 +467,7 @@ function StatsRow() {
   )
 }
 
-function AgentOffice({ screenIndex }) {
+function AgentOffice({ screenIndex, meetingAgents }) {
   return (
     <div
       style={{
@@ -488,7 +528,7 @@ function AgentOffice({ screenIndex }) {
           border: '0.5px solid rgba(255,255,255,0.04)',
           backgroundImage:
             'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
-          backgroundSize: '18px 18px',
+          backgroundSize: '24px 24px',
           backgroundPosition: '0 0',
         }}
       >
@@ -505,6 +545,7 @@ function AgentOffice({ screenIndex }) {
               agent={agent}
               screenIndex={screenIndex}
               index={i}
+              inMeeting={meetingAgents.includes(agent.key)}
             />
           ))}
         </div>
@@ -513,23 +554,73 @@ function AgentOffice({ screenIndex }) {
   )
 }
 
-function AgentDesk({ agent, screenIndex, index }) {
+function AgentDesk({ agent, screenIndex, index, inMeeting }) {
   const Icon = agent.icon
   const status = agent.statuses[screenIndex % agent.statuses.length]
   return (
     <div
       style={{
-        position: 'relative',
-        background: 'rgba(255,255,255,0.025)',
-        border: '0.5px solid rgba(255,255,255,0.06)',
-        borderRadius: 12,
-        padding: 12,
-        minHeight: 110,
         display: 'flex',
         flexDirection: 'column',
-        gap: 8,
+        alignItems: 'center',
+        gap: 6,
       }}
     >
+      <motion.div
+        animate={{ y: [0, -4, 0] }}
+        transition={{
+          duration: 1.5,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: index * 0.3,
+        }}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 2,
+        }}
+        aria-hidden
+      >
+        <div
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            background: agent.color,
+            boxShadow: `0 0 8px ${agent.color}80`,
+          }}
+        />
+        <div
+          style={{
+            width: 14,
+            height: 8,
+            borderRadius: 4,
+            background: agent.color,
+            opacity: 0.5,
+          }}
+        />
+      </motion.div>
+      <div
+        style={{
+          position: 'relative',
+          background: 'rgba(255,255,255,0.025)',
+          border: inMeeting
+            ? '0.5px solid rgba(255,255,255,0.3)'
+            : '0.5px solid rgba(255,255,255,0.06)',
+          boxShadow: inMeeting
+            ? '0 0 16px rgba(255,255,255,0.18)'
+            : 'none',
+          borderRadius: 12,
+          padding: 12,
+          minHeight: 110,
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
+        }}
+      >
       <div
         style={{
           display: 'flex',
@@ -634,6 +725,7 @@ function AgentDesk({ agent, screenIndex, index }) {
             </div>
           </motion.div>
         </AnimatePresence>
+      </div>
       </div>
     </div>
   )
@@ -970,7 +1062,7 @@ function ReviewPanel({ items, onApprove, onReject }) {
   )
 }
 
-function LogPanel() {
+function LogPanel({ entries }) {
   return (
     <div
       style={{
@@ -990,46 +1082,63 @@ function LogPanel() {
           Real-time agent activity
         </span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {LIVE_LOG.map((entry, i) => (
-          <div
-            key={i}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '52px 110px 1fr',
-              gap: 12,
-              padding: '10px 4px',
-              borderBottom:
-                i === LIVE_LOG.length - 1
-                  ? 'none'
-                  : '0.5px solid rgba(255,255,255,0.04)',
-              alignItems: 'baseline',
-            }}
-          >
-            <span
-              style={{
-                fontSize: 11,
-                color: textFaint,
-                fontVariantNumeric: 'tabular-nums',
-                fontFamily: 'ui-monospace, monospace',
-              }}
-            >
-              {entry.time}
-            </span>
-            <span style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>
-              {entry.agent}
-            </span>
-            <span
-              style={{
-                fontSize: 12.5,
-                color: 'rgba(255,255,255,0.7)',
-                lineHeight: 1.4,
-              }}
-            >
-              {entry.action}
-            </span>
-          </div>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 420, overflowY: 'auto' }}>
+        <AnimatePresence initial={false}>
+          {entries.map((entry, i) => {
+            const color = AGENT_COLOR[entry.agent] || '#fff'
+            return (
+              <motion.div
+                key={`${entry.time}-${i}-${entry.action.slice(0, 12)}`}
+                layout
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '52px 130px 1fr',
+                  gap: 12,
+                  padding: '10px 4px',
+                  borderBottom:
+                    i === entries.length - 1
+                      ? 'none'
+                      : '0.5px solid rgba(255,255,255,0.04)',
+                  alignItems: 'baseline',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: textFaint,
+                    fontVariantNumeric: 'tabular-nums',
+                    fontFamily: 'ui-monospace, monospace',
+                  }}
+                >
+                  {entry.time}
+                </span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    color,
+                    fontWeight: 600,
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  {entry.agent}
+                </span>
+                <span
+                  style={{
+                    fontSize: 12.5,
+                    color: 'rgba(255,255,255,0.7)',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {entry.action}
+                </span>
+              </motion.div>
+            )
+          })}
+        </AnimatePresence>
       </div>
     </div>
   )
