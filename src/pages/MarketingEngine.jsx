@@ -740,7 +740,7 @@ function AgentStation({ agent, index, screenIndex, inMeeting, allHands }) {
         y: (Math.random() - 0.5) * 6,
       })
       returnId = setTimeout(() => setWalk({ x: 0, y: 0 }), 1400)
-    }, 6000)
+    }, 8000)
     return () => {
       clearInterval(id)
       if (returnId) clearTimeout(returnId)
