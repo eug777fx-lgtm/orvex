@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import db from '@/lib/db'
 import {
   Activity,
   Brain,
@@ -165,13 +166,54 @@ function nowHHMM() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function fmtTime(d) {
+  if (!d) return ''
+  const date = new Date(d)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function LoadingPulse() {
+  return (
+    <motion.span
+      animate={{ opacity: [0.3, 1, 0.3] }}
+      transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+      style={{
+        fontSize: 10.5,
+        color: 'rgba(255,255,255,0.55)',
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        fontWeight: 500,
+      }}
+    >
+      Syncing
+    </motion.span>
+  )
+}
+
+function reviewItemText(item) {
+  return item.hook || item.caption || item.script || '(empty)'
+}
+
+function reviewItemType(item) {
+  return item.type || (item.hook ? 'hook' : item.caption ? 'caption' : item.script ? 'script' : 'item')
+}
+
 // ===== Page =====
 export default function MarketingEngine() {
-  const [selectedBrand, setSelectedBrand] = useState('LIMITLESS')
+  const [brands, setBrands] = useState([])
+  const [selectedBrand, setSelectedBrand] = useState(null)
   const [activeTab, setActiveTab] = useState('review')
   const [now, setNow] = useState(new Date())
   const [screenIndex, setScreenIndex] = useState(0)
-  const [reviewItems, setReviewItems] = useState(INITIAL_REVIEW)
+  const [reviewItems, setReviewItems] = useState([])
+  const [schedule, setSchedule] = useState([])
+  const [stats, setStats] = useState({
+    contentReady: 0,
+    scheduled: 0,
+    avgScore: 0,
+    published: 0,
+  })
+  const [loading, setLoading] = useState(true)
   const [meetingAgents, setMeetingAgents] = useState([])
   const [liveLog, setLiveLog] = useState(LIVE_LOG)
 
@@ -210,11 +252,120 @@ export default function MarketingEngine() {
     return () => clearInterval(id)
   }, [])
 
-  function approve(id) {
-    setReviewItems((items) => items.filter((it) => it.id !== id))
+  // Load brands once
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const rows = await db.query(
+          'SELECT id, name, color FROM brands ORDER BY created_at ASC',
+        )
+        if (cancelled) return
+        setBrands(rows || [])
+        if (rows && rows.length > 0) setSelectedBrand(rows[0])
+        else setLoading(false)
+      } catch (e) {
+        console.error('load brands failed', e)
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Refetch stats / review / schedule whenever selectedBrand changes
+  const refreshBrandData = useCallback(async () => {
+    if (!selectedBrand) return
+    setLoading(true)
+    try {
+      const [
+        cReadyRows,
+        schedCountRows,
+        publishedRows,
+        avgScoreRows,
+        reviewRows,
+        scheduleRows,
+      ] = await Promise.all([
+        db.query(
+          "SELECT COUNT(*)::int AS count FROM content WHERE brand_id=$1 AND status='pending'",
+          [selectedBrand.id],
+        ),
+        db.query(
+          'SELECT COUNT(*)::int AS count FROM schedules WHERE brand_id=$1 AND published=false',
+          [selectedBrand.id],
+        ),
+        db.query(
+          "SELECT COUNT(*)::int AS count FROM content WHERE brand_id=$1 AND status='published'",
+          [selectedBrand.id],
+        ),
+        db.query(
+          'SELECT AVG(score)::float AS avg FROM analytics WHERE brand_id=$1',
+          [selectedBrand.id],
+        ),
+        db.query(
+          `SELECT id, type, hook, caption, script, created_at
+           FROM content
+           WHERE brand_id=$1 AND status='pending'
+           ORDER BY created_at DESC
+           LIMIT 10`,
+          [selectedBrand.id],
+        ),
+        db.query(
+          `SELECT s.id, s.platform, s.scheduled_at, s.published, c.hook, c.caption, c.type
+           FROM schedules s
+           JOIN content c ON s.content_id = c.id
+           WHERE s.brand_id = $1 AND s.scheduled_at > now() - interval '1 day'
+           ORDER BY s.scheduled_at ASC
+           LIMIT 8`,
+          [selectedBrand.id],
+        ),
+      ])
+      setStats({
+        contentReady: cReadyRows?.[0]?.count ?? 0,
+        scheduled: schedCountRows?.[0]?.count ?? 0,
+        published: publishedRows?.[0]?.count ?? 0,
+        avgScore: avgScoreRows?.[0]?.avg
+          ? Math.round(avgScoreRows[0].avg)
+          : 0,
+      })
+      setReviewItems(reviewRows || [])
+      setSchedule(scheduleRows || [])
+    } catch (e) {
+      console.error('fetch brand data failed', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedBrand])
+
+  useEffect(() => {
+    refreshBrandData()
+  }, [refreshBrandData])
+
+  async function approve(id) {
+    try {
+      await db.query("UPDATE content SET status='approved' WHERE id=$1", [id])
+      setReviewItems((items) => items.filter((it) => it.id !== id))
+      setStats((s) => ({
+        ...s,
+        contentReady: Math.max(0, s.contentReady - 1),
+      }))
+    } catch (e) {
+      console.error('approve failed', e)
+    }
   }
-  function reject(id) {
-    setReviewItems((items) => items.filter((it) => it.id !== id))
+
+  async function reject(id) {
+    try {
+      await db.query("UPDATE content SET status='rejected' WHERE id=$1", [id])
+      setReviewItems((items) => items.filter((it) => it.id !== id))
+      setStats((s) => ({
+        ...s,
+        contentReady: Math.max(0, s.contentReady - 1),
+      }))
+    } catch (e) {
+      console.error('reject failed', e)
+    }
   }
 
   return (
@@ -224,7 +375,6 @@ export default function MarketingEngine() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
       style={{
-        // Escape Shell's main padding for full-bleed
         margin: '-2rem',
         display: 'grid',
         gridTemplateColumns: '1fr 280px',
@@ -242,9 +392,13 @@ export default function MarketingEngine() {
           overflow: 'hidden',
         }}
       >
-        <PageHeader now={now} />
-        <BrandSelector selected={selectedBrand} onSelect={setSelectedBrand} />
-        <StatsRow />
+        <PageHeader now={now} loading={loading} />
+        <BrandSelector
+          brands={brands}
+          selected={selectedBrand}
+          onSelect={setSelectedBrand}
+        />
+        <StatsRow stats={stats} loading={loading} />
 
         <div
           style={{
@@ -258,7 +412,7 @@ export default function MarketingEngine() {
           }}
         >
           <AgentOffice screenIndex={screenIndex} meetingAgents={meetingAgents} />
-          <ScheduleStrip />
+          <ScheduleStrip schedule={schedule} />
         </div>
       </div>
 
@@ -282,7 +436,12 @@ export default function MarketingEngine() {
           }}
         >
           {activeTab === 'review' && (
-            <ReviewPanel items={reviewItems} onApprove={approve} onReject={reject} />
+            <ReviewPanel
+              items={reviewItems}
+              brand={selectedBrand}
+              onApprove={approve}
+              onReject={reject}
+            />
           )}
           {activeTab === 'log' && <LogPanel entries={liveLog} />}
           {activeTab === 'stats' && <StatsPanel />}
@@ -293,7 +452,7 @@ export default function MarketingEngine() {
 }
 
 // ===== Page Header =====
-function PageHeader({ now }) {
+function PageHeader({ now, loading }) {
   return (
     <div
       style={{
@@ -321,6 +480,7 @@ function PageHeader({ now }) {
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {loading && <LoadingPulse />}
         <motion.span
           animate={{ scale: [1, 1.3, 1], opacity: [1, 0.55, 1] }}
           transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
@@ -358,7 +518,7 @@ function PageHeader({ now }) {
 }
 
 // ===== Brand Selector =====
-function BrandSelector({ selected, onSelect }) {
+function BrandSelector({ brands, selected, onSelect }) {
   return (
     <div
       style={{
@@ -369,13 +529,14 @@ function BrandSelector({ selected, onSelect }) {
         overflowX: 'auto',
       }}
     >
-      {BRANDS.map((b) => {
-        const active = selected === b.name
+      {brands.map((b) => {
+        const active = selected?.id === b.id
+        const color = b.color || '#a855f7'
         return (
           <button
-            key={b.name}
+            key={b.id}
             type="button"
-            onClick={() => onSelect(b.name)}
+            onClick={() => onSelect(b)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -401,8 +562,8 @@ function BrandSelector({ selected, onSelect }) {
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
-                background: b.color,
-                boxShadow: `0 0 6px ${b.color}80`,
+                background: color,
+                boxShadow: `0 0 6px ${color}80`,
               }}
             />
             {b.name}
@@ -434,12 +595,12 @@ function BrandSelector({ selected, onSelect }) {
 }
 
 // ===== Stats Row =====
-function StatsRow() {
-  const stats = [
-    { label: 'Content Ready', value: 14, sub: 'awaiting approval', accent: '#a855f7' },
-    { label: 'Scheduled', value: 31, sub: 'next 30 days', accent: '#06b6d4' },
-    { label: 'Avg Score', value: 84, sub: 'AI performance', accent: '#f59e0b' },
-    { label: 'Published', value: 127, sub: 'all time', accent: '#10b981' },
+function StatsRow({ stats, loading }) {
+  const cells = [
+    { label: 'Content Ready', value: stats.contentReady, sub: 'awaiting approval', accent: '#a855f7' },
+    { label: 'Scheduled', value: stats.scheduled, sub: 'next 30 days', accent: '#06b6d4' },
+    { label: 'Avg Score', value: stats.avgScore, sub: 'AI performance', accent: '#f59e0b' },
+    { label: 'Published', value: stats.published, sub: 'all time', accent: '#10b981' },
   ]
   return (
     <div
@@ -448,9 +609,11 @@ function StatsRow() {
         display: 'grid',
         gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
         gap: 10,
+        opacity: loading ? 0.55 : 1,
+        transition: 'opacity 0.2s ease',
       }}
     >
-      {stats.map((s) => (
+      {cells.map((s) => (
         <div
           key={s.label}
           style={{
@@ -900,7 +1063,17 @@ function AgentStation({ agent, index, screenIndex, inMeeting, allHands }) {
 }
 
 // ===== Schedule Strip =====
-function ScheduleStrip() {
+function ScheduleStrip({ schedule }) {
+  const usingFallback = !schedule || schedule.length === 0
+  const rows = usingFallback
+    ? SCHEDULE
+    : schedule.map((s) => ({
+        time: fmtTime(s.scheduled_at),
+        task: s.hook || s.caption || s.platform || s.type || 'Scheduled post',
+        agent: (s.platform || 'Post').toString(),
+        color: '#10b981',
+        status: s.published ? 'done' : 'pending',
+      }))
   return (
     <div
       style={{
@@ -925,6 +1098,18 @@ function ScheduleStrip() {
         <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
           Today's Schedule
         </span>
+        {usingFallback && (
+          <span
+            style={{
+              fontSize: 9.5,
+              color: TEXT_FAINT,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+            }}
+          >
+            sample
+          </span>
+        )}
       </div>
       <div
         style={{
@@ -934,7 +1119,7 @@ function ScheduleStrip() {
           paddingBottom: 4,
         }}
       >
-        {SCHEDULE.map((row, i) => {
+        {rows.map((row, i) => {
           const done = row.status === 'done'
           const active = row.status === 'active'
           return (
@@ -1059,7 +1244,7 @@ function Tabs({ active, onChange }) {
 }
 
 // ===== Right: Review =====
-function ReviewPanel({ items, onApprove, onReject }) {
+function ReviewPanel({ items, brand, onApprove, onReject }) {
   return (
     <div>
       <div
@@ -1112,7 +1297,7 @@ function ReviewPanel({ items, onApprove, onReject }) {
                   letterSpacing: '0.06em',
                 }}
               >
-                {it.type.toUpperCase()}
+                {reviewItemType(it).toUpperCase()}
               </span>
               <span
                 style={{
@@ -1121,7 +1306,7 @@ function ReviewPanel({ items, onApprove, onReject }) {
                   letterSpacing: '0.05em',
                 }}
               >
-                {it.brand}
+                {brand?.name || ''}
               </span>
             </div>
             <p
@@ -1132,7 +1317,7 @@ function ReviewPanel({ items, onApprove, onReject }) {
                 lineHeight: 1.5,
               }}
             >
-              {it.text}
+              {reviewItemText(it)}
             </p>
             <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               <button
