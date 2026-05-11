@@ -37,7 +37,7 @@ const AGENTS = [
     name: 'Strategy',
     color: '#a855f7',
     icon: Brain,
-    pos: { left: '5%', top: '10%' },
+    pos: { left: '8%', top: '12%' },
     statuses: [
       ['Analyzing comps', '3 gaps found'],
       ['Trend scan running', 'ICT +38%'],
@@ -49,7 +49,7 @@ const AGENTS = [
     name: 'Writer',
     color: '#06b6d4',
     icon: PenLine,
-    pos: { left: '35%', top: '10%' },
+    pos: { left: '38%', top: '12%' },
     statuses: [
       ['Polishing copy', 'Tone: confident'],
       ['Hook batch ready', '6 generated'],
@@ -61,7 +61,7 @@ const AGENTS = [
     name: 'Video Director',
     color: '#f59e0b',
     icon: Video,
-    pos: { left: '65%', top: '10%' },
+    pos: { left: '66%', top: '12%' },
     statuses: [
       ['Sourcing B-roll', 'Stock library'],
       ['Building Runway brief', ''],
@@ -73,7 +73,7 @@ const AGENTS = [
     name: 'Distribution',
     color: '#10b981',
     icon: Send,
-    pos: { left: '15%', top: '55%' },
+    pos: { left: '8%', top: '58%' },
     statuses: [
       ['Queue: 4 pending', 'Auto-post on'],
       ['Posted to Instagram', '9:00 AM'],
@@ -85,7 +85,7 @@ const AGENTS = [
     name: 'Analytics',
     color: '#ef4444',
     icon: BarChart3,
-    pos: { left: '55%', top: '55%' },
+    pos: { left: '66%', top: '58%' },
     statuses: [
       ['Top: Reel #14', 'Score 92'],
       ['Scoring 7 posts', 'avg 84'],
@@ -552,26 +552,104 @@ function AgentOffice({ screenIndex, meetingAgents }) {
       <div
         style={{
           position: 'relative',
-          minHeight: 280,
+          minHeight: 340,
           borderRadius: 12,
           background: 'rgba(0,0,0,0.2)',
-          border: '0.5px solid rgba(255,255,255,0.04)',
+          border: '0.5px solid rgba(255,255,255,0.07)',
           backgroundImage:
-            'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
+            'radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
           backgroundPosition: '0 0',
           overflow: 'hidden',
         }}
       >
+        {/* Vertical room dividers */}
+        <div
+          style={{
+            position: 'absolute',
+            left: '33%',
+            top: '5%',
+            height: '90%',
+            width: '0.5px',
+            background: 'rgba(255,255,255,0.05)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            left: '62%',
+            top: '5%',
+            height: '90%',
+            width: '0.5px',
+            background: 'rgba(255,255,255,0.05)',
+          }}
+        />
+        {/* Horizontal room divider */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '48%',
+            left: '5%',
+            width: '90%',
+            height: '0.5px',
+            background: 'rgba(255,255,255,0.05)',
+          }}
+        />
+
+        {/* Room labels */}
+        {[
+          { text: 'Content Room', left: '3%', top: '3%' },
+          { text: 'Production', left: '35%', top: '3%' },
+          { text: 'Strategy Room', left: '64%', top: '3%' },
+          { text: 'Operations', left: '3%', top: '52%' },
+          { text: 'Analytics Lab', left: '64%', top: '52%' },
+        ].map((label) => (
+          <span
+            key={label.text}
+            style={{
+              position: 'absolute',
+              left: label.left,
+              top: label.top,
+              fontSize: 9,
+              color: 'rgba(255,255,255,0.1)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              pointerEvents: 'none',
+            }}
+          >
+            {label.text}
+          </span>
+        ))}
+
+        {/* Decorative floor dots */}
+        {[
+          { left: '57%', top: '68%' },
+          { left: '30%', top: '78%' },
+          { left: '52%', top: '22%' },
+        ].map((d, i) => (
+          <span
+            key={i}
+            style={{
+              position: 'absolute',
+              left: d.left,
+              top: d.top,
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.06)',
+              pointerEvents: 'none',
+            }}
+          />
+        ))}
+
         {/* Meeting table */}
         <div
           style={{
             position: 'absolute',
-            left: '50%',
-            top: '40%',
-            transform: 'translateX(-50%)',
-            width: 80,
-            height: 40,
+            left: '38%',
+            top: '50%',
+            width: 120,
+            height: 60,
             borderRadius: 999,
             background: 'rgba(255,255,255,0.025)',
             border: '0.5px solid rgba(255,255,255,0.05)',
