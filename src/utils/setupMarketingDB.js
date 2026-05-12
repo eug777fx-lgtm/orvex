@@ -16,6 +16,16 @@ export async function setupMarketingDB() {
     CREATE UNIQUE INDEX IF NOT EXISTS brands_name_unique ON brands(name)
   `)
 
+  await db.query(
+    `ALTER TABLE brands ADD COLUMN IF NOT EXISTS client_id TEXT`,
+  )
+  await db.query(
+    `ALTER TABLE brands ADD COLUMN IF NOT EXISTS brand_type TEXT DEFAULT 'own'`,
+  )
+  await db.query(
+    `UPDATE brands SET brand_type = 'own' WHERE brand_type IS NULL`,
+  )
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS content (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -274,27 +274,29 @@ export default function MarketingEngine() {
     return () => clearInterval(id)
   }, [])
 
-  // Load brands once
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const rows = await db.query(
-          'SELECT id, name, color FROM brands ORDER BY created_at ASC',
-        )
-        if (cancelled) return
-        setBrands(rows || [])
-        if (rows && rows.length > 0) setSelectedBrand(rows[0])
-        else setLoading(false)
-      } catch (e) {
-        console.error('load brands failed', e)
-        if (!cancelled) setLoading(false)
+  const loadBrands = useCallback(async (selectIdAfter) => {
+    try {
+      const rows = await db.query(
+        "SELECT id, name, color, COALESCE(brand_type, 'own') AS brand_type FROM brands ORDER BY brand_type ASC, created_at ASC",
+      )
+      setBrands(rows || [])
+      if (selectIdAfter) {
+        const match = (rows || []).find((b) => b.id === selectIdAfter)
+        if (match) setSelectedBrand(match)
+      } else if ((rows || []).length > 0) {
+        setSelectedBrand((current) => current || rows[0])
+      } else {
+        setLoading(false)
       }
-    })()
-    return () => {
-      cancelled = true
+    } catch (e) {
+      console.error('load brands failed', e)
+      setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    loadBrands()
+  }, [loadBrands])
 
   // Refetch stats / review / schedule whenever selectedBrand changes
   const refreshBrandData = useCallback(async () => {
@@ -461,6 +463,10 @@ export default function MarketingEngine() {
           brands={brands}
           selected={selectedBrand}
           onSelect={setSelectedBrand}
+          showToast={showToast}
+          onBrandAdded={async (created) => {
+            await loadBrands(created?.id)
+          }}
         />
         <StatsRow stats={stats} loading={loading} />
 
@@ -483,6 +489,11 @@ export default function MarketingEngine() {
             onRefresh={refreshBrandData}
             showToast={showToast}
             now={now}
+            hasMemory={memory.length > 0}
+            onSetUpMemory={() => {
+              const el = document.getElementById('brand-memory-section')
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
           />
           <ScheduleStrip brand={selectedBrand} />
           <BrandMemory
@@ -756,78 +767,363 @@ function PageHeader({ now, loading }) {
 }
 
 // ===== Brand Selector =====
-function BrandSelector({ brands, selected, onSelect }) {
+const BRAND_PRESET_COLORS = [
+  '#ffffff',
+  '#a78bfa',
+  '#22d3ee',
+  '#4ade80',
+  '#fbbf24',
+  '#f87171',
+]
+const BRAND_PLATFORMS = ['instagram', 'tiktok', 'linkedin', 'facebook', 'youtube']
+
+function BrandChip({ brand, active, isClient, onSelect }) {
+  const color = brand.color || '#ffffff'
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => onSelect(brand)}
       style={{
-        padding: '12px 20px',
-        display: 'flex',
+        display: 'inline-flex',
         alignItems: 'center',
-        gap: 8,
-        overflowX: 'auto',
+        gap: 7,
+        padding: '6px 12px',
+        borderRadius: 999,
+        background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
+        border: active
+          ? '0.5px solid rgba(255,255,255,0.35)'
+          : isClient
+          ? '0.5px dashed rgba(255,255,255,0.18)'
+          : '0.5px solid rgba(255,255,255,0.08)',
+        color: active ? '#fff' : 'rgba(255,255,255,0.65)',
+        fontSize: 12,
+        fontWeight: 500,
+        letterSpacing: '0.02em',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+        transition: 'all 0.15s ease',
       }}
     >
-      {brands.map((b) => {
-        const active = selected?.id === b.id
-        const color = b.color || '#ffffff'
-        return (
-          <button
-            key={b.id}
-            type="button"
-            onClick={() => onSelect(b)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 7,
-              padding: '6px 12px',
-              borderRadius: 999,
-              background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
-              border: active
-                ? '0.5px solid rgba(255,255,255,0.35)'
-                : '0.5px solid rgba(255,255,255,0.08)',
-              color: active ? '#fff' : 'rgba(255,255,255,0.65)',
-              fontSize: 12,
-              fontWeight: 500,
-              letterSpacing: '0.02em',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: color,
-                boxShadow: `0 0 6px ${color}80`,
-              }}
-            />
-            {b.name}
-          </button>
-        )
-      })}
-      <button
-        type="button"
+      <span
         style={{
-          display: 'inline-flex',
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: color,
+          boxShadow: `0 0 6px ${color}80`,
+        }}
+      />
+      {brand.name}
+    </button>
+  )
+}
+
+function BrandSelector({ brands, selected, onSelect, onBrandAdded, showToast }) {
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState({
+    name: '',
+    brand_type: 'own',
+    color: '#ffffff',
+    platforms: ['instagram'],
+  })
+  const [saving, setSaving] = useState(false)
+
+  const ownBrands = brands.filter((b) => (b.brand_type || 'own') === 'own')
+  const clientBrands = brands.filter((b) => b.brand_type === 'client')
+
+  function toggle(platform) {
+    setForm((f) => ({
+      ...f,
+      platforms: f.platforms.includes(platform)
+        ? f.platforms.filter((p) => p !== platform)
+        : [...f.platforms, platform],
+    }))
+  }
+
+  async function save() {
+    const name = form.name.trim()
+    if (!name) return
+    setSaving(true)
+    try {
+      const rows = await db.query(
+        `INSERT INTO brands (name, color, platforms, brand_type)
+         VALUES ($1, $2, $3::jsonb, $4)
+         ON CONFLICT (name) DO NOTHING
+         RETURNING id, name, color, COALESCE(brand_type, 'own') AS brand_type`,
+        [name, form.color, JSON.stringify(form.platforms), form.brand_type],
+      )
+      const created = rows?.[0]
+      setAdding(false)
+      setForm({ name: '', brand_type: 'own', color: '#ffffff', platforms: ['instagram'] })
+      await onBrandAdded?.(created || null)
+      showToast?.(
+        created
+          ? 'Brand created — add memory to get started'
+          : 'A brand with that name already exists',
+        created ? 'info' : 'error',
+      )
+    } catch (e) {
+      console.error('brand insert failed', e)
+      showToast?.('Failed to create brand', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function renderGroup(label, list, isClient) {
+    if (list.length === 0) return null
+    return (
+      <div
+        style={{
+          display: 'flex',
           alignItems: 'center',
-          gap: 5,
-          padding: '6px 11px',
-          borderRadius: 999,
-          background: 'transparent',
-          border: '0.5px dashed rgba(255,255,255,0.18)',
-          color: TEXT_MUTED,
-          fontSize: 12,
-          fontWeight: 500,
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
+          gap: 8,
           flexShrink: 0,
         }}
       >
-        <Plus size={11} /> Add Brand
-      </button>
+        <span
+          style={{
+            fontSize: 9.5,
+            color: TEXT_FAINT,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            fontWeight: 600,
+            paddingRight: 4,
+          }}
+        >
+          {label}
+        </span>
+        {list.map((b) => (
+          <BrandChip
+            key={b.id}
+            brand={b}
+            active={selected?.id === b.id}
+            isClient={isClient}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          overflowX: 'auto',
+        }}
+      >
+        {renderGroup('Your Brands', ownBrands, false)}
+        {renderGroup('Clients', clientBrands, true)}
+        <button
+          type="button"
+          onClick={() => setAdding((a) => !a)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '6px 11px',
+            borderRadius: 999,
+            background: adding ? 'rgba(255,255,255,0.07)' : 'transparent',
+            border: '0.5px dashed rgba(255,255,255,0.18)',
+            color: TEXT_MUTED,
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          <Plus size={11} /> {adding ? 'Cancel' : 'Add Brand'}
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {adding && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.025)',
+                border: '0.5px solid rgba(255,255,255,0.07)',
+                borderRadius: 12,
+                padding: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Brand name"
+                  style={{
+                    flex: 1,
+                    minWidth: 160,
+                    fontSize: 13,
+                    padding: '7px 10px',
+                    borderRadius: 8,
+                    border: '0.5px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(0,0,0,0.3)',
+                    color: '#fff',
+                    outline: 'none',
+                  }}
+                />
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '0.5px solid rgba(255,255,255,0.08)',
+                    borderRadius: 999,
+                    padding: 2,
+                  }}
+                >
+                  {['own', 'client'].map((t) => {
+                    const active = form.brand_type === t
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, brand_type: t }))}
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: 999,
+                          background: active ? '#fff' : 'transparent',
+                          color: active ? '#000' : 'rgba(255,255,255,0.55)',
+                          border: 'none',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          letterSpacing: '0.04em',
+                          textTransform: 'capitalize',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {t === 'own' ? 'Own brand' : 'Client'}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 11, color: TEXT_MUTED, minWidth: 60 }}>
+                  Color
+                </span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {BRAND_PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, color: c }))}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: '50%',
+                        background: c,
+                        border:
+                          form.color === c
+                            ? '1.5px solid #fff'
+                            : '0.5px solid rgba(255,255,255,0.15)',
+                        cursor: 'pointer',
+                        boxShadow: form.color === c ? `0 0 8px ${c}` : 'none',
+                      }}
+                      aria-label={`Color ${c}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: TEXT_MUTED, minWidth: 60 }}>
+                  Platforms
+                </span>
+                {BRAND_PLATFORMS.map((p) => {
+                  const checked = form.platforms.includes(p)
+                  return (
+                    <label
+                      key={p}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '3px 9px',
+                        borderRadius: 999,
+                        background: checked
+                          ? 'rgba(255,255,255,0.08)'
+                          : 'transparent',
+                        border: checked
+                          ? '0.5px solid rgba(255,255,255,0.25)'
+                          : '0.5px solid rgba(255,255,255,0.08)',
+                        color: checked ? '#fff' : 'rgba(255,255,255,0.55)',
+                        fontSize: 11,
+                        letterSpacing: '0.04em',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(p)}
+                        style={{ display: 'none' }}
+                      />
+                      {p}
+                    </label>
+                  )
+                })}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={saving || !form.name.trim()}
+                  style={{
+                    fontSize: 12,
+                    padding: '7px 16px',
+                    borderRadius: 8,
+                    background: '#fff',
+                    color: '#000',
+                    border: 'none',
+                    fontWeight: 600,
+                    cursor: saving || !form.name.trim() ? 'not-allowed' : 'pointer',
+                    opacity: saving || !form.name.trim() ? 0.55 : 1,
+                  }}
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdding(false)}
+                  style={{
+                    fontSize: 12,
+                    padding: '7px 14px',
+                    borderRadius: 8,
+                    background: 'transparent',
+                    color: TEXT_MUTED,
+                    border: '0.5px solid rgba(255,255,255,0.1)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -1235,7 +1531,7 @@ function AgentCharacter({ agent, position, mode, screenIndex }) {
   )
 }
 
-function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast }) {
+function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMemory }) {
   const colors = HUD_COLORS[agent.key] || { accent: '#ffffff' }
   const status = agent.statuses[screenIndex % agent.statuses.length]
   const [runStatus, setRunStatus] = useState('idle')
@@ -1335,6 +1631,13 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast }) {
         disabled={!brand || isRunning}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
+        title={
+          hasMemory === false
+            ? 'Add brand memory first for best results'
+            : isRunning
+            ? 'Running…'
+            : 'Run'
+        }
         style={{
           fontSize: 9,
           padding: '3px 8px',
@@ -1363,7 +1666,79 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast }) {
   )
 }
 
-function AgentOffice({ screenIndex, meetingAgents, brand, onRefresh, showToast, now }) {
+function NoMemoryOverlay({ onSetUpMemory }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25 }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'rgba(10,10,12,0.7)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 14,
+        zIndex: 20,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: '#fff',
+          letterSpacing: '-0.01em',
+        }}
+      >
+        No memory yet
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: 'rgba(255,255,255,0.55)',
+          textAlign: 'center',
+          maxWidth: 360,
+          lineHeight: 1.5,
+        }}
+      >
+        Add brand memory so the agents know your voice, audience, and goals
+        before they start running.
+      </div>
+      <button
+        type="button"
+        onClick={onSetUpMemory}
+        style={{
+          marginTop: 6,
+          background: '#fff',
+          color: '#000',
+          fontSize: 12,
+          fontWeight: 600,
+          padding: '8px 18px',
+          borderRadius: 8,
+          border: 'none',
+          cursor: 'pointer',
+        }}
+      >
+        Set up brand memory
+      </button>
+    </motion.div>
+  )
+}
+
+function AgentOffice({
+  screenIndex,
+  meetingAgents,
+  brand,
+  onRefresh,
+  showToast,
+  now,
+  hasMemory,
+  onSetUpMemory,
+}) {
   const [agentPositions, setAgentPositions] = useState(() => ({ ...HOME_POSITIONS }))
   const [agentModes, setAgentModes] = useState(() =>
     Object.fromEntries(AGENTS.map((a) => [a.key, 'wandering'])),
@@ -1657,9 +2032,14 @@ function AgentOffice({ screenIndex, meetingAgents, brand, onRefresh, showToast, 
             brand={brand}
             onRefresh={onRefresh}
             showToast={showToast}
+            hasMemory={hasMemory}
           />
         ))}
       </div>
+
+      {brand && hasMemory === false && (
+        <NoMemoryOverlay onSetUpMemory={onSetUpMemory} />
+      )}
     </div>
   )
 }
@@ -1964,6 +2344,7 @@ function BrandMemory({ brand, memory, onRefresh }) {
 
   return (
     <div
+      id="brand-memory-section"
       style={{
         background: CARD_BG,
         backdropFilter: 'blur(12px)',
