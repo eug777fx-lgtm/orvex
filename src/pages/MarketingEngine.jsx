@@ -18,6 +18,7 @@ import {
   Star,
   ChevronUp,
   ChevronDown,
+  Recycle,
 } from 'lucide-react'
 
 // ===== Design tokens =====
@@ -394,6 +395,37 @@ export default function MarketingEngine() {
     }
   }
 
+  async function repurpose() {
+    if (!selectedBrand) return
+    showToast('Repurposing to 4 platforms...')
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand_id: selectedBrand.id,
+          agent_type: 'repurpose',
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'failed' }))
+        throw new Error(err.error || 'repurpose failed')
+      }
+      const data = await res.json()
+      const n = data.items_created || data.items_generated || 4
+      showToast(`Repurposed — ${n} new items added to queue`)
+      refreshBrandData()
+    } catch (e) {
+      console.error('repurpose failed', e)
+      showToast(
+        e.message === 'no approved content to repurpose'
+          ? 'No approved content yet — approve a piece first'
+          : 'Repurpose failed',
+        'error',
+      )
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -471,6 +503,7 @@ export default function MarketingEngine() {
             brand={selectedBrand}
             onApprove={approve}
             onReject={reject}
+            onRepurpose={repurpose}
             wide
           />
         )}
@@ -2274,7 +2307,7 @@ function Tabs({ active, onChange }) {
 }
 
 // ===== Right: Review =====
-function ReviewPanel({ items, brand, onApprove, onReject, wide }) {
+function ReviewPanel({ items, brand, onApprove, onReject, onRepurpose, wide }) {
   return (
     <div>
       <div
@@ -2398,6 +2431,28 @@ function ReviewPanel({ items, brand, onApprove, onReject, wide }) {
               >
                 <Pencil size={10} /> Edit
               </button>
+              {onRepurpose && (
+                <button
+                  type="button"
+                  onClick={() => onRepurpose()}
+                  title="Repurpose latest approved content to 4 platforms"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '5px 9px',
+                    borderRadius: 7,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '0.5px solid rgba(255,255,255,0.12)',
+                    color: 'rgba(255,255,255,0.75)',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Recycle size={10} /> Repurpose
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onReject(it.id)}

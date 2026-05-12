@@ -117,6 +117,23 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
     systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers} Write high-performing social media content matching this brand voice exactly. Output ONLY valid JSON: { hooks: array of 5 strings, captions: array of 3 strings, scripts: array of 2 full reel scripts, cta: string }`
   } else if (agent_type === 'analytics') {
     systemPrompt = `You are an analytics agent for ${brand.name}. BRAND VOICE: ${voiceRules} TOP PERFORMERS: ${topPerformers} Output ONLY valid JSON: { top_performer: string, key_insight: string, recommendation: string, memory_update: string, avoid: string }`
+  } else if (agent_type === 'repurpose') {
+    const approvedRows = await sql.query(
+      `SELECT id, hook, caption, script FROM content
+       WHERE brand_id = $1 AND status = 'approved'
+       ORDER BY created_at DESC LIMIT 1`,
+      [brand_id],
+    )
+    const approved = (approvedRows?.rows ?? approvedRows)?.[0]
+    if (!approved) {
+      const err = new Error('no approved content to repurpose')
+      err.status = 404
+      throw err
+    }
+    const originalContent = [approved.hook, approved.caption, approved.script]
+      .filter(Boolean)
+      .join('\n')
+    systemPrompt = `You are a content repurposing agent for ${brand.name}. BRAND VOICE: ${voiceRules} Take this original content and repurpose it into 4 platform-native formats. Original content: ${originalContent}. Output ONLY valid JSON: { instagram_caption: string, tiktok_script: string, linkedin_post: string, twitter_thread: array of 3 tweet strings }`
   } else {
     const err = new Error(`unsupported agent_type: ${agent_type}`)
     err.status = 400
@@ -212,6 +229,27 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
          VALUES ($1, 'script', $2, 'pending')`,
         [brand_id, String(scriptText)],
       )
+      itemsGenerated += 1
+    }
+  }
+
+  if (agent_type === 'repurpose' && parsed && typeof parsed === 'object') {
+    const platforms = [
+      { type: 'instagram', column: 'caption', value: parsed.instagram_caption },
+      { type: 'tiktok', column: 'script', value: parsed.tiktok_script },
+      { type: 'linkedin', column: 'caption', value: parsed.linkedin_post },
+      {
+        type: 'twitter',
+        column: 'script',
+        value: Array.isArray(parsed.twitter_thread)
+          ? parsed.twitter_thread.join('\n\n')
+          : parsed.twitter_thread,
+      },
+    ]
+    for (const p of platforms) {
+      if (!p.value) continue
+      const insertSQL = `INSERT INTO content (brand_id, type, ${p.column}, status) VALUES ($1, $2, $3, 'pending')`
+      await sql.query(insertSQL, [brand_id, p.type, String(p.value)])
       itemsGenerated += 1
     }
   }
