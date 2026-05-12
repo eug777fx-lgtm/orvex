@@ -446,7 +446,7 @@ export default function MarketingEngine() {
             showToast={showToast}
             now={now}
           />
-          <ScheduleStrip schedule={schedule} />
+          <ScheduleStrip brand={selectedBrand} />
           <BrandMemory
             brand={selectedBrand}
             memory={memory}
@@ -1674,17 +1674,55 @@ function RunAllButton({ disabled, step, onClick }) {
 }
 
 // ===== Schedule Strip =====
-function ScheduleStrip({ schedule }) {
-  const usingFallback = !schedule || schedule.length === 0
+function agentDisplayName(type) {
+  if (!type) return 'Agent'
+  return type.charAt(0).toUpperCase() + type.slice(1)
+}
+
+function ScheduleStrip({ brand }) {
+  const [apiSchedule, setApiSchedule] = useState(null)
+  const [clock, setClock] = useState(new Date())
+
+  useEffect(() => {
+    const id = setInterval(() => setClock(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (!brand?.id) {
+      setApiSchedule(null)
+      return
+    }
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch(`/api/schedule?brand_id=${encodeURIComponent(brand.id)}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled) setApiSchedule(Array.isArray(data) ? data : [])
+      } catch (e) {
+        console.error('schedule fetch failed', e)
+      }
+    }
+    load()
+    const id = setInterval(load, 60000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [brand?.id])
+
+  const usingFallback = !apiSchedule || apiSchedule.length === 0
   const rows = usingFallback
     ? SCHEDULE
-    : schedule.map((s) => ({
-        time: fmtTime(s.scheduled_at),
-        task: s.hook || s.caption || s.platform || s.type || 'Scheduled post',
-        agent: (s.platform || 'Post').toString(),
-        color: '#ffffff',
-        status: s.published ? 'done' : 'pending',
+    : apiSchedule.map((s) => ({
+        time: s.time,
+        task: s.task,
+        agent: agentDisplayName(s.agent_type),
+        color: HUD_COLORS[s.agent_type]?.accent || '#ffffff',
+        status: s.status,
       }))
+
   return (
     <div
       style={{
@@ -1703,24 +1741,39 @@ function ScheduleStrip({ schedule }) {
           alignItems: 'center',
           gap: 8,
           marginBottom: 12,
+          justifyContent: 'space-between',
         }}
       >
-        <CalendarClock size={13} color={TEXT_MUTED} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
-          Today's Schedule
-        </span>
-        {usingFallback && (
-          <span
-            style={{
-              fontSize: 9.5,
-              color: TEXT_FAINT,
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-            }}
-          >
-            sample
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <CalendarClock size={13} color={TEXT_MUTED} />
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+            Today's Schedule
           </span>
-        )}
+          {usingFallback && (
+            <span
+              style={{
+                fontSize: 9.5,
+                color: TEXT_FAINT,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+              }}
+            >
+              sample
+            </span>
+          )}
+        </div>
+        <span
+          style={{
+            fontSize: 11,
+            color: TEXT_MUTED,
+            fontFamily: MONO,
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '0.02em',
+            flexShrink: 0,
+          }}
+        >
+          {formatClock(clock)}
+        </span>
       </div>
       <div
         style={{
@@ -1737,6 +1790,7 @@ function ScheduleStrip({ schedule }) {
             <div
               key={i}
               style={{
+                position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 6,
@@ -1744,22 +1798,44 @@ function ScheduleStrip({ schedule }) {
                 minWidth: 140,
                 borderRadius: 10,
                 background: active
-                  ? 'rgba(255,255,255,0.04)'
+                  ? 'rgba(74,222,128,0.04)'
                   : 'rgba(255,255,255,0.02)',
                 border: active
-                  ? '0.5px solid rgba(255,255,255,0.3)'
+                  ? '0.5px solid rgba(74,222,128,0.4)'
                   : '0.5px solid rgba(255,255,255,0.06)',
+                boxShadow: active
+                  ? '0 0 12px rgba(74,222,128,0.12)'
+                  : 'none',
                 opacity: done ? 0.4 : 1,
                 flexShrink: 0,
+                transition: 'all 0.3s ease',
               }}
             >
+              {active && (
+                <motion.span
+                  aria-hidden
+                  animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 10,
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: '#4ade80',
+                    boxShadow: '0 0 8px rgba(74,222,128,0.7)',
+                  }}
+                />
+              )}
               <span
                 style={{
                   fontSize: 10.5,
-                  color: active ? '#ffffff' : TEXT_MUTED,
+                  color: active ? '#4ade80' : TEXT_MUTED,
                   fontFamily: MONO,
                   fontVariantNumeric: 'tabular-nums',
                   letterSpacing: '0.04em',
+                  fontWeight: active ? 600 : 500,
                 }}
               >
                 {row.time}
