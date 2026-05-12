@@ -586,7 +586,9 @@ export default function MarketingEngine() {
             wide
           />
         )}
-        {activeTab === 'log' && <LogPanel entries={liveLog} wide />}
+        {activeTab === 'log' && (
+          <LogPanel entries={liveLog} wide brand={selectedBrand} />
+        )}
         {activeTab === 'stats' && (
           <StatsPanel wide brand={selectedBrand} showToast={showToast} />
         )}
@@ -3546,8 +3548,38 @@ function ReviewPanel({ items, brand, onApprove, onReject, onRepurpose, wide }) {
 }
 
 // ===== Right: Log =====
-function LogPanel({ entries, wide }) {
-  if (!entries || entries.length === 0) {
+function LogPanel({ entries, wide, brand }) {
+  const [realLogs, setRealLogs] = useState([])
+
+  useEffect(() => {
+    if (!brand?.id) {
+      setRealLogs([])
+      return
+    }
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch(
+          `/api/logs?brand_id=${encodeURIComponent(brand.id)}&limit=20`,
+        )
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled && Array.isArray(data)) setRealLogs(data)
+      } catch (e) {
+        console.error('logs fetch failed', e)
+      }
+    }
+    load()
+    const id = setInterval(load, 30000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [brand?.id])
+
+  const hasReal = realLogs.length > 0
+
+  if (!hasReal && (!entries || entries.length === 0)) {
     return (
       <div
         style={{
@@ -3576,21 +3608,111 @@ function LogPanel({ entries, wide }) {
     )
   }
   return (
-    <div
-      style={
-        wide
-          ? {
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-              columnGap: 32,
-              rowGap: 1,
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {hasReal && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <AnimatePresence initial={false}>
+            {realLogs.map((entry) => {
+              const agentName = (entry.agent_type || 'agent')
+                .split('_')
+                .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+                .join(' ')
+              const colorKey = entry.agent_type === 'video_director' ? 'video' : entry.agent_type
+              const color = HUD_COLORS[colorKey]?.accent || '#fff'
+              const t = new Date(entry.created_at)
+              const time = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
+              return (
+                <motion.div
+                  key={entry.id}
+                  layout
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.22 }}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '46px 1fr',
+                    gap: 8,
+                    padding: '9px 2px',
+                    borderBottom: '0.5px solid rgba(255,255,255,0.04)',
+                    alignItems: 'baseline',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: TEXT_FAINT,
+                      fontFamily: MONO,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {time}
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <span
+                      style={{
+                        fontSize: 11.5,
+                        color,
+                        fontWeight: 600,
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      {agentName}
+                      {entry.status && entry.status !== 'complete' && (
+                        <span style={{ marginLeft: 6, color: TEXT_FAINT, fontWeight: 500 }}>
+                          · {entry.status}
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: TEXT_MUTED,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {entry.message}
+                    </span>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {(!hasReal || entries.length > 0) && (
+        <>
+          {!hasReal && entries.length > 0 && (
+            <div
+              style={{
+                fontSize: 9.5,
+                color: TEXT_FAINT,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                fontWeight: 600,
+                paddingBottom: 4,
+                borderBottom: '0.5px dashed rgba(255,255,255,0.06)',
+              }}
+            >
+              Sample data
+            </div>
+          )}
+          <div
+            style={
+              wide
+                ? {
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                    columnGap: 32,
+                    rowGap: 1,
+                  }
+                : { display: 'flex', flexDirection: 'column', gap: 1 }
             }
-          : { display: 'flex', flexDirection: 'column', gap: 1 }
-      }
-    >
-      <AnimatePresence initial={false}>
-        {entries.map((entry, i) => {
-          const color = AGENT_COLOR[entry.agent] || '#fff'
+          >
+            <AnimatePresence initial={false}>
+              {entries.map((entry, i) => {
+                const color = AGENT_COLOR[entry.agent] || '#fff'
           return (
             <motion.div
               key={`${entry.time}-${i}-${entry.action.slice(0, 16)}`}
@@ -3649,7 +3771,10 @@ function LogPanel({ entries, wide }) {
             </motion.div>
           )
         })}
-      </AnimatePresence>
+            </AnimatePresence>
+          </div>
+        </>
+      )}
     </div>
   )
 }
