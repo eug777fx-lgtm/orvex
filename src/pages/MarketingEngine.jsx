@@ -361,7 +361,7 @@ export default function MarketingEngine() {
           `SELECT id, memory_type, content, created_at
              FROM brand_memory
             WHERE brand_id = $1
-            ORDER BY created_at DESC`,
+            ORDER BY memory_type, created_at DESC`,
           [selectedBrand.id],
         ),
       ])
@@ -560,6 +560,7 @@ export default function MarketingEngine() {
             brand={selectedBrand}
             memory={memory}
             onRefresh={refreshBrandData}
+            showToast={showToast}
           />
           <VideoTemplates brand={selectedBrand} showToast={showToast} />
         </div>
@@ -2572,8 +2573,24 @@ const MEMORY_TYPES = [
   { key: 'campaign_history', title: 'Campaign History', color: '#ffffff', tint: 'rgba(255,255,255,0.12)' },
 ]
 
-function BrandMemory({ brand, memory, onRefresh }) {
+function relativeTime(iso) {
+  if (!iso) return ''
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diffMs / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  return `${d}d ago`
+}
+
+function BrandMemory({ brand, memory, onRefresh, showToast }) {
   const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editValue, setEditValue] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [memoryType, setMemoryType] = useState('voice_rules')
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
@@ -2595,12 +2612,74 @@ function BrandMemory({ brand, memory, onRefresh }) {
       setContent('')
       setAdding(false)
       onRefresh?.()
+      showToast?.('Memory updated — agents will use this in next run')
     } catch (e) {
       console.error('memory insert failed', e)
+      showToast?.('Failed to save memory', 'error')
     } finally {
       setSaving(false)
     }
   }
+
+  async function saveEdit(id) {
+    const trimmed = editValue.trim()
+    if (!id || !trimmed) return
+    setEditSaving(true)
+    try {
+      await db.query('UPDATE brand_memory SET content=$1 WHERE id=$2', [
+        trimmed,
+        id,
+      ])
+      setEditingId(null)
+      setEditValue('')
+      onRefresh?.()
+      showToast?.('Memory updated — agents will use this in next run')
+    } catch (e) {
+      console.error('memory update failed', e)
+      showToast?.('Failed to update memory', 'error')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function refreshFromAgent() {
+    if (!brand?.id || refreshing) return
+    setRefreshing(true)
+    showToast?.('Running Analytics Agent to refresh memory…')
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand_id: brand.id,
+          agent_type: 'analytics',
+          input: 'Update brand memory based on recent performance',
+        }),
+      })
+      if (!res.ok) throw new Error('failed')
+      const data = await res.json()
+      const update = data?.output?.memory_update
+      if (update && brand?.id) {
+        await db.query(
+          `INSERT INTO brand_memory (brand_id, memory_type, content)
+           VALUES ($1, 'top_performers', $2)`,
+          [brand.id, String(update)],
+        )
+      }
+      onRefresh?.()
+      showToast?.('Brand memory refreshed')
+    } catch (e) {
+      console.error('refresh memory failed', e)
+      showToast?.('Failed to refresh memory', 'error')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const wordCount = (memory || []).reduce(
+    (s, m) => s + String(m.content || '').split(/\s+/).filter(Boolean).length,
+    0,
+  )
 
   return (
     <div
@@ -2646,7 +2725,7 @@ function BrandMemory({ brand, memory, onRefresh }) {
                   letterSpacing: '0.04em',
                 }}
               >
-                · {(memory || []).length} {memory.length === 1 ? 'entry' : 'entries'}
+                · {(memory || []).length} {memory.length === 1 ? 'entry' : 'entries'} · ~{wordCount} words of context
               </span>
             </div>
             <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 1 }}>
@@ -2654,23 +2733,43 @@ function BrandMemory({ brand, memory, onRefresh }) {
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setAdding((a) => !a)}
-          style={{
-            fontSize: 10.5,
-            padding: '4px 10px',
-            borderRadius: 999,
-            border: '0.5px solid rgba(255,255,255,0.12)',
-            background: 'transparent',
-            color: 'rgba(255,255,255,0.7)',
-            cursor: 'pointer',
-            letterSpacing: '0.04em',
-            fontWeight: 500,
-          }}
-        >
-          {adding ? 'Close' : 'Edit'}
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            type="button"
+            onClick={refreshFromAgent}
+            disabled={!brand || refreshing}
+            style={{
+              fontSize: 10.5,
+              padding: '4px 10px',
+              borderRadius: 999,
+              border: '0.5px solid rgba(255,255,255,0.12)',
+              background: 'transparent',
+              color: !brand || refreshing ? TEXT_FAINT : 'rgba(255,255,255,0.7)',
+              cursor: !brand || refreshing ? 'not-allowed' : 'pointer',
+              letterSpacing: '0.04em',
+              fontWeight: 500,
+            }}
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh Memory'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAdding((a) => !a)}
+            style={{
+              fontSize: 10.5,
+              padding: '4px 10px',
+              borderRadius: 999,
+              border: '0.5px solid rgba(255,255,255,0.12)',
+              background: 'transparent',
+              color: 'rgba(255,255,255,0.7)',
+              cursor: 'pointer',
+              letterSpacing: '0.04em',
+              fontWeight: 500,
+            }}
+          >
+            {adding ? 'Close' : 'Add'}
+          </button>
+        </div>
       </div>
 
       {(memory || []).length === 0 ? (
@@ -2697,7 +2796,9 @@ function BrandMemory({ brand, memory, onRefresh }) {
         >
           {MEMORY_TYPES.map((t) => {
             const items = grouped[t.key] || []
-            const preview = items[0]?.content || ''
+            const latest = items[0]
+            const preview = latest?.content || ''
+            const isEditing = editingId === latest?.id
             return (
               <div
                 key={t.key}
@@ -2740,36 +2841,126 @@ function BrandMemory({ brand, memory, onRefresh }) {
                     {items.length}
                   </span>
                 </div>
-                <div
-                  style={{
-                    fontSize: 11.5,
-                    color: 'rgba(255,255,255,0.78)',
-                    lineHeight: 1.45,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    flex: 1,
-                  }}
-                >
-                  {preview || (
-                    <span style={{ color: TEXT_FAINT, fontStyle: 'italic' }}>
-                      empty
-                    </span>
-                  )}
-                </div>
-                {items.length > 1 && (
-                  <span
-                    style={{
-                      marginTop: 6,
-                      fontSize: 10,
-                      color: t.color,
-                      letterSpacing: '0.04em',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    View all →
-                  </span>
+                {isEditing ? (
+                  <>
+                    <textarea
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        fontSize: 11.5,
+                        padding: 8,
+                        borderRadius: 6,
+                        border: '0.5px solid rgba(255,255,255,0.1)',
+                        background: 'rgba(0,0,0,0.3)',
+                        color: '#fff',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => saveEdit(latest.id)}
+                        disabled={editSaving || !editValue.trim()}
+                        style={{
+                          fontSize: 10.5,
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          background: '#fff',
+                          color: '#000',
+                          border: 'none',
+                          fontWeight: 600,
+                          cursor: editSaving ? 'not-allowed' : 'pointer',
+                          opacity: editSaving || !editValue.trim() ? 0.55 : 1,
+                        }}
+                      >
+                        {editSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(null)
+                          setEditValue('')
+                        }}
+                        style={{
+                          fontSize: 10.5,
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          background: 'transparent',
+                          color: TEXT_MUTED,
+                          border: '0.5px solid rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        fontSize: 11.5,
+                        color: 'rgba(255,255,255,0.78)',
+                        lineHeight: 1.45,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        flex: 1,
+                      }}
+                    >
+                      {preview || (
+                        <span style={{ color: TEXT_FAINT, fontStyle: 'italic' }}>
+                          empty
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: 6,
+                        gap: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 9.5,
+                          color: TEXT_FAINT,
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        {latest ? `Updated ${relativeTime(latest.created_at)}` : '—'}
+                      </span>
+                      {latest && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingId(latest.id)
+                            setEditValue(latest.content || '')
+                          }}
+                          style={{
+                            fontSize: 10,
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            border: '0.5px solid rgba(255,255,255,0.12)',
+                            background: 'transparent',
+                            color: 'rgba(255,255,255,0.65)',
+                            cursor: 'pointer',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )
