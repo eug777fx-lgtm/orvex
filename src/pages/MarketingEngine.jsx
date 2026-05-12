@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import db from '@/lib/db'
+import useIsMobile from '../utils/useIsMobile'
 import { Player } from '@remotion/player'
 import { HookOpener } from '../remotion/compositions/HookOpener'
 import { TradeInsight } from '../remotion/compositions/TradeInsight'
@@ -213,6 +214,7 @@ export default function MarketingEngine() {
   const [selectedBrand, setSelectedBrand] = useState(null)
   const [activeTab, setActiveTab] = useState('review')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const isMobile = useIsMobile()
   const [now, setNow] = useState(new Date())
   const [screenIndex, setScreenIndex] = useState(0)
   const [reviewItems, setReviewItems] = useState([])
@@ -375,6 +377,27 @@ export default function MarketingEngine() {
     refreshBrandData()
   }, [refreshBrandData])
 
+  // Keyboard shortcuts: A approves, R rejects the first review item when drawer is open
+  useEffect(() => {
+    function onKey(e) {
+      if (!drawerOpen || activeTab !== 'review') return
+      const target = e.target
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable))
+        return
+      if (reviewItems.length === 0) return
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault()
+        approve(reviewItems[0].id)
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
+        reject(reviewItems[0].id)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerOpen, activeTab, reviewItems])
+
   async function approve(id) {
     try {
       await db.query("UPDATE content SET status='approved' WHERE id=$1", [id])
@@ -441,7 +464,7 @@ export default function MarketingEngine() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
       style={{
-        margin: '-2rem',
+        margin: isMobile ? '-1rem' : '-2rem',
         display: 'grid',
         gridTemplateColumns: '1fr',
         height: 'calc(100vh - 56px)',
@@ -514,6 +537,7 @@ export default function MarketingEngine() {
           setDrawerOpen(true)
         }}
         reviewCount={reviewItems.length}
+        isMobile={isMobile}
       >
         {activeTab === 'review' && (
           <ReviewPanel
@@ -536,7 +560,8 @@ export default function MarketingEngine() {
   )
 }
 
-function BottomDrawer({ open, onToggle, activeTab, onTabChange, reviewCount, children }) {
+function BottomDrawer({ open, onToggle, activeTab, onTabChange, reviewCount, isMobile, children }) {
+  const drawerHeight = isMobile ? Math.round(window.innerHeight * 0.6) : 380
   const tabs = [
     { key: 'review', label: 'Review', badge: reviewCount },
     { key: 'log', label: 'Live Log' },
@@ -547,7 +572,7 @@ function BottomDrawer({ open, onToggle, activeTab, onTabChange, reviewCount, chi
       {/* Drawer panel — slides up */}
       <motion.div
         initial={false}
-        animate={{ y: open ? 0 : 380 }}
+        animate={{ y: open ? 0 : drawerHeight }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         style={{
           position: 'fixed',
@@ -555,7 +580,7 @@ function BottomDrawer({ open, onToggle, activeTab, onTabChange, reviewCount, chi
           left: 0,
           right: 0,
           zIndex: 49,
-          height: 380,
+          height: drawerHeight,
           background: 'rgba(10,10,12,0.98)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
@@ -3253,7 +3278,8 @@ function ReviewPanel({ items, brand, onApprove, onReject, onRepurpose, wide }) {
             border: '0.5px dashed rgba(255,255,255,0.08)',
           }}
         >
-          All caught up — agents are drafting more.
+          <Sparkles size={20} style={{ marginBottom: 8 }} />
+          <div>No content yet — click Run on any agent to generate your first batch</div>
         </div>
       )}
     </div>
@@ -3262,6 +3288,34 @@ function ReviewPanel({ items, brand, onApprove, onReject, onRepurpose, wide }) {
 
 // ===== Right: Log =====
 function LogPanel({ entries, wide }) {
+  if (!entries || entries.length === 0) {
+    return (
+      <div
+        style={{
+          padding: 28,
+          textAlign: 'center',
+          color: TEXT_MUTED,
+          fontSize: 12,
+          background: 'rgba(255,255,255,0.02)',
+          borderRadius: 10,
+          border: '0.5px dashed rgba(255,255,255,0.08)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <motion.span
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ fontFamily: MONO, letterSpacing: '0.3em' }}
+        >
+          …
+        </motion.span>
+        <div>Agents are warming up…</div>
+      </div>
+    )
+  }
   return (
     <div
       style={
