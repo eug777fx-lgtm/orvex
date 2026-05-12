@@ -226,6 +226,7 @@ export default function MarketingEngine() {
     scheduled: 0,
     avgScore: 0,
     published: 0,
+    generatedToday: 0,
   })
   const [loading, setLoading] = useState(true)
   const [meetingAgents, setMeetingAgents] = useState([])
@@ -309,26 +310,34 @@ export default function MarketingEngine() {
       const [
         cReadyRows,
         schedCountRows,
-        publishedRows,
         avgScoreRows,
+        publishedRows,
+        generatedTodayRows,
         reviewRows,
         scheduleRows,
         memoryRows,
       ] = await Promise.all([
         db.query(
-          "SELECT COUNT(*)::int AS count FROM content WHERE brand_id=$1 AND status='pending'",
+          "SELECT COUNT(*) AS count FROM content WHERE brand_id=$1 AND status='pending'",
           [selectedBrand.id],
         ),
         db.query(
-          'SELECT COUNT(*)::int AS count FROM schedules WHERE brand_id=$1 AND published=false',
+          `SELECT COUNT(*) AS count
+             FROM schedules s
+             JOIN content c ON s.content_id = c.id
+            WHERE s.brand_id=$1 AND s.published=false AND c.status='approved'`,
           [selectedBrand.id],
         ),
         db.query(
-          "SELECT COUNT(*)::int AS count FROM content WHERE brand_id=$1 AND status='published'",
+          'SELECT COALESCE(ROUND(AVG(score)::numeric, 0), 0) AS avg_score FROM analytics WHERE brand_id=$1',
           [selectedBrand.id],
         ),
         db.query(
-          'SELECT AVG(score)::float AS avg FROM analytics WHERE brand_id=$1',
+          "SELECT COUNT(*) AS count FROM content WHERE brand_id=$1 AND status='published'",
+          [selectedBrand.id],
+        ),
+        db.query(
+          "SELECT COUNT(*) AS count FROM content WHERE brand_id=$1 AND created_at::date = CURRENT_DATE",
           [selectedBrand.id],
         ),
         db.query(
@@ -357,12 +366,11 @@ export default function MarketingEngine() {
         ),
       ])
       setStats({
-        contentReady: cReadyRows?.[0]?.count ?? 0,
-        scheduled: schedCountRows?.[0]?.count ?? 0,
-        published: publishedRows?.[0]?.count ?? 0,
-        avgScore: avgScoreRows?.[0]?.avg
-          ? Math.round(avgScoreRows[0].avg)
-          : 0,
+        contentReady: Number(cReadyRows?.[0]?.count ?? 0),
+        scheduled: Number(schedCountRows?.[0]?.count ?? 0),
+        published: Number(publishedRows?.[0]?.count ?? 0),
+        avgScore: Number(avgScoreRows?.[0]?.avg_score ?? 0),
+        generatedToday: Number(generatedTodayRows?.[0]?.count ?? 0),
       })
       setReviewItems(reviewRows || [])
       setSchedule(scheduleRows || [])
@@ -376,7 +384,10 @@ export default function MarketingEngine() {
 
   useEffect(() => {
     refreshBrandData()
-  }, [refreshBrandData])
+    if (!selectedBrand) return
+    const id = setInterval(() => refreshBrandData(), 60000)
+    return () => clearInterval(id)
+  }, [refreshBrandData, selectedBrand])
 
   // Keyboard shortcuts: A approves, R rejects the first review item when drawer is open
   useEffect(() => {
@@ -1184,73 +1195,135 @@ function BrandSelector({ brands, selected, onSelect, onBrandAdded, showToast }) 
 // ===== Stats Row =====
 function StatsRow({ stats, loading }) {
   const cells = [
-    { label: 'Content Ready', value: stats.contentReady, sub: 'awaiting approval', accent: '#ffffff' },
-    { label: 'Scheduled', value: stats.scheduled, sub: 'next 30 days', accent: '#ffffff' },
-    { label: 'Avg Score', value: stats.avgScore, sub: 'AI performance', accent: '#ffffff' },
-    { label: 'Published', value: stats.published, sub: 'all time', accent: '#ffffff' },
+    { key: 'ready', label: 'Content Ready', value: stats.contentReady, sub: 'awaiting approval' },
+    { key: 'scheduled', label: 'Scheduled', value: stats.scheduled, sub: 'approved & queued' },
+    { key: 'avg', label: 'Avg Score', value: stats.avgScore, sub: 'AI performance' },
+    {
+      key: 'published',
+      label: 'Published',
+      value: stats.published,
+      sub: 'all time',
+      trend: stats.generatedToday > 0 ? `+${stats.generatedToday} today` : null,
+    },
   ]
   return (
     <div
       style={{
         padding: '0 20px',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-        gap: 10,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
         opacity: loading ? 0.55 : 1,
         transition: 'opacity 0.2s ease',
       }}
     >
-      {cells.map((s) => (
-        <div
-          key={s.label}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gap: 10,
+        }}
+      >
+        {cells.map((s) => (
+          <div
+            key={s.key}
+            style={{
+              background: CARD_BG,
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: CARD_BORDER,
+              borderRadius: 12,
+              padding: 14,
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: 22,
+                height: 2,
+                background: '#ffffff',
+                borderRadius: 999,
+              }}
+            />
+            <div
+              style={{
+                fontSize: 10,
+                color: TEXT_MUTED,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                fontWeight: 500,
+              }}
+            >
+              {s.label}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 8,
+                marginTop: 6,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 22,
+                  fontWeight: 500,
+                  color: '#fff',
+                  letterSpacing: '-0.02em',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {s.value}
+              </span>
+              {s.trend && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    fontSize: 10,
+                    color: '#4ade80',
+                    fontWeight: 600,
+                  }}
+                >
+                  <TrendingUp size={10} />
+                  {s.trend}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: TEXT_FAINT, marginTop: 2 }}>{s.sub}</div>
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 11,
+          color: TEXT_MUTED,
+        }}
+      >
+        <span
           style={{
-            background: CARD_BG,
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: CARD_BORDER,
-            borderRadius: 12,
-            padding: 14,
-            position: 'relative',
-            overflow: 'hidden',
+            fontSize: 9.5,
+            color: TEXT_FAINT,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            fontWeight: 600,
           }}
         >
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: 22,
-              height: 2,
-              background: s.accent,
-              borderRadius: 999,
-            }}
-          />
-          <div
-            style={{
-              fontSize: 10,
-              color: TEXT_MUTED,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              fontWeight: 500,
-            }}
-          >
-            {s.label}
-          </div>
-          <div
-            style={{
-              fontSize: 22,
-              fontWeight: 500,
-              color: '#fff',
-              marginTop: 6,
-              letterSpacing: '-0.02em',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {s.value}
-          </div>
-          <div style={{ fontSize: 11, color: TEXT_FAINT, marginTop: 2 }}>{s.sub}</div>
-        </div>
-      ))}
+          Generated today
+        </span>
+        <span style={{ color: '#fff', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+          {stats.generatedToday}
+        </span>
+        <span style={{ color: TEXT_FAINT }}>items added in the last 24h</span>
+      </div>
     </div>
   )
 }
