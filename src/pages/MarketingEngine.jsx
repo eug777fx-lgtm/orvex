@@ -23,6 +23,8 @@ import {
   ChevronUp,
   ChevronDown,
   Recycle,
+  Mic,
+  Play,
 } from 'lucide-react'
 
 // ===== Design tokens =====
@@ -2584,7 +2586,100 @@ function Tabs({ active, onChange }) {
 }
 
 // ===== Right: Review =====
+function VoiceoverControl({ item, state, onGenerate, onPlay }) {
+  const status = state?.status
+  if (status === 'ready') {
+    return (
+      <button
+        type="button"
+        onClick={onPlay}
+        title="Play voiceover"
+        style={voiceoverBtnStyle('#ffffff', '#000')}
+      >
+        <Play size={10} /> Voice ready
+      </button>
+    )
+  }
+  if (status === 'loading') {
+    return (
+      <button type="button" disabled style={voiceoverBtnStyle('rgba(255,255,255,0.04)', 'rgba(255,255,255,0.5)')}>
+        <Mic size={10} /> Generating…
+      </button>
+    )
+  }
+  if (status === 'error') {
+    return (
+      <button
+        type="button"
+        onClick={onGenerate}
+        title="Retry voiceover"
+        style={voiceoverBtnStyle('transparent', 'rgba(255,255,255,0.5)')}
+      >
+        <Mic size={10} /> Retry voice
+      </button>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onGenerate}
+      title="Generate voiceover"
+      style={voiceoverBtnStyle('rgba(255,255,255,0.04)', 'rgba(255,255,255,0.7)')}
+    >
+      <Mic size={10} /> Voice
+    </button>
+  )
+}
+
+function voiceoverBtnStyle(background, color) {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '5px 9px',
+    borderRadius: 7,
+    background,
+    border: '0.5px solid rgba(255,255,255,0.12)',
+    color,
+    fontSize: 11,
+    fontWeight: 500,
+    cursor: 'pointer',
+  }
+}
+
 function ReviewPanel({ items, brand, onApprove, onReject, onRepurpose, wide }) {
+  const [voiceovers, setVoiceovers] = useState({}) // { [contentId]: { status, audioUrl } }
+
+  async function generateVoiceover(it) {
+    const id = it.id
+    const text = it.script || it.caption || it.hook || ''
+    if (!text.trim()) return
+    setVoiceovers((prev) => ({ ...prev, [id]: { status: 'loading' } }))
+    try {
+      const res = await fetch('/api/voiceover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, brand_id: brand?.id || null }),
+      })
+      if (!res.ok) throw new Error('voiceover failed')
+      const data = await res.json()
+      setVoiceovers((prev) => ({
+        ...prev,
+        [id]: { status: 'ready', audioUrl: data.audio_url },
+      }))
+    } catch (e) {
+      console.error('voiceover failed', e)
+      setVoiceovers((prev) => ({ ...prev, [id]: { status: 'error' } }))
+    }
+  }
+
+  function playVoiceover(id) {
+    const v = voiceovers[id]
+    if (!v?.audioUrl) return
+    const audio = new Audio(v.audioUrl)
+    audio.play().catch((e) => console.error('audio play failed', e))
+  }
+
   return (
     <div>
       <div
@@ -2708,6 +2803,14 @@ function ReviewPanel({ items, brand, onApprove, onReject, onRepurpose, wide }) {
               >
                 <Pencil size={10} /> Edit
               </button>
+              {reviewItemType(it) === 'script' && (
+                <VoiceoverControl
+                  item={it}
+                  state={voiceovers[it.id]}
+                  onGenerate={() => generateVoiceover(it)}
+                  onPlay={() => playVoiceover(it.id)}
+                />
+              )}
               {onRepurpose && (
                 <button
                   type="button"
