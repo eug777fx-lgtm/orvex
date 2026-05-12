@@ -526,7 +526,9 @@ export default function MarketingEngine() {
           />
         )}
         {activeTab === 'log' && <LogPanel entries={liveLog} wide />}
-        {activeTab === 'stats' && <StatsPanel wide />}
+        {activeTab === 'stats' && (
+          <StatsPanel wide brand={selectedBrand} showToast={showToast} />
+        )}
       </BottomDrawer>
 
       <Toast toast={toast} drawerOpen={drawerOpen} />
@@ -3340,26 +3342,134 @@ function LogPanel({ entries, wide }) {
 }
 
 // ===== Right: Stats =====
-function StatsPanel({ wide }) {
-  const cells = [
-    { label: 'Engagement', value: '12.4%', sub: '+2.1% wk', accent: '#ffffff' },
-    { label: 'Reach', value: '184K', sub: '7-day', accent: '#ffffff' },
-    { label: 'Saves', value: '2.3K', sub: '/1K views', accent: '#ffffff' },
-    { label: 'Followers', value: '+312', sub: 'this week', accent: '#ffffff' },
-  ]
-  return (
-    <div
-      style={
-        wide
-          ? {
-              display: 'grid',
-              gridTemplateColumns: '2fr 1fr',
-              gap: 24,
-              alignItems: 'flex-start',
-            }
-          : { display: 'flex', flexDirection: 'column', gap: 12 }
+function StatsPanel({ wide, brand, showToast }) {
+  const [data, setData] = useState({
+    totalPublished: 0,
+    avgScore: 0,
+    contentThisWeek: 0,
+    topPlatform: '—',
+    dailyScores: [],
+    topPerformers: [],
+    typeCounts: {},
+    totalContent: 0,
+  })
+  const [digest, setDigest] = useState(null)
+  const [digestLoading, setDigestLoading] = useState(false)
+
+  useEffect(() => {
+    if (!brand?.id) return
+    let cancelled = false
+    async function load() {
+      try {
+        const [pubRows, avgRows, weekRows, platformRows, dailyRows, topRows, typeRows] =
+          await Promise.all([
+            db.query(
+              "SELECT COUNT(*)::int AS c FROM content WHERE brand_id=$1 AND status='published'",
+              [brand.id],
+            ),
+            db.query(
+              'SELECT AVG(score)::float AS v FROM analytics WHERE brand_id=$1',
+              [brand.id],
+            ),
+            db.query(
+              "SELECT COUNT(*)::int AS c FROM content WHERE brand_id=$1 AND created_at > now() - interval '7 days'",
+              [brand.id],
+            ),
+            db.query(
+              `SELECT s.platform, COUNT(*)::int AS c
+                 FROM schedules s
+                WHERE s.brand_id=$1 AND s.platform IS NOT NULL
+             GROUP BY s.platform
+             ORDER BY c DESC
+                LIMIT 1`,
+              [brand.id],
+            ),
+            db.query(
+              `SELECT date_trunc('day', recorded_at)::date AS d,
+                      AVG(score)::float AS s
+                 FROM analytics
+                WHERE brand_id=$1 AND recorded_at > now() - interval '7 days'
+             GROUP BY 1
+             ORDER BY 1 ASC`,
+              [brand.id],
+            ),
+            db.query(
+              `SELECT c.id, c.hook, c.caption, a.score, a.engagement_rate
+                 FROM content c
+                 JOIN analytics a ON c.id = a.content_id
+                WHERE c.brand_id=$1
+             ORDER BY a.score DESC
+                LIMIT 5`,
+              [brand.id],
+            ),
+            db.query(
+              `SELECT type, COUNT(*)::int AS c
+                 FROM content
+                WHERE brand_id=$1
+             GROUP BY type`,
+              [brand.id],
+            ),
+          ])
+        if (cancelled) return
+        const typeCounts = {}
+        for (const r of typeRows || []) typeCounts[r.type] = r.c
+        const total = (typeRows || []).reduce((s, r) => s + r.c, 0)
+        setData({
+          totalPublished: pubRows?.[0]?.c ?? 0,
+          avgScore: avgRows?.[0]?.v ? Math.round(avgRows[0].v) : 0,
+          contentThisWeek: weekRows?.[0]?.c ?? 0,
+          topPlatform: platformRows?.[0]?.platform || '—',
+          dailyScores: dailyRows || [],
+          topPerformers: topRows || [],
+          typeCounts,
+          totalContent: total,
+        })
+      } catch (e) {
+        console.error('stats fetch failed', e)
       }
-    >
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [brand?.id])
+
+  async function generateDigest() {
+    if (!brand?.id || digestLoading) return
+    setDigestLoading(true)
+    setDigest(null)
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand_id: brand.id,
+          agent_type: 'analytics',
+          input: 'Generate the weekly performance digest.',
+        }),
+      })
+      if (!res.ok) throw new Error('failed')
+      const out = await res.json()
+      setDigest(out.output)
+      showToast?.('Weekly digest ready')
+    } catch (e) {
+      console.error('digest failed', e)
+      showToast?.('Digest generation failed', 'error')
+    } finally {
+      setDigestLoading(false)
+    }
+  }
+
+  const cells = [
+    { label: 'Total Published', value: data.totalPublished, sub: 'all time' },
+    { label: 'Avg Score', value: data.avgScore || 0, sub: 'engagement' },
+    { label: 'Content This Week', value: data.contentThisWeek, sub: 'last 7 days' },
+    { label: 'Top Platform', value: data.topPlatform, sub: 'most scheduled' },
+  ]
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Overview row */}
       <div
         style={{
           display: 'grid',
@@ -3388,7 +3498,7 @@ function StatsPanel({ wide }) {
                 left: 0,
                 width: 18,
                 height: 2,
-                background: c.accent,
+                background: '#ffffff',
                 borderRadius: 999,
               }}
             />
@@ -3411,6 +3521,9 @@ function StatsPanel({ wide }) {
                 marginTop: 4,
                 letterSpacing: '-0.02em',
                 fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               {c.value}
@@ -3422,69 +3535,479 @@ function StatsPanel({ wide }) {
         ))}
       </div>
 
+      <PerformanceChart dailyScores={data.dailyScores} />
+
+      <div
+        style={
+          wide
+            ? {
+                display: 'grid',
+                gridTemplateColumns: '1.4fr 1fr',
+                gap: 16,
+                alignItems: 'flex-start',
+              }
+            : { display: 'flex', flexDirection: 'column', gap: 16 }
+        }
+      >
+        <TopPerformersList items={data.topPerformers} />
+        <ContentBreakdown typeCounts={data.typeCounts} total={data.totalContent} />
+      </div>
+
       <div>
-        <div
+        <button
+          type="button"
+          onClick={generateDigest}
+          disabled={!brand || digestLoading}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            marginBottom: 6,
+            background: '#fff',
+            color: '#000',
+            border: 'none',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: !brand || digestLoading ? 'not-allowed' : 'pointer',
+            opacity: !brand || digestLoading ? 0.55 : 1,
+            letterSpacing: '0.02em',
           }}
         >
-          <TrendingUp size={11} color="#ffffff" />
-          <span style={{ fontSize: 11, color: TEXT_MUTED }}>Top performers</span>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {TOP_PERFORMERS.map((p, i) => (
-            <div
-              key={i}
+          {digestLoading ? 'Generating…' : 'Generate Weekly Report'}
+        </button>
+        <AnimatePresence>
+          {digest && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 10,
-                padding: '8px 2px',
-                borderBottom:
-                  i === TOP_PERFORMERS.length - 1
-                    ? 'none'
-                    : '0.5px solid rgba(255,255,255,0.04)',
+                marginTop: 12,
+                padding: 14,
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.03)',
+                border: '0.5px solid rgba(255,255,255,0.08)',
+                overflow: 'hidden',
               }}
             >
               <div
                 style={{
+                  fontSize: 11,
+                  color: TEXT_MUTED,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
+                Weekly Insight
+              </div>
+              <DigestContent digest={digest} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
+function PerformanceChart({ dailyScores }) {
+  const W = 600
+  const H = 140
+  const padLeft = 26
+  const padRight = 8
+  const padTop = 10
+  const padBottom = 18
+  const chartW = W - padLeft - padRight
+  const chartH = H - padTop - padBottom
+
+  // Build last 7 days keyed by weekday label
+  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const today = new Date()
+  const days = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const iso = d.toISOString().slice(0, 10)
+    days.push({ iso, label: dayLabels[(d.getDay() + 6) % 7] })
+  }
+  const scoreMap = {}
+  for (const r of dailyScores || []) {
+    const iso = new Date(r.d).toISOString().slice(0, 10)
+    scoreMap[iso] = Math.max(0, Math.min(100, Math.round(r.s || 0)))
+  }
+  const bars = days.map((d) => ({
+    label: d.label,
+    score: scoreMap[d.iso] ?? null,
+  }))
+  const hasData = bars.some((b) => b.score !== null)
+  const avg = hasData
+    ? Math.round(
+        bars.reduce((s, b) => s + (b.score || 0), 0) /
+          bars.filter((b) => b.score !== null).length,
+      )
+    : 0
+
+  const barWidth = chartW / bars.length - 8
+  const avgY = padTop + chartH - (avg / 100) * chartH
+
+  return (
+    <div
+      style={{
+        padding: 14,
+        borderRadius: 12,
+        background: 'rgba(255,255,255,0.03)',
+        border: '0.5px solid rgba(255,255,255,0.07)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 8,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            color: TEXT_MUTED,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontWeight: 600,
+          }}
+        >
+          Last 7 days
+        </div>
+        {hasData && (
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+            avg <span style={{ color: '#fff', fontWeight: 600 }}>{avg}</span>
+          </div>
+        )}
+      </div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        style={{ width: '100%', height: 140, display: 'block' }}
+      >
+        {[0, 50, 100].map((v) => {
+          const y = padTop + chartH - (v / 100) * chartH
+          return (
+            <g key={v}>
+              <line
+                x1={padLeft}
+                y1={y}
+                x2={W - padRight}
+                y2={y}
+                stroke="rgba(255,255,255,0.04)"
+                strokeWidth={0.5}
+              />
+              <text
+                x={padLeft - 6}
+                y={y + 3}
+                fontSize={9}
+                fill="rgba(255,255,255,0.3)"
+                textAnchor="end"
+              >
+                {v}
+              </text>
+            </g>
+          )
+        })}
+        {bars.map((b, i) => {
+          const x = padLeft + i * (chartW / bars.length) + 4
+          const isEmpty = b.score === null
+          const score = isEmpty ? 20 : b.score
+          const h = (score / 100) * chartH
+          const y = padTop + chartH - h
+          return (
+            <g key={i}>
+              <rect
+                x={x}
+                y={y}
+                width={barWidth}
+                height={h}
+                rx={2}
+                fill={isEmpty ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)'}
+              />
+              <text
+                x={x + barWidth / 2}
+                y={H - 4}
+                fontSize={9}
+                fill="rgba(255,255,255,0.4)"
+                textAnchor="middle"
+              >
+                {b.label}
+              </text>
+            </g>
+          )
+        })}
+        {hasData && (
+          <line
+            x1={padLeft}
+            y1={avgY}
+            x2={W - padRight}
+            y2={avgY}
+            stroke="rgba(255,255,255,0.45)"
+            strokeWidth={0.5}
+            strokeDasharray="3 3"
+          />
+        )}
+      </svg>
+      {!hasData && (
+        <div
+          style={{
+            fontSize: 11,
+            color: TEXT_MUTED,
+            textAlign: 'center',
+            marginTop: 8,
+          }}
+        >
+          Run agents to start tracking
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TopPerformersList({ items }) {
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 6,
+        }}
+      >
+        <TrendingUp size={11} color="#ffffff" />
+        <span style={{ fontSize: 11, color: TEXT_MUTED }}>Top performers</span>
+      </div>
+      {items.length === 0 ? (
+        <div
+          style={{
+            padding: 14,
+            background: 'rgba(255,255,255,0.02)',
+            border: '0.5px dashed rgba(255,255,255,0.08)',
+            borderRadius: 10,
+            fontSize: 11,
+            color: TEXT_MUTED,
+            textAlign: 'center',
+          }}
+        >
+          No analytics scored yet
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {items.map((p, i) => {
+            const preview = p.hook || p.caption || '(untitled)'
+            const score = Math.round(p.score || 0)
+            const high = score >= 80
+            return (
+              <div
+                key={p.id || i}
+                style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
-                  minWidth: 0,
+                  justifyContent: 'space-between',
+                  gap: 10,
+                  padding: '8px 2px',
+                  borderBottom:
+                    i === items.length - 1
+                      ? 'none'
+                      : '0.5px solid rgba(255,255,255,0.04)',
                 }}
               >
-                <Star size={10} color="#ffffff" fill="#ffffff" />
-                <span
+                <div
                   style={{
-                    fontSize: 11.5,
-                    color: '#fff',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    minWidth: 0,
                   }}
                 >
-                  {p.title}
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: TEXT_MUTED,
+                      fontVariantNumeric: 'tabular-nums',
+                      fontFamily: MONO,
+                      minWidth: 14,
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 11.5,
+                      color: '#fff',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {preview}
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontSize: 11,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    background: high
+                      ? 'rgba(255,255,255,0.08)'
+                      : 'transparent',
+                    border: '0.5px solid rgba(255,255,255,0.12)',
+                    color: high ? '#fff' : 'rgba(255,255,255,0.5)',
+                    fontWeight: 600,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {score}
                 </span>
               </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: '#ffffff',
-                  fontWeight: 600,
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {p.score}
-              </span>
-            </div>
-          ))}
+            )
+          })}
         </div>
+      )}
+    </div>
+  )
+}
+
+function ContentBreakdown({ typeCounts, total }) {
+  const buckets = [
+    { key: 'hook', label: 'Hooks' },
+    { key: 'caption', label: 'Captions' },
+    { key: 'script', label: 'Scripts' },
+    { key: 'video', label: 'Videos' },
+  ]
+  const safeTotal = total || 0
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 8,
+        }}
+      >
+        <BarChart3 size={11} color="#ffffff" />
+        <span style={{ fontSize: 11, color: TEXT_MUTED }}>Content mix</span>
       </div>
+      {safeTotal === 0 ? (
+        <div
+          style={{
+            padding: 14,
+            background: 'rgba(255,255,255,0.02)',
+            border: '0.5px dashed rgba(255,255,255,0.08)',
+            borderRadius: 10,
+            fontSize: 11,
+            color: TEXT_MUTED,
+            textAlign: 'center',
+          }}
+        >
+          No content yet
+        </div>
+      ) : (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              height: 10,
+              borderRadius: 999,
+              overflow: 'hidden',
+              background: 'rgba(255,255,255,0.04)',
+              border: '0.5px solid rgba(255,255,255,0.08)',
+              marginBottom: 10,
+            }}
+          >
+            {buckets.map((b, i) => {
+              const count = typeCounts[b.key] || 0
+              const pct = safeTotal === 0 ? 0 : (count / safeTotal) * 100
+              if (pct === 0) return null
+              const opacity = 0.9 - i * 0.15
+              return (
+                <div
+                  key={b.key}
+                  style={{
+                    width: `${pct}%`,
+                    background: `rgba(255,255,255,${Math.max(0.2, opacity)})`,
+                    borderRight: '0.5px solid rgba(0,0,0,0.2)',
+                  }}
+                />
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {buckets.map((b) => {
+              const count = typeCounts[b.key] || 0
+              const pct =
+                safeTotal === 0 ? 0 : Math.round((count / safeTotal) * 100)
+              return (
+                <div
+                  key={b.key}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: 11,
+                  }}
+                >
+                  <span style={{ color: 'rgba(255,255,255,0.7)' }}>{b.label}</span>
+                  <span
+                    style={{
+                      color: TEXT_MUTED,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {count} · {pct}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function DigestContent({ digest }) {
+  if (!digest || typeof digest !== 'object') {
+    return (
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+        {String(digest || 'No content')}
+      </div>
+    )
+  }
+  const rows = [
+    ['Top performer', digest.top_performer],
+    ['Key insight', digest.key_insight],
+    ['Recommendation', digest.recommendation],
+    ['Memory update', digest.memory_update],
+    ['Avoid', digest.avoid],
+  ].filter(([, v]) => v)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {rows.map(([label, value]) => (
+        <div key={label}>
+          <div
+            style={{
+              fontSize: 10,
+              color: TEXT_FAINT,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+              marginBottom: 3,
+            }}
+          >
+            {label}
+          </div>
+          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+            {value}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
