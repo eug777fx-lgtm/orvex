@@ -143,7 +143,7 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
     const originalContent = [approved.hook, approved.caption, approved.script]
       .filter(Boolean)
       .join('\n')
-    systemPrompt = `You are a content repurposing agent for ${brand.name}. BRAND VOICE: ${voiceRules}${visualContext} Take this original content and repurpose it into 4 platform-native formats. Original content: ${originalContent}. Output ONLY valid JSON: { instagram_caption: string, tiktok_script: string, linkedin_post: string, twitter_thread: array of 3 tweet strings }`
+    systemPrompt = `You are a content repurposing agent for ${brand.name}. BRAND VOICE: ${voiceRules}${visualContext} Take this original content and repurpose it into 2 platform-native formats for Instagram and Facebook. Original content: ${originalContent}. Output ONLY valid JSON: { instagram_caption: string, facebook_post: string }`
   } else {
     const err = new Error(`unsupported agent_type: ${agent_type}`)
     err.status = 400
@@ -234,7 +234,7 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
         [brand_id, String(captionText)],
       )
       const id = (r?.rows ?? r)?.[0]?.id
-      if (id) queued.push({ id, platform: 'linkedin' })
+      if (id) queued.push({ id, platform: 'facebook' })
       itemsGenerated += 1
     }
     for (const scriptText of scripts) {
@@ -245,7 +245,7 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
         [brand_id, String(scriptText)],
       )
       const id = (r?.rows ?? r)?.[0]?.id
-      if (id) queued.push({ id, platform: 'tiktok' })
+      if (id) queued.push({ id, platform: 'instagram' })
       itemsGenerated += 1
     }
 
@@ -285,15 +285,7 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
   if (agent_type === 'repurpose' && parsed && typeof parsed === 'object') {
     const platforms = [
       { type: 'instagram', column: 'caption', value: parsed.instagram_caption },
-      { type: 'tiktok', column: 'script', value: parsed.tiktok_script },
-      { type: 'linkedin', column: 'caption', value: parsed.linkedin_post },
-      {
-        type: 'twitter',
-        column: 'script',
-        value: Array.isArray(parsed.twitter_thread)
-          ? parsed.twitter_thread.join('\n\n')
-          : parsed.twitter_thread,
-      },
+      { type: 'facebook', column: 'caption', value: parsed.facebook_post },
     ]
     for (const p of platforms) {
       if (!p.value) continue

@@ -98,7 +98,7 @@ const AGENTS = [
     statuses: [
       ['Queue: 4 pending', 'Auto-post on'],
       ['Posted to Instagram', '9:00 AM'],
-      ['TikTok scheduled', '3:00 PM'],
+      ['Facebook post', '3:00 PM'],
     ],
   },
   {
@@ -122,7 +122,7 @@ const SCHEDULE = [
   { time: '8:00', task: 'Write hooks', agent: 'Writer', color: '#ffffff', status: 'done' },
   { time: '9:00', task: 'Post Instagram', agent: 'Distribution', color: '#ffffff', status: 'active' },
   { time: '12:00', task: 'Video briefs', agent: 'Video', color: '#ffffff', status: 'pending' },
-  { time: '3:00', task: 'Post TikTok', agent: 'Distribution', color: '#ffffff', status: 'pending' },
+  { time: '3:00', task: 'Post Facebook', agent: 'Distribution', color: '#ffffff', status: 'pending' },
   { time: '8:00', task: 'Score posts', agent: 'Analytics', color: '#ffffff', status: 'pending' },
 ]
 
@@ -163,7 +163,7 @@ const LOG_FEED = [
   { agent: 'Analytics', action: 'scored Reel #14 — 92/100 added to memory' },
   { agent: 'Writer', action: 'added 3 items to review queue' },
   { agent: 'Strategy', action: 'updated weekly brief — new campaign angle found' },
-  { agent: 'Distribution', action: 'scheduled TikTok for 3:00 PM' },
+  { agent: 'Distribution', action: 'scheduled Facebook for 3:00 PM' },
   { agent: 'Analytics', action: 'updated brand memory with new top performer' },
 ]
 
@@ -918,7 +918,7 @@ const BRAND_PRESET_COLORS = [
   '#fbbf24',
   '#f87171',
 ]
-const BRAND_PLATFORMS = ['instagram', 'tiktok', 'linkedin', 'facebook', 'youtube']
+const BRAND_PLATFORMS = ['instagram', 'facebook']
 
 function BrandChip({ brand, active, isClient, onSelect, onUploadLogo, uploading }) {
   const color = brand.primary_color || brand.color || '#ffffff'
@@ -2392,10 +2392,7 @@ function agentDisplayName(type) {
 
 const PLATFORM_COLORS = {
   instagram: '#a78bfa',
-  tiktok: '#22d3ee',
-  linkedin: '#60a5fa',
   facebook: '#4ade80',
-  youtube: '#f87171',
 }
 
 function platformColor(p) {
@@ -3976,9 +3973,7 @@ const CONTENT_TYPE_GROUP = {
   cta: 'scripts',
   repurpose: 'scripts',
   instagram: 'scripts',
-  tiktok: 'scripts',
-  linkedin: 'scripts',
-  twitter: 'scripts',
+  facebook: 'scripts',
   voiceover: 'scripts',
   video: 'videos',
   video_render: 'videos',
@@ -3988,12 +3983,10 @@ const CONTENT_TYPE_GROUP = {
 
 const TYPE_PLATFORM = {
   hook: 'instagram',
-  caption: 'instagram',
-  script: 'tiktok',
+  caption: 'facebook',
+  script: 'instagram',
   cta: 'instagram',
   instagram: 'instagram',
-  tiktok: 'tiktok',
-  linkedin: 'linkedin',
   facebook: 'facebook',
   video: 'instagram',
   image: 'instagram',
@@ -4498,8 +4491,6 @@ function PlatformFilterBar({ value, onChange }) {
   const platforms = [
     { key: 'all', label: 'All' },
     { key: 'instagram', label: 'Instagram' },
-    { key: 'tiktok', label: 'TikTok' },
-    { key: 'linkedin', label: 'LinkedIn' },
     { key: 'facebook', label: 'Facebook' },
   ]
   return (
@@ -4563,9 +4554,7 @@ const SCRIPT_TYPE_COLORS = {
   cta: '#fbbf24',
   voiceover: '#f87171',
   instagram: '#a78bfa',
-  tiktok: '#22d3ee',
-  linkedin: '#60a5fa',
-  twitter: '#f87171',
+  facebook: '#4ade80',
   repurpose: '#ffffff',
 }
 
@@ -5314,7 +5303,7 @@ const WORKFLOW_STAGES = [
     accent: '#4ade80',
     items: [
       'Make.com triggers at scheduled time',
-      'Posts to Instagram/TikTok/LinkedIn',
+      'Posts to Instagram and Facebook',
       'Webhook confirms published',
       'Status updates to published',
     ],

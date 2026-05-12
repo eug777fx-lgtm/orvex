@@ -10,10 +10,9 @@
 //   - subsequent slots: previous slot + 4 hours
 //   - hard cap of 3 posts per day — overflow moves to the next day at 09:00 UTC
 // Platform mapping by content.type:
-//   hook|caption → instagram
-//   script        → tiktok
-//   video         → instagram
-//   anything else → instagram
+//   hook|script|video → instagram
+//   caption           → facebook
+//   anything else     → instagram
 
 const MAX_PER_DAY = 3
 const SLOT_GAP_HOURS = 4
@@ -25,7 +24,7 @@ function startOfUtcDay(d) {
 }
 
 function platformForType(type) {
-  if (type === 'script') return 'tiktok'
+  if (type === 'caption') return 'facebook'
   return 'instagram'
 }
 

@@ -104,7 +104,7 @@ export async function setupMarketingDB() {
 
   await db.query(
     `INSERT INTO brands (name, color, platforms)
-     VALUES ('LIMITLESS', '#ffffff', '["instagram","tiktok","linkedin"]')
+     VALUES ('LIMITLESS', '#ffffff', '["instagram","facebook"]')
      ON CONFLICT (name) DO NOTHING`,
   )
 
@@ -122,7 +122,7 @@ export async function setupMarketingDB() {
   await db.query(
     'CREATE TABLE IF NOT EXISTS app_meta (key text PRIMARY KEY, value text)',
   )
-  const versionKey = 'limitless_memory_v2'
+  const versionKey = 'limitless_memory_v3'
   const versionRows = await db.query(
     'SELECT value FROM app_meta WHERE key = $1 LIMIT 1',
     [versionKey],
@@ -232,7 +232,7 @@ const LIMITLESS_MEMORY = [
   {
     memory_type: 'audience',
     content:
-      'Primary: futures and forex traders aged 18-35. Mostly male. Trading NQ, ES, forex pairs. Learning ICT concepts, Smart Money Concepts, order flow. Most are struggling with consistency — they know what to do but dont do it. They lose money because of emotions and no system, not lack of knowledge. Secondary: aspiring traders who follow trading content on TikTok and Instagram looking for motivation and tools. Pain points: inconsistency, emotional trading, revenge trading, no clear system, not tracking their trades. Desires: consistent profits, a clear edge, emotional control, to journal but dont know where to start. They respond to: identity-based hooks, real trade examples, psychology content, product demos showing real data.',
+      'Primary: futures and forex traders aged 18-35. Mostly male. Trading NQ, ES, forex pairs. Learning ICT concepts, Smart Money Concepts, order flow. Most are struggling with consistency — they know what to do but dont do it. They lose money because of emotions and no system, not lack of knowledge. Secondary: aspiring traders who follow trading content on Instagram and Facebook looking for motivation and tools. Pain points: inconsistency, emotional trading, revenge trading, no clear system, not tracking their trades. Desires: consistent profits, a clear edge, emotional control, to journal but dont know where to start. They respond to: identity-based hooks, real trade examples, psychology content, product demos showing real data.',
   },
   {
     memory_type: 'top_performers',
@@ -242,7 +242,7 @@ const LIMITLESS_MEMORY = [
   {
     memory_type: 'campaign_history',
     content:
-      'Product: LIMITLESS Trading Journal — web app for futures and forex traders. Features: trade logging, P&L tracking, performance analytics, pattern detection, trading plan page, news calendar. Price: 10 per month, 84 per year, 200 lifetime. USP vs competitors like TradePath: LIMITLESS is built by a real trader for real traders. More personal, more community focused, cinematic brand aesthetic that traders actually want to follow. Content competitor reference: tradepathai shows product UI with real data and gets strong engagement. LIMITLESS should do same but with more emotional storytelling and identity-based hooks. Platforms: Instagram Reels primary, TikTok secondary, YouTube Shorts tertiary. Posting frequency goal: daily on Instagram, 3x week TikTok. Visual identity: dark monochrome, black and white, clean typography, cinematic slow motion, no green neon like competitors.',
+      'Product: LIMITLESS Trading Journal — web app for futures and forex traders. Features: trade logging, P&L tracking, performance analytics, pattern detection, trading plan page, news calendar. Price: 10 per month, 84 per year, 200 lifetime. USP vs competitors like TradePath: LIMITLESS is built by a real trader for real traders. More personal, more community focused, cinematic brand aesthetic that traders actually want to follow. Content competitor reference: tradepathai shows product UI with real data and gets strong engagement. LIMITLESS should do same but with more emotional storytelling and identity-based hooks. Platforms: Instagram Reels primary, Facebook secondary. Posting frequency goal: daily on Instagram, 3x week on Facebook. Visual identity: dark monochrome, black and white, clean typography, cinematic slow motion, no green neon like competitors.',
   },
 ]
 
