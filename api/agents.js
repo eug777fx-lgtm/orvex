@@ -1,10 +1,13 @@
 // Required environment variables (set in Vercel project settings):
 //   VITE_DATABASE_URL   — Neon Postgres connection string
 //   ANTHROPIC_API_KEY   — Anthropic API key for Claude calls
+//   HIGGSFIELD_API_KEY  — Higgsfield API key (only needed for video_director)
 //
 // Endpoints:
 //   POST /api/agents                     body: { brand_id, agent_type, input }
 //   GET  /api/agents?scheduled=true&brand=<name>&agent=<type>
+
+import { generateVideo } from './video.js'
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -61,6 +64,7 @@ export default async function handler(req, res) {
       output: result.parsed,
       tokens_used: result.tokensUsed,
       items_generated: result.itemsGenerated,
+      ...(result.video ? { video: result.video } : {}),
     })
   } catch (error) {
     console.error('agents handler error:', error.message)
@@ -117,6 +121,8 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
     systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers} Write high-performing social media content matching this brand voice exactly. Output ONLY valid JSON: { hooks: array of 5 strings, captions: array of 3 strings, scripts: array of 2 full reel scripts, cta: string }`
   } else if (agent_type === 'analytics') {
     systemPrompt = `You are an analytics agent for ${brand.name}. BRAND VOICE: ${voiceRules} TOP PERFORMERS: ${topPerformers} Output ONLY valid JSON: { top_performer: string, key_insight: string, recommendation: string, memory_update: string, avoid: string }`
+  } else if (agent_type === 'video_director') {
+    systemPrompt = `You are a video director agent for ${brand.name}. BRAND VOICE: ${voiceRules} AUDIENCE: ${audience} Your job is to generate a cinematic video prompt for this brand. Output ONLY valid JSON: { video_prompt: string (detailed cinematic prompt for Higgsfield), image_prompt: string (detailed image prompt), style: string, mood: string, duration: 5, type: text_to_video }`
   } else if (agent_type === 'repurpose') {
     const approvedRows = await sql.query(
       `SELECT id, hook, caption, script FROM content
@@ -233,6 +239,25 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
     }
   }
 
+  let videoResult = null
+  if (agent_type === 'video_director' && parsed && typeof parsed === 'object') {
+    const videoPrompt = parsed.video_prompt
+    if (videoPrompt) {
+      try {
+        videoResult = await generateVideo({
+          brand_id,
+          type: 'text_to_video',
+          prompt: videoPrompt,
+          sql,
+        })
+        if (videoResult?.success) itemsGenerated += 1
+      } catch (e) {
+        console.error('video_director generateVideo failed', e)
+        videoResult = { success: false, error: e.message }
+      }
+    }
+  }
+
   if (agent_type === 'repurpose' && parsed && typeof parsed === 'object') {
     const platforms = [
       { type: 'instagram', column: 'caption', value: parsed.instagram_caption },
@@ -254,5 +279,5 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
     }
   }
 
-  return { parsed, tokensUsed, itemsGenerated }
+  return { parsed, tokensUsed, itemsGenerated, video: videoResult }
 }

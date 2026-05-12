@@ -1568,7 +1568,8 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
     if (!brand || runStatus === 'running') return
     setRunStatus('running')
     try {
-      const data = await callAgent(brand.id, agent.key)
+      const apiAgentType = agent.key === 'video' ? 'video_director' : agent.key
+      const data = await callAgent(brand.id, apiAgentType)
       setRunStatus('success')
       const added = countItemsAdded(data)
       showToast?.(
@@ -3163,16 +3164,44 @@ function ReviewPanel({ items, brand, onApprove, onReject, onRepurpose, wide }) {
                 {brand?.name || ''}
               </span>
             </div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: 'rgba(255,255,255,0.85)',
-                lineHeight: 1.5,
-              }}
-            >
-              {reviewItemText(it)}
-            </p>
+            {it.type === 'image' && it.script ? (
+              <img
+                src={it.script}
+                alt="generated"
+                style={{
+                  width: '100%',
+                  maxHeight: 360,
+                  objectFit: 'cover',
+                  borderRadius: 8,
+                  border: '0.5px solid rgba(255,255,255,0.06)',
+                  display: 'block',
+                }}
+              />
+            ) : it.type === 'video' && it.script ? (
+              <video
+                src={it.script}
+                controls
+                style={{
+                  width: '100%',
+                  maxHeight: 360,
+                  borderRadius: 8,
+                  border: '0.5px solid rgba(255,255,255,0.06)',
+                  background: '#000',
+                  display: 'block',
+                }}
+              />
+            ) : (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 12,
+                  color: 'rgba(255,255,255,0.85)',
+                  lineHeight: 1.5,
+                }}
+              >
+                {reviewItemText(it)}
+              </p>
+            )}
             <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
               <button
                 type="button"
