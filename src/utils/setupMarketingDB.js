@@ -104,6 +104,40 @@ export async function setupMarketingDB() {
 
   await seedBrandMemory('LIMITLESS', LIMITLESS_MEMORY)
   await seedBrandMemory('AWATEC', AWATEC_MEMORY)
+
+  // One-time forced refresh of LIMITLESS memory for existing installs.
+  // Gated on app_meta key so it only runs once per database, not every page load.
+  await db.query(
+    'CREATE TABLE IF NOT EXISTS app_meta (key text PRIMARY KEY, value text)',
+  )
+  const versionKey = 'limitless_memory_v2'
+  const versionRows = await db.query(
+    'SELECT value FROM app_meta WHERE key = $1 LIMIT 1',
+    [versionKey],
+  )
+  if (versionRows.length === 0) {
+    const limitlessRows = await db.query(
+      "SELECT id FROM brands WHERE name = 'LIMITLESS' LIMIT 1",
+    )
+    const limitlessId = limitlessRows[0]?.id
+    if (limitlessId) {
+      await db.query('DELETE FROM brand_memory WHERE brand_id = $1', [
+        limitlessId,
+      ])
+      for (const entry of LIMITLESS_MEMORY) {
+        await db.query(
+          `INSERT INTO brand_memory (brand_id, memory_type, content)
+           VALUES ($1, $2, $3)`,
+          [limitlessId, entry.memory_type, entry.content],
+        )
+      }
+    }
+    await db.query(
+      `INSERT INTO app_meta (key, value) VALUES ($1, '1')
+       ON CONFLICT (key) DO NOTHING`,
+      [versionKey],
+    )
+  }
 }
 
 async function seedBrandMemory(brandName, entries) {
