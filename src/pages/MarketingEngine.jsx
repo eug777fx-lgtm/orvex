@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import db from '@/lib/db'
 import {
@@ -440,6 +440,7 @@ export default function MarketingEngine() {
             brand={selectedBrand}
             onRefresh={refreshBrandData}
             showToast={showToast}
+            now={now}
           />
           <ScheduleStrip schedule={schedule} />
           <BrandMemory
@@ -755,20 +756,42 @@ const HUD_COLORS = {
   analytics: { glow: 'rgba(248,113,113,0.08)', accent: '#f87171', soft: 'rgba(248,113,113,0.5)' },
 }
 
-const sectionLabelStyle = {
-  fontSize: 9,
-  color: 'rgba(255,255,255,0.12)',
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase',
-  fontWeight: 600,
-  marginBottom: 6,
+const DESK_POSITIONS = {
+  strategy: { left: '8%', top: '12%' },
+  writer: { left: '38%', top: '12%' },
+  video: { left: '68%', top: '12%' },
+  distribution: { left: '18%', top: '62%' },
+  analytics: { left: '62%', top: '62%' },
 }
 
-const LINES = [
-  { x1: 17, y1: 28, x2: 50, y2: 28, dur: 3.0, delay: 0 },
-  { x1: 50, y1: 28, x2: 83, y2: 28, dur: 3.2, delay: 0.7 },
-  { x1: 17, y1: 28, x2: 28, y2: 82, dur: 3.6, delay: 1.3 },
-  { x1: 72, y1: 82, x2: 17, y2: 28, dur: 4.0, delay: 1.9 },
+const HOME_POSITIONS = {
+  strategy: { left: '6%', top: '18%' },
+  writer: { left: '36%', top: '18%' },
+  video: { left: '66%', top: '18%' },
+  distribution: { left: '16%', top: '68%' },
+  analytics: { left: '60%', top: '68%' },
+}
+
+const MEETING_POSITIONS = {
+  strategy: { left: '40%', top: '40%' },
+  writer: { left: '54%', top: '40%' },
+  video: { left: '36%', top: '50%' },
+  distribution: { left: '57%', top: '50%' },
+  analytics: { left: '47%', top: '58%' },
+}
+
+const ROOM_RECTS = [
+  { name: 'Content Room', left: '2%', top: '4%', width: '28%', height: '42%' },
+  { name: 'Production', left: '36%', top: '4%', width: '26%', height: '42%' },
+  { name: 'Strategy Room', left: '68%', top: '4%', width: '28%', height: '42%' },
+  { name: 'Ops Row', left: '2%', top: '54%', width: '94%', height: '40%' },
+]
+
+const CHAIR_DOTS = [
+  { left: '50%', top: '38%' },
+  { left: '50%', top: '62%' },
+  { left: '40%', top: '50%' },
+  { left: '60%', top: '50%' },
 ]
 
 async function callAgent(brandId, agentType) {
@@ -792,65 +815,6 @@ function countItemsAdded(data) {
   return hooks + captions
 }
 
-function AuroraBackground() {
-  const auroras = [
-    {
-      background: 'radial-gradient(ellipse 60% 40% at 20% 50%, rgba(139,92,246,0.06) 0%, transparent 60%)',
-      dur: 10,
-      dx: 30,
-      dy: -20,
-    },
-    {
-      background: 'radial-gradient(ellipse 40% 60% at 80% 30%, rgba(6,182,212,0.06) 0%, transparent 60%)',
-      dur: 12,
-      dx: -25,
-      dy: 22,
-    },
-    {
-      background: 'radial-gradient(ellipse 50% 50% at 50% 80%, rgba(255,255,255,0.03) 0%, transparent 50%)',
-      dur: 8,
-      dx: 18,
-      dy: 14,
-    },
-  ]
-  return (
-    <>
-      {auroras.map((a, i) => (
-        <motion.div
-          key={i}
-          aria-hidden
-          animate={{ x: [0, a.dx, 0], y: [0, a.dy, 0] }}
-          transition={{ duration: a.dur, repeat: Infinity, ease: 'easeInOut' }}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: a.background,
-            pointerEvents: 'none',
-            zIndex: 0,
-          }}
-        />
-      ))}
-    </>
-  )
-}
-
-function ScanLines() {
-  return (
-    <div
-      aria-hidden
-      style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage:
-          'linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)',
-        backgroundSize: '40px 40px',
-        zIndex: 0,
-        pointerEvents: 'none',
-      }}
-    />
-  )
-}
-
 function ActivityPulse() {
   return (
     <motion.span
@@ -861,95 +825,58 @@ function ActivityPulse() {
         width: 7,
         height: 7,
         borderRadius: '50%',
-        background: '#ffffff',
-        boxShadow: '0 0 8px rgba(255,255,255,0.5)',
+        background: '#10b981',
+        boxShadow: '0 0 10px rgba(16,185,129,0.7)',
         flexShrink: 0,
       }}
     />
   )
 }
 
-function ConnectingLines({ allHands }) {
-  const stroke = allHands ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.06)'
-  return (
-    <svg
-      aria-hidden
-      style={{
-        position: 'absolute',
-        inset: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: 0,
-      }}
-      preserveAspectRatio="none"
-      viewBox="0 0 100 100"
-    >
-      {LINES.map((l, i) => (
-        <g key={i}>
-          <line
-            x1={l.x1}
-            y1={l.y1}
-            x2={l.x2}
-            y2={l.y2}
-            stroke={stroke}
-            strokeWidth={0.4}
-            strokeDasharray="2 2"
-          />
-          <motion.circle
-            r={0.7}
-            fill="white"
-            opacity={allHands ? 0.7 : 0.4}
-            animate={{ cx: [l.x1, l.x2], cy: [l.y1, l.y2] }}
-            transition={{
-              duration: l.dur,
-              repeat: Infinity,
-              ease: 'linear',
-              delay: l.delay,
-            }}
-          />
-        </g>
-      ))}
-    </svg>
-  )
-}
-
-function MeetingTable({ allHands, onClick }) {
+function MeetingPiece({ active, onClick }) {
   return (
     <motion.button
       type="button"
       onClick={onClick}
       animate={{
-        boxShadow: allHands
-          ? '0 0 20px rgba(255,255,255,0.18)'
+        boxShadow: active
+          ? '0 0 20px rgba(255,255,255,0.15)'
           : '0 0 0px rgba(255,255,255,0)',
-        borderColor: allHands ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)',
-        backgroundColor: allHands ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+        borderColor: active
+          ? 'rgba(255,255,255,0.35)'
+          : 'rgba(255,255,255,0.1)',
+        backgroundColor: active
+          ? 'rgba(255,255,255,0.05)'
+          : 'rgba(255,255,255,0.03)',
       }}
       transition={{ duration: 0.3 }}
       style={{
-        width: 80,
-        height: 40,
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 70,
+        height: 44,
         border: '0.5px solid rgba(255,255,255,0.1)',
-        borderRadius: 8,
+        borderRadius: 10,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 9,
-        color: 'rgba(255,255,255,0.5)',
+        fontSize: 8,
+        color: active ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.15)',
         textTransform: 'uppercase',
-        letterSpacing: '0.08em',
+        letterSpacing: '0.1em',
         cursor: 'pointer',
-        flexShrink: 0,
         fontWeight: 600,
+        zIndex: 4,
       }}
     >
       <AnimatePresence mode="wait">
-        {allHands ? (
+        {active ? (
           <motion.span
             key="all"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1, color: '#fff' }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
@@ -963,7 +890,7 @@ function MeetingTable({ allHands, onClick }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            Meeting
+            Meet
           </motion.span>
         )}
       </AnimatePresence>
@@ -971,14 +898,332 @@ function MeetingTable({ allHands, onClick }) {
   )
 }
 
-function AgentOffice({ screenIndex, meetingAgents, brand, onRefresh, showToast }) {
-  const [allHands, setAllHands] = useState(false)
-  const [runAllStep, setRunAllStep] = useState(null)
+function Desk({ agent }) {
+  const colors = HUD_COLORS[agent.key] || { accent: '#ffffff' }
+  const pos = DESK_POSITIONS[agent.key]
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: 'absolute',
+        left: pos.left,
+        top: pos.top,
+        width: 52,
+        height: 36,
+        background: 'rgba(255,255,255,0.04)',
+        border: '0.5px solid rgba(255,255,255,0.1)',
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1,
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: 36,
+          height: 20,
+          background: 'rgba(255,255,255,0.06)',
+          borderRadius: 4,
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: 2,
+            right: 2,
+            width: 4,
+            height: 4,
+            borderRadius: '50%',
+            background: colors.accent,
+            boxShadow: `0 0 3px ${colors.accent}`,
+          }}
+        />
+      </div>
+    </div>
+  )
+}
 
-  function triggerAllHands() {
-    if (allHands) return
-    setAllHands(true)
-    setTimeout(() => setAllHands(false), 4000)
+function ChairDots() {
+  return (
+    <>
+      {CHAIR_DOTS.map((c, i) => (
+        <div
+          key={i}
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: c.left,
+            top: c.top,
+            transform: 'translate(-50%, -50%)',
+            width: 4,
+            height: 4,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.08)',
+            zIndex: 2,
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
+    </>
+  )
+}
+
+function AgentCharacter({ agent, position, mode, screenIndex }) {
+  const colors = HUD_COLORS[agent.key] || { accent: '#ffffff' }
+  const status = agent.statuses[screenIndex % agent.statuses.length]
+  const [hover, setHover] = useState(false)
+  const isAtDesk = mode === 'desk'
+  const isMeetingWalk = mode === 'meeting-walk'
+  const bubble = isMeetingWalk ? 'Checking in...' : status[0] || ''
+
+  return (
+    <motion.div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      animate={{
+        left: position.left,
+        top: position.top,
+      }}
+      transition={{ duration: 1.8, ease: 'easeInOut' }}
+      style={{
+        position: 'absolute',
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 2,
+        pointerEvents: 'auto',
+      }}
+    >
+      {/* Thought bubble */}
+      <motion.div
+        animate={{ opacity: hover || isMeetingWalk ? 1 : 0 }}
+        transition={{ duration: 0.2 }}
+        style={{
+          position: 'absolute',
+          top: -22,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(20,20,28,0.95)',
+          border: '0.5px solid rgba(255,255,255,0.1)',
+          borderRadius: 6,
+          padding: '3px 7px',
+          fontSize: 8,
+          color: 'rgba(255,255,255,0.6)',
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+        }}
+      >
+        {bubble}
+      </motion.div>
+
+      {/* Body (bob when at desk, lean when walking) */}
+      <motion.div
+        animate={
+          isAtDesk
+            ? { y: [0, -2, 0], rotate: 0 }
+            : { y: 0, rotate: [-3, 3, -3] }
+        }
+        transition={{
+          duration: isAtDesk ? 0.8 : 0.6,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            background: colors.accent,
+            boxShadow: `0 0 6px ${colors.accent}`,
+          }}
+        />
+        <div
+          style={{
+            width: 14,
+            height: 9,
+            borderRadius: 3,
+            background: colors.accent,
+            opacity: 0.5,
+            marginTop: 1,
+          }}
+        />
+      </motion.div>
+
+      {/* Name tag */}
+      <div
+        style={{
+          fontSize: 8,
+          color: 'rgba(255,255,255,0.5)',
+          background: 'rgba(0,0,0,0.4)',
+          borderRadius: 999,
+          padding: '1px 5px',
+          marginTop: 2,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {agent.name}
+      </div>
+    </motion.div>
+  )
+}
+
+function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast }) {
+  const colors = HUD_COLORS[agent.key] || { accent: '#ffffff' }
+  const status = agent.statuses[screenIndex % agent.statuses.length]
+  const [runStatus, setRunStatus] = useState('idle')
+  const [hover, setHover] = useState(false)
+
+  async function handleRun() {
+    if (!brand || runStatus === 'running') return
+    setRunStatus('running')
+    try {
+      const data = await callAgent(brand.id, agent.key)
+      setRunStatus('success')
+      const added = countItemsAdded(data)
+      showToast?.(
+        added > 0
+          ? `${agent.name} Agent finished — ${added} items added to queue`
+          : `${agent.name} Agent finished`,
+      )
+      if (agent.key === 'writer' || agent.key === 'strategy') onRefresh?.()
+      setTimeout(() => setRunStatus('idle'), 3000)
+    } catch (e) {
+      console.error(`${agent.key} run failed`, e)
+      setRunStatus('error')
+      showToast?.(`${agent.name} Agent failed — retry`, 'error')
+      setTimeout(() => setRunStatus('idle'), 3000)
+    }
+  }
+
+  const isRunning = runStatus === 'running'
+  const statusLabel = isRunning
+    ? 'Running...'
+    : runStatus === 'success'
+    ? 'Complete ✓'
+    : runStatus === 'error'
+    ? 'Error — retry'
+    : status[0] || ''
+
+  return (
+    <div
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '0.5px solid rgba(255,255,255,0.07)',
+        borderRadius: 10,
+        padding: '8px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        flexShrink: 0,
+        minWidth: 220,
+      }}
+    >
+      <motion.span
+        animate={{ opacity: [1, 0.4, 1] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: colors.accent,
+          boxShadow: `0 0 6px ${colors.accent}`,
+          flexShrink: 0,
+        }}
+      />
+      <div
+        style={{
+          minWidth: 0,
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: '#fff',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {agent.name}
+        </span>
+        <span
+          style={{
+            fontSize: 10,
+            color: 'rgba(255,255,255,0.4)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {statusLabel}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={handleRun}
+        disabled={!brand || isRunning}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{
+          fontSize: 9,
+          padding: '3px 8px',
+          borderRadius: 999,
+          border: '0.5px solid rgba(255,255,255,0.15)',
+          background:
+            hover && !isRunning && brand
+              ? 'rgba(255,255,255,0.06)'
+              : 'transparent',
+          color:
+            !brand || isRunning
+              ? 'rgba(255,255,255,0.25)'
+              : hover
+              ? '#fff'
+              : 'rgba(255,255,255,0.5)',
+          fontWeight: 500,
+          letterSpacing: '0.04em',
+          cursor: !brand || isRunning ? 'not-allowed' : 'pointer',
+          flexShrink: 0,
+          transition: 'all 0.15s ease',
+        }}
+      >
+        {isRunning ? '...' : 'Run'}
+      </button>
+    </div>
+  )
+}
+
+function AgentOffice({ screenIndex, meetingAgents, brand, onRefresh, showToast, now }) {
+  const [agentPositions, setAgentPositions] = useState(() => ({ ...HOME_POSITIONS }))
+  const [agentModes, setAgentModes] = useState(() =>
+    Object.fromEntries(AGENTS.map((a) => [a.key, 'wandering'])),
+  )
+  const [meetingActive, setMeetingActive] = useState(false)
+  const [runAllStep, setRunAllStep] = useState(null)
+  const meetingActiveRef = useRef(false)
+  meetingActiveRef.current = meetingActive
+
+  function triggerMeeting() {
+    if (meetingActiveRef.current) return
+    setMeetingActive(true)
+    setAgentPositions({ ...MEETING_POSITIONS })
+    setAgentModes(Object.fromEntries(AGENTS.map((a) => [a.key, 'meeting'])))
+    setTimeout(() => {
+      setMeetingActive(false)
+      setAgentPositions({ ...HOME_POSITIONS })
+      setAgentModes(Object.fromEntries(AGENTS.map((a) => [a.key, 'wandering'])))
+    }, 5000)
   }
 
   async function handleRunAll() {
@@ -1001,31 +1246,94 @@ function AgentOffice({ screenIndex, meetingAgents, brand, onRefresh, showToast }
     }
   }
 
-  const topAgents = AGENTS.slice(0, 3)
-  const bottomAgents = AGENTS.slice(3)
+  // Wandering: per-agent setTimeout chain every 4-7s
+  useEffect(() => {
+    const wanderTimers = {}
+
+    function scheduleWander(agentKey) {
+      const delay = 4000 + Math.random() * 3000
+      wanderTimers[agentKey] = setTimeout(() => {
+        if (meetingActiveRef.current) {
+          scheduleWander(agentKey)
+          return
+        }
+        const base = HOME_POSITIONS[agentKey]
+        const bL = parseFloat(base.left)
+        const bT = parseFloat(base.top)
+        setAgentPositions((prev) => ({
+          ...prev,
+          [agentKey]: {
+            left: `${(bL + (Math.random() - 0.5) * 10).toFixed(1)}%`,
+            top: `${(bT + (Math.random() - 0.5) * 10).toFixed(1)}%`,
+          },
+        }))
+        setAgentModes((prev) => ({ ...prev, [agentKey]: 'wandering' }))
+        scheduleWander(agentKey)
+      }, delay)
+    }
+
+    AGENTS.forEach((a) => scheduleWander(a.key))
+    return () => Object.values(wanderTimers).forEach(clearTimeout)
+  }, [])
+
+  // Desk visit every 12s per agent (returns to desk for 3s)
+  useEffect(() => {
+    const cleanup = []
+    AGENTS.forEach((agent) => {
+      const intervalId = setInterval(() => {
+        if (meetingActiveRef.current) return
+        setAgentPositions((prev) => ({ ...prev, [agent.key]: DESK_POSITIONS[agent.key] }))
+        setAgentModes((prev) => ({ ...prev, [agent.key]: 'desk' }))
+        const returnId = setTimeout(() => {
+          if (meetingActiveRef.current) return
+          setAgentPositions((prev) => ({ ...prev, [agent.key]: HOME_POSITIONS[agent.key] }))
+          setAgentModes((prev) => ({ ...prev, [agent.key]: 'wandering' }))
+        }, 3000)
+        cleanup.push(() => clearTimeout(returnId))
+      }, 12000)
+      cleanup.push(() => clearInterval(intervalId))
+    })
+    return () => cleanup.forEach((fn) => fn())
+  }, [])
+
+  // Cross-room walk every 25s — one random agent visits the meeting table
+  useEffect(() => {
+    const cleanup = []
+    const intervalId = setInterval(() => {
+      if (meetingActiveRef.current) return
+      const agent = AGENTS[Math.floor(Math.random() * AGENTS.length)]
+      setAgentPositions((prev) => ({
+        ...prev,
+        [agent.key]: { left: '47%', top: '47%' },
+      }))
+      setAgentModes((prev) => ({ ...prev, [agent.key]: 'meeting-walk' }))
+      const returnId = setTimeout(() => {
+        if (meetingActiveRef.current) return
+        setAgentPositions((prev) => ({ ...prev, [agent.key]: HOME_POSITIONS[agent.key] }))
+        setAgentModes((prev) => ({ ...prev, [agent.key]: 'wandering' }))
+      }, 4000)
+      cleanup.push(() => clearTimeout(returnId))
+    }, 25000)
+    cleanup.push(() => clearInterval(intervalId))
+    return () => cleanup.forEach((fn) => fn())
+  }, [])
 
   return (
     <div
       style={{
-        position: 'relative',
-        background: 'rgba(255,255,255,0.02)',
-        border: '0.5px solid rgba(255,255,255,0.08)',
-        borderRadius: 20,
-        padding: 0,
+        background: 'rgba(255,255,255,0.03)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '0.5px solid rgba(255,255,255,0.07)',
+        borderRadius: 16,
         overflow: 'hidden',
-        minHeight: 480,
         flexShrink: 0,
       }}
     >
-      <AuroraBackground />
-      <ScanLines />
-
       {/* Header */}
       <div
         style={{
-          position: 'relative',
-          zIndex: 1,
-          padding: '16px 20px',
+          padding: '14px 16px',
           borderBottom: '0.5px solid rgba(255,255,255,0.06)',
           display: 'flex',
           alignItems: 'center',
@@ -1033,21 +1341,36 @@ function AgentOffice({ screenIndex, meetingAgents, brand, onRefresh, showToast }
           gap: 12,
         }}
       >
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
-            Agent Network
-          </div>
-          <div
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+            AI Office
+          </span>
+          <span
             style={{
-              fontSize: 11,
-              color: 'rgba(255,255,255,0.5)',
-              marginTop: 2,
+              fontSize: 10,
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: 'rgba(16,185,129,0.1)',
+              border: '0.5px solid rgba(16,185,129,0.3)',
+              color: '#10b981',
+              letterSpacing: '0.06em',
+              fontWeight: 600,
             }}
           >
-            5 nodes active
-          </div>
+            5 AGENTS ACTIVE
+          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              fontSize: 11.5,
+              color: 'rgba(255,255,255,0.6)',
+              fontFamily: MONO,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {formatClock(now || new Date())}
+          </span>
           <RunAllButton
             disabled={!brand || !!runAllStep}
             step={runAllStep}
@@ -1057,72 +1380,126 @@ function AgentOffice({ screenIndex, meetingAgents, brand, onRefresh, showToast }
         </div>
       </div>
 
-      {/* Cards area */}
-      <div style={{ position: 'relative', zIndex: 1, padding: 20 }}>
-        <ConnectingLines allHands={allHands} />
+      {/* Floor */}
+      <div
+        style={{
+          background: '#0a0a0c',
+          position: 'relative',
+          height: 420,
+          width: '100%',
+          overflow: 'hidden',
+          backgroundImage:
+            'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+        }}
+      >
+        {/* Room rectangles + labels */}
+        {ROOM_RECTS.map((r) => (
+          <div key={r.name} aria-hidden>
+            <div
+              style={{
+                position: 'absolute',
+                left: r.left,
+                top: r.top,
+                width: r.width,
+                height: r.height,
+                background: 'rgba(255,255,255,0.015)',
+                borderRadius: 12,
+                pointerEvents: 'none',
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                left: `calc(${r.left} + 10px)`,
+                top: `calc(${r.top} + 10px)`,
+                fontSize: 9,
+                color: 'rgba(255,255,255,0.1)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.12em',
+                pointerEvents: 'none',
+                fontWeight: 600,
+              }}
+            >
+              {r.name}
+            </span>
+          </div>
+        ))}
 
-        <div style={sectionLabelStyle}>CREATIVE CLUSTER</div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 12,
-            position: 'relative',
-            zIndex: 1,
-          }}
-        >
-          {topAgents.map((agent, i) => (
-            <HUDAgentCard
-              key={agent.key}
-              agent={agent}
-              index={i}
-              screenIndex={screenIndex}
-              inMeeting={allHands || meetingAgents.includes(agent.key)}
-              brand={brand}
-              onRefresh={onRefresh}
-              showToast={showToast}
-            />
-          ))}
-        </div>
+        {/* Desks */}
+        {AGENTS.map((agent) => (
+          <Desk key={agent.key} agent={agent} />
+        ))}
 
-        <div style={{ ...sectionLabelStyle, marginTop: 20 }}>OPS CLUSTER</div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'stretch',
-            justifyContent: 'center',
-            gap: 12,
-            marginTop: 6,
-            position: 'relative',
-            zIndex: 1,
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <HUDAgentCard
-              agent={bottomAgents[0]}
-              index={3}
-              screenIndex={screenIndex}
-              inMeeting={allHands || meetingAgents.includes(bottomAgents[0].key)}
-              brand={brand}
-              onRefresh={onRefresh}
-              showToast={showToast}
+        {/* Chair dots */}
+        <ChairDots />
+
+        {/* Meeting table */}
+        <MeetingPiece active={meetingActive} onClick={triggerMeeting} />
+
+        {/* Ripple on meeting trigger */}
+        <AnimatePresence>
+          {meetingActive && (
+            <motion.div
+              key="ripple"
+              initial={{ scale: 1, opacity: 0.3 }}
+              animate={{ scale: 2.5, opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 2, ease: 'easeOut' }}
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 70,
+                height: 44,
+                borderRadius: 10,
+                border: '0.5px solid rgba(255,255,255,0.4)',
+                pointerEvents: 'none',
+                zIndex: 3,
+              }}
             />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <MeetingTable allHands={allHands} onClick={triggerAllHands} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <HUDAgentCard
-              agent={bottomAgents[1]}
-              index={4}
-              screenIndex={screenIndex}
-              inMeeting={allHands || meetingAgents.includes(bottomAgents[1].key)}
-              brand={brand}
-              onRefresh={onRefresh}
-              showToast={showToast}
-            />
-          </div>
-        </div>
+          )}
+        </AnimatePresence>
+
+        {/* Agent characters */}
+        {AGENTS.map((agent) => (
+          <AgentCharacter
+            key={agent.key}
+            agent={agent}
+            position={agentPositions[agent.key] || HOME_POSITIONS[agent.key]}
+            mode={
+              meetingActive
+                ? 'meeting'
+                : meetingAgents?.includes(agent.key)
+                ? 'meeting'
+                : agentModes[agent.key] || 'wandering'
+            }
+            screenIndex={screenIndex}
+          />
+        ))}
+      </div>
+
+      {/* Agent info strip */}
+      <div
+        style={{
+          padding: '12px 16px',
+          display: 'flex',
+          gap: 12,
+          overflowX: 'auto',
+          borderTop: '0.5px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        {AGENTS.map((agent) => (
+          <AgentInfoPill
+            key={agent.key}
+            agent={agent}
+            screenIndex={screenIndex}
+            brand={brand}
+            onRefresh={onRefresh}
+            showToast={showToast}
+          />
+        ))}
       </div>
     </div>
   )
@@ -1174,371 +1551,6 @@ function RunAllButton({ disabled, step, onClick }) {
       )}
       {label}
     </button>
-  )
-}
-
-function RunButton({ disabled, running, onClick }) {
-  const [hover, setHover] = useState(false)
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        fontSize: 9,
-        padding: '3px 8px',
-        borderRadius: 999,
-        border: '0.5px solid rgba(255,255,255,0.15)',
-        background: hover && !disabled ? 'rgba(255,255,255,0.06)' : 'transparent',
-        color: disabled ? 'rgba(255,255,255,0.25)' : hover ? '#fff' : 'rgba(255,255,255,0.5)',
-        letterSpacing: '0.04em',
-        fontWeight: 500,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        marginTop: 4,
-        alignSelf: 'flex-start',
-        transition: 'all 0.15s ease',
-      }}
-    >
-      {running ? 'Running' : 'Run'}
-    </button>
-  )
-}
-
-function HUDAgentCard({
-  agent,
-  index,
-  screenIndex,
-  inMeeting,
-  brand,
-  onRefresh,
-  showToast,
-}) {
-  const colors = HUD_COLORS[agent.key] || {
-    glow: 'rgba(255,255,255,0.06)',
-    accent: '#ffffff',
-    soft: 'rgba(255,255,255,0.4)',
-  }
-  const Icon = agent.icon
-  const status = agent.statuses[screenIndex % agent.statuses.length]
-  const [hover, setHover] = useState(false)
-  const [runStatus, setRunStatus] = useState('idle')
-  const [progress, setProgress] = useState(40 + index * 8)
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setProgress(40 + Math.random() * 50)
-    }, 4000)
-    return () => clearInterval(id)
-  }, [])
-
-  async function handleRun(e) {
-    e?.stopPropagation?.()
-    if (!brand || runStatus === 'running') return
-    setRunStatus('running')
-    try {
-      const data = await callAgent(brand.id, agent.key)
-      setRunStatus('success')
-      const added = countItemsAdded(data)
-      showToast?.(
-        added > 0
-          ? `${agent.name} Agent finished — ${added} items added to queue`
-          : `${agent.name} Agent finished`,
-      )
-      if (agent.key === 'writer' || agent.key === 'strategy') {
-        onRefresh?.()
-      }
-      setTimeout(() => setRunStatus('idle'), 3000)
-    } catch (err) {
-      console.error(`${agent.key} run failed`, err)
-      setRunStatus('error')
-      showToast?.(`${agent.name} Agent failed — retry`, 'error')
-      setTimeout(() => setRunStatus('idle'), 3000)
-    }
-  }
-
-  const isRunning = runStatus === 'running'
-  const isSuccess = runStatus === 'success'
-  const isError = runStatus === 'error'
-
-  const borderColor = inMeeting
-    ? 'rgba(255,255,255,0.4)'
-    : isSuccess
-    ? 'rgba(255,255,255,0.5)'
-    : isError
-    ? 'rgba(255,255,255,0.35)'
-    : hover
-    ? 'rgba(255,255,255,0.18)'
-    : 'rgba(255,255,255,0.08)'
-
-  const cardShadow = inMeeting
-    ? '0 0 20px rgba(255,255,255,0.15)'
-    : isSuccess
-    ? '0 0 14px rgba(255,255,255,0.18)'
-    : 'none'
-
-  function renderScreen() {
-    if (isRunning) {
-      return (
-        <>
-          <div>
-            <span style={{ color: colors.accent, fontWeight: 600 }}>Running</span>{' '}
-            agent task...
-          </div>
-          <div>
-            <span style={{ color: colors.accent, opacity: 0.7 }}>{'> '}</span>
-            awaiting response
-          </div>
-        </>
-      )
-    }
-    if (isSuccess) {
-      return (
-        <>
-          <div>
-            <span style={{ color: colors.accent, fontWeight: 600 }}>Complete</span>{' '}
-            — task done ✓
-          </div>
-          <div>
-            <span style={{ color: colors.accent, opacity: 0.7 }}>{'> '}</span>
-            data updated
-          </div>
-        </>
-      )
-    }
-    if (isError) {
-      return (
-        <>
-          <div>
-            <span style={{ color: colors.accent, fontWeight: 600 }}>Error</span>{' '}
-            — task failed
-          </div>
-          <div>
-            <span style={{ color: colors.accent, opacity: 0.7 }}>{'> '}</span>
-            tap retry
-          </div>
-        </>
-      )
-    }
-    const parts0 = (status[0] || '').split(' ')
-    const parts1 = (status[1] || '').split(' ')
-    const first0 = parts0[0] || ''
-    const rest0 = parts0.slice(1).join(' ')
-    const first1 = parts1[0] || ''
-    const rest1 = parts1.slice(1).join(' ')
-    return (
-      <>
-        <div
-          style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <span style={{ color: colors.accent, fontWeight: 600 }}>{first0}</span>
-          {rest0 && ' '}
-          {rest0}
-        </div>
-        {status[1] && (
-          <div
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <span style={{ color: colors.accent, opacity: 0.7 }}>{first1}</span>
-            {rest1 && ' '}
-            {rest1}
-          </div>
-        )}
-      </>
-    )
-  }
-
-  return (
-    <motion.div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      animate={{
-        y: hover ? -2 : 0,
-        backgroundColor: hover
-          ? 'rgba(255,255,255,0.06)'
-          : 'rgba(255,255,255,0.03)',
-        borderColor,
-        boxShadow: cardShadow,
-      }}
-      transition={{ duration: 0.3 }}
-      style={{
-        position: 'relative',
-        background: 'rgba(255,255,255,0.03)',
-        border: '0.5px solid rgba(255,255,255,0.08)',
-        borderRadius: 16,
-        padding: 16,
-        overflow: 'hidden',
-        cursor: 'pointer',
-      }}
-    >
-      {/* Top glow */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 60,
-          background: `linear-gradient(to bottom, ${colors.glow}, transparent)`,
-          borderRadius: '16px 16px 0 0',
-          pointerEvents: 'none',
-        }}
-      />
-
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        {/* Floating orb */}
-        <motion.div
-          aria-hidden
-          animate={{ scale: [1, 1.3, 1], opacity: [0.7, 1, 0.7] }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: index * 0.4,
-          }}
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: colors.accent,
-            boxShadow: `0 0 8px ${colors.accent}, 0 0 16px ${colors.soft}`,
-            margin: '0 auto 10px',
-          }}
-        />
-
-        {/* Top row: icon + name + status indicator */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              minWidth: 0,
-            }}
-          >
-            <Icon size={14} color={colors.accent} />
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#fff',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {agent.name}
-            </span>
-          </div>
-          <motion.div
-            animate={{ opacity: [1, 0.4, 1] }}
-            transition={{
-              duration: 1.6,
-              repeat: Infinity,
-              ease: 'easeInOut',
-              delay: index * 0.2,
-            }}
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: colors.accent,
-              boxShadow: `0 0 6px ${colors.accent}`,
-              flexShrink: 0,
-            }}
-          />
-        </div>
-
-        {/* Activity screen */}
-        <div
-          style={{
-            background: 'rgba(0,0,0,0.3)',
-            border: '0.5px solid rgba(255,255,255,0.06)',
-            borderRadius: 8,
-            padding: '8px 10px',
-            marginTop: 10,
-            minHeight: 52,
-            fontFamily: MONO,
-            fontSize: 10,
-            color: 'rgba(255,255,255,0.5)',
-            lineHeight: 1.7,
-          }}
-        >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={
-                isRunning
-                  ? 'run'
-                  : isSuccess
-                  ? 'ok'
-                  : isError
-                  ? 'err'
-                  : `s-${screenIndex % agent.statuses.length}`
-              }
-              initial={{ opacity: 0, y: 3 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -3 }}
-              transition={{ duration: 0.25 }}
-            >
-              {renderScreen()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Bottom row: progress + Run button */}
-        <div
-          style={{
-            marginTop: 10,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 10,
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              height: 2,
-              background: 'rgba(255,255,255,0.06)',
-              borderRadius: 999,
-              overflow: 'hidden',
-            }}
-          >
-            <motion.div
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 1.5, ease: 'easeInOut' }}
-              style={{
-                height: '100%',
-                background: colors.accent,
-                borderRadius: 999,
-              }}
-            />
-          </div>
-          <RunButton
-            disabled={!brand || isRunning}
-            running={isRunning}
-            onClick={handleRun}
-          />
-        </div>
-      </div>
-    </motion.div>
   )
 }
 
