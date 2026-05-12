@@ -285,7 +285,13 @@ export default function MarketingEngine() {
   const loadBrands = useCallback(async (selectIdAfter) => {
     try {
       const rows = await db.query(
-        "SELECT id, name, color, COALESCE(brand_type, 'own') AS brand_type, logo_url, primary_color, secondary_color, visual_style, aesthetic_description FROM brands ORDER BY brand_type ASC, created_at ASC",
+        `SELECT * FROM (
+           SELECT DISTINCT ON (name) id, name, color, COALESCE(brand_type, 'own') AS brand_type,
+                  logo_url, primary_color, secondary_color, visual_style, aesthetic_description, created_at
+             FROM brands
+            ORDER BY name, created_at ASC
+         ) sub
+         ORDER BY brand_type ASC, created_at ASC`,
       )
       setBrands(rows || [])
       if (selectIdAfter) {
@@ -506,22 +512,12 @@ export default function MarketingEngine() {
       transition={{ duration: 0.2 }}
       style={{
         margin: isMobile ? '-1rem' : '-2rem',
-        display: 'grid',
-        gridTemplateColumns: '1fr',
-        height: 'calc(100vh - 56px)',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 'calc(100vh - 56px)',
         color: '#fff',
-        overflow: 'hidden',
       }}
     >
-      {/* ===== MAIN AREA ===== */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          minWidth: 0,
-          overflow: 'hidden',
-        }}
-      >
         <PageHeader now={now} loading={loading} />
         <BrandSelector
           brands={brands}
@@ -536,14 +532,11 @@ export default function MarketingEngine() {
 
         <div
           style={{
-            flex: 1,
             display: 'flex',
             flexDirection: 'column',
             gap: 12,
-            padding: '12px 20px 20px',
-            paddingBottom: 60,
-            minHeight: 0,
-            overflow: 'auto',
+            padding: '12px 20px',
+            paddingBottom: 80,
           }}
         >
           <AgentOffice
@@ -568,7 +561,6 @@ export default function MarketingEngine() {
           />
           <VideoTemplates brand={selectedBrand} showToast={showToast} />
         </div>
-      </div>
 
       <BottomDrawer
         open={drawerOpen}
@@ -2138,7 +2130,7 @@ function AgentOffice({
         style={{
           background: '#0a0a0c',
           position: 'relative',
-          height: 420,
+          minHeight: 420,
           width: '100%',
           overflow: 'hidden',
           backgroundImage:

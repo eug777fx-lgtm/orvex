@@ -12,6 +12,11 @@ export async function setupMarketingDB() {
     )
   `)
 
+  // Clean up any duplicate brand rows (oldest wins) before the unique index
+  // is created — CREATE UNIQUE INDEX would error if duplicates still exist.
+  await dedupeBrand('AWATEC')
+  await dedupeBrand('LIMITLESS')
+
   await db.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS brands_name_unique ON brands(name)
   `)
@@ -144,6 +149,23 @@ export async function setupMarketingDB() {
        ON CONFLICT (key) DO NOTHING`,
       [versionKey],
     )
+  }
+}
+
+async function dedupeBrand(brandName) {
+  const rows = await db.query(
+    'SELECT id FROM brands WHERE name = $1 ORDER BY created_at ASC',
+    [brandName],
+  )
+  if (!rows || rows.length <= 1) return
+  const deleteIds = rows.slice(1).map((r) => r.id)
+  for (const deleteId of deleteIds) {
+    await db.query('DELETE FROM brand_memory WHERE brand_id = $1', [deleteId])
+    await db.query('DELETE FROM agent_runs WHERE brand_id = $1', [deleteId])
+    await db.query('DELETE FROM analytics WHERE brand_id = $1', [deleteId])
+    await db.query('DELETE FROM schedules WHERE brand_id = $1', [deleteId])
+    await db.query('DELETE FROM content WHERE brand_id = $1', [deleteId])
+    await db.query('DELETE FROM brands WHERE id = $1', [deleteId])
   }
 }
 
