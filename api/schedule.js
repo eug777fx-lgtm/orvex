@@ -1,30 +1,8 @@
 // GET /api/schedule?brand_id=<uuid>
 //
-// Returns today's hardcoded agent schedule with computed status per slot:
-//   - 'active'   when the slot is within ±30 minutes of now
-//   - 'done'     when the slot is more than 30 minutes in the past
-//   - 'upcoming' when the slot is more than 30 minutes in the future
-//
-// Times below are interpreted in the server's timezone (Vercel = UTC).
-
-const SLOTS = [
-  { time: '07:00', task: 'Daily strategy brief', agent_type: 'strategy' },
-  { time: '08:00', task: 'Generate hooks and captions', agent_type: 'writer' },
-  { time: '09:00', task: 'Post to Instagram', agent_type: 'distribution' },
-  { time: '12:00', task: 'Build video briefs', agent_type: 'video' },
-  { time: '15:00', task: 'Post to TikTok', agent_type: 'distribution' },
-  { time: '20:00', task: 'Score performance', agent_type: 'analytics' },
-]
-
-function slotStatus(slotTime, now) {
-  const [h, m] = slotTime.split(':').map(Number)
-  const scheduled = new Date(now)
-  scheduled.setHours(h, m, 0, 0)
-  const diffMin = (scheduled.getTime() - now.getTime()) / 60000
-  if (Math.abs(diffMin) <= 30) return 'active'
-  if (diffMin < 0) return 'done'
-  return 'upcoming'
-}
+// Returns today's scheduled content for a brand from the schedules table.
+// Response shape: { schedules: [...], is_empty: boolean }
+// When no schedules exist for today: { schedules: [], is_empty: true }
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -37,14 +15,28 @@ export default async function handler(req, res) {
   const { brand_id } = req.query || {}
   if (!brand_id) return res.status(400).json({ error: 'brand_id required' })
 
-  const now = new Date()
-  const items = SLOTS.map((s) => ({
-    time: s.time,
-    task: s.task,
-    agent_type: s.agent_type,
-    status: slotStatus(s.time, now),
-    brand_id,
-  }))
+  try {
+    const { neon } = await import('@neondatabase/serverless')
+    const sql = neon(process.env.VITE_DATABASE_URL)
 
-  return res.status(200).json(items)
+    const result = await sql.query(
+      `SELECT s.id, s.scheduled_at, s.platform, s.published,
+              c.type, c.hook, c.caption, c.script
+         FROM schedules s
+         JOIN content c ON s.content_id = c.id
+        WHERE s.brand_id = $1
+          AND s.scheduled_at::date = CURRENT_DATE
+        ORDER BY s.scheduled_at ASC`,
+      [brand_id],
+    )
+    const rows = result?.rows ?? result ?? []
+
+    if (rows.length === 0) {
+      return res.status(200).json({ schedules: [], is_empty: true })
+    }
+    return res.status(200).json({ schedules: rows, is_empty: false })
+  } catch (error) {
+    console.error('schedule handler error:', error.message)
+    return res.status(500).json({ error: error.message })
+  }
 }

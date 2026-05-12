@@ -2153,8 +2153,29 @@ function agentDisplayName(type) {
   return type.charAt(0).toUpperCase() + type.slice(1)
 }
 
-function ScheduleStrip({ brand }) {
-  const [apiSchedule, setApiSchedule] = useState(null)
+const PLATFORM_COLORS = {
+  instagram: '#a78bfa',
+  tiktok: '#22d3ee',
+  linkedin: '#60a5fa',
+  facebook: '#4ade80',
+  youtube: '#f87171',
+}
+
+function platformColor(p) {
+  return PLATFORM_COLORS[p] || '#ffffff'
+}
+
+function fmtSchedTime(d) {
+  if (!d) return ''
+  return new Date(d).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function ScheduleStrip({ brand, version }) {
+  const [schedules, setSchedules] = useState([])
+  const [isEmpty, setIsEmpty] = useState(false)
   const [clock, setClock] = useState(new Date())
 
   useEffect(() => {
@@ -2164,38 +2185,53 @@ function ScheduleStrip({ brand }) {
 
   useEffect(() => {
     if (!brand?.id) {
-      setApiSchedule(null)
+      setSchedules([])
+      setIsEmpty(true)
       return
     }
     let cancelled = false
     async function load() {
       try {
-        const res = await fetch(`/api/schedule?brand_id=${encodeURIComponent(brand.id)}`)
+        const res = await fetch(
+          `/api/schedule?brand_id=${encodeURIComponent(brand.id)}`,
+        )
         if (!res.ok) return
         const data = await res.json()
-        if (!cancelled) setApiSchedule(Array.isArray(data) ? data : [])
+        if (cancelled) return
+        if (Array.isArray(data)) {
+          setSchedules(data)
+          setIsEmpty(data.length === 0)
+        } else {
+          setSchedules(data.schedules || [])
+          setIsEmpty(!!data.is_empty)
+        }
       } catch (e) {
         console.error('schedule fetch failed', e)
       }
     }
     load()
-    const id = setInterval(load, 60000)
+    const id = setInterval(load, 5 * 60 * 1000)
     return () => {
       cancelled = true
       clearInterval(id)
     }
-  }, [brand?.id])
+  }, [brand?.id, version])
 
-  const usingFallback = !apiSchedule || apiSchedule.length === 0
-  const rows = usingFallback
-    ? SCHEDULE
-    : apiSchedule.map((s) => ({
-        time: s.time,
-        task: s.task,
-        agent: agentDisplayName(s.agent_type),
-        color: HUD_COLORS[s.agent_type]?.accent || '#ffffff',
-        status: s.status,
-      }))
+  const now = clock.getTime()
+  const total = schedules.length
+  const published = schedules.filter((s) => s.published).length
+  // Active = next unpublished closest to now (smallest |scheduled - now| where scheduled >= now - 30min)
+  let activeId = null
+  let minDelta = Infinity
+  for (const s of schedules) {
+    if (s.published) continue
+    const t = new Date(s.scheduled_at).getTime()
+    const delta = Math.abs(t - now)
+    if (delta < minDelta) {
+      minDelta = delta
+      activeId = s.id
+    }
+  }
 
   return (
     <div
@@ -2223,137 +2259,232 @@ function ScheduleStrip({ brand }) {
           <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
             Today's Schedule
           </span>
-          {usingFallback && (
-            <span
-              style={{
-                fontSize: 9.5,
-                color: TEXT_FAINT,
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase',
-              }}
-            >
-              sample
-            </span>
-          )}
         </div>
-        <span
-          style={{
-            fontSize: 11,
-            color: TEXT_MUTED,
-            fontFamily: MONO,
-            fontVariantNumeric: 'tabular-nums',
-            letterSpacing: '0.02em',
-            flexShrink: 0,
-          }}
-        >
-          {formatClock(clock)}
-        </span>
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          overflowX: 'auto',
-          paddingBottom: 4,
-        }}
-      >
-        {rows.map((row, i) => {
-          const done = row.status === 'done'
-          const active = row.status === 'active'
-          return (
-            <div
-              key={i}
-              style={{
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-                padding: '10px 12px',
-                minWidth: 140,
-                borderRadius: 10,
-                background: active
-                  ? 'rgba(74,222,128,0.04)'
-                  : 'rgba(255,255,255,0.02)',
-                border: active
-                  ? '0.5px solid rgba(74,222,128,0.4)'
-                  : '0.5px solid rgba(255,255,255,0.06)',
-                boxShadow: active
-                  ? '0 0 12px rgba(74,222,128,0.12)'
-                  : 'none',
-                opacity: done ? 0.4 : 1,
-                flexShrink: 0,
-                transition: 'all 0.3s ease',
-              }}
-            >
-              {active && (
-                <motion.span
-                  aria-hidden
-                  animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
-                  transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                  style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 10,
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: '#4ade80',
-                    boxShadow: '0 0 8px rgba(74,222,128,0.7)',
-                  }}
-                />
-              )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {total > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 style={{
                   fontSize: 10.5,
-                  color: active ? '#4ade80' : TEXT_MUTED,
-                  fontFamily: MONO,
+                  color: TEXT_MUTED,
+                  letterSpacing: '0.04em',
                   fontVariantNumeric: 'tabular-nums',
-                  letterSpacing: '0.04em',
-                  fontWeight: active ? 600 : 500,
                 }}
               >
-                {row.time}
+                {published}/{total} · {published} published
               </span>
-              <span
+              <div
                 style={{
-                  fontSize: 12,
-                  color: '#fff',
-                  fontWeight: 500,
-                  textDecoration: done ? 'line-through' : 'none',
-                }}
-              >
-                {row.task}
-              </span>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '2px 8px',
+                  width: 60,
+                  height: 3,
                   borderRadius: 999,
-                  background: `${row.color}14`,
-                  border: `0.5px solid ${row.color}33`,
-                  color: row.color,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: '0.04em',
-                  alignSelf: 'flex-start',
+                  background: 'rgba(255,255,255,0.06)',
+                  overflow: 'hidden',
                 }}
               >
-                <span
+                <div
                   style={{
-                    width: 4,
-                    height: 4,
-                    borderRadius: '50%',
-                    background: row.color,
+                    width: `${total === 0 ? 0 : (published / total) * 100}%`,
+                    height: '100%',
+                    background: 'rgba(74,222,128,0.7)',
                   }}
                 />
-                {row.agent}
-              </span>
+              </div>
             </div>
-          )
-        })}
+          )}
+          <span
+            style={{
+              fontSize: 11,
+              color: TEXT_MUTED,
+              fontFamily: MONO,
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '0.02em',
+              flexShrink: 0,
+            }}
+          >
+            {formatClock(clock)}
+          </span>
+        </div>
       </div>
+
+      {isEmpty ? (
+        <div
+          style={{
+            padding: 18,
+            textAlign: 'center',
+            color: TEXT_MUTED,
+            fontSize: 12,
+            background: 'rgba(255,255,255,0.02)',
+            borderRadius: 10,
+            border: '0.5px dashed rgba(255,255,255,0.08)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <Sparkles size={16} color="rgba(255,255,255,0.4)" />
+          <div>No content scheduled today — approve content to schedule it</div>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            overflowX: 'auto',
+            paddingBottom: 4,
+          }}
+        >
+          {schedules.map((s) => {
+            const t = new Date(s.scheduled_at).getTime()
+            const isActive = s.id === activeId
+            const isPublished = !!s.published
+            const isPending = !isPublished && t < now - 30 * 60 * 1000
+            const preview =
+              (s.hook || s.caption || s.script || '').slice(0, 35) +
+              ((s.hook || s.caption || s.script || '').length > 35 ? '…' : '')
+            const platform = s.platform || 'post'
+            const pColor = platformColor(platform)
+            return (
+              <div
+                key={s.id}
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  padding: '10px 12px',
+                  minWidth: 180,
+                  borderRadius: 10,
+                  background:
+                    isActive && !isPublished
+                      ? 'rgba(74,222,128,0.04)'
+                      : 'rgba(255,255,255,0.02)',
+                  border:
+                    isActive && !isPublished
+                      ? '0.5px solid rgba(74,222,128,0.4)'
+                      : '0.5px solid rgba(255,255,255,0.06)',
+                  boxShadow:
+                    isActive && !isPublished
+                      ? '0 0 12px rgba(74,222,128,0.12)'
+                      : 'none',
+                  opacity: isPublished ? 0.5 : 1,
+                  flexShrink: 0,
+                  transition: 'all 0.3s ease',
+                }}
+              >
+                {isActive && !isPublished && (
+                  <motion.span
+                    aria-hidden
+                    animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
+                    transition={{
+                      duration: 1.4,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 10,
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: '#4ade80',
+                      boxShadow: '0 0 8px rgba(74,222,128,0.7)',
+                    }}
+                  />
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      color:
+                        isPublished
+                          ? 'rgba(74,222,128,0.9)'
+                          : isPending
+                          ? '#fbbf24'
+                          : isActive
+                          ? '#4ade80'
+                          : TEXT_MUTED,
+                      fontFamily: MONO,
+                      fontVariantNumeric: 'tabular-nums',
+                      letterSpacing: '0.04em',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {fmtSchedTime(s.scheduled_at)}
+                  </span>
+                  {isPublished && (
+                    <span
+                      style={{
+                        fontSize: 9.5,
+                        color: 'rgba(74,222,128,0.9)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      <Check size={10} /> Posted
+                    </span>
+                  )}
+                  {!isPublished && isPending && (
+                    <span
+                      style={{
+                        fontSize: 9.5,
+                        color: '#fbbf24',
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      Pending
+                    </span>
+                  )}
+                </div>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    color: 'rgba(255,255,255,0.85)',
+                    fontWeight: 500,
+                    textDecoration: isPublished ? 'line-through' : 'none',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: 220,
+                  }}
+                >
+                  {preview || '(empty)'}
+                </span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    background: `${pColor}14`,
+                    border: `0.5px solid ${pColor}33`,
+                    color: pColor,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 4,
+                      height: 4,
+                      borderRadius: '50%',
+                      background: pColor,
+                    }}
+                  />
+                  {platform}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
