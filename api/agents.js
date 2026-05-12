@@ -30,40 +30,110 @@ export default async function handler(req, res) {
       'SELECT content, memory_type FROM brand_memory WHERE brand_id = $1',
       [brand_id],
     )
-    const memory = memoryRows?.rows ?? memoryRows
-
-    const memoryByType = memory.reduce((acc, row) => {
-      const k = row.memory_type || 'general'
-      if (!acc[k]) acc[k] = []
-      acc[k].push(row.content)
-      return acc
-    }, {})
+    const brandMemory = memoryRows?.rows ?? memoryRows ?? []
 
     const voiceRules =
-      (memoryByType.voice_rules || []).join('\n') ||
+      brandMemory
+        .filter((m) => m.memory_type === 'voice_rules')
+        .map((m) => m.content)
+        .join('\n') ||
       brand.voice_prompt ||
-      'Confident, concise, no fluff.'
-    const memoryDump = memory.map((m) => `[${m.memory_type}] ${m.content}`).join('\n') ||
-      'No prior memory yet.'
+      'No voice rules defined yet.'
+    const audience =
+      brandMemory
+        .filter((m) => m.memory_type === 'audience')
+        .map((m) => m.content)
+        .join('\n') || 'No audience profile defined yet.'
+    const topPerformers =
+      brandMemory
+        .filter((m) => m.memory_type === 'top_performers')
+        .map((m) => m.content)
+        .join('\n') || 'No prior performance data yet.'
+    const campaignHistory =
+      brandMemory
+        .filter((m) => m.memory_type === 'campaign_history')
+        .map((m) => m.content)
+        .join('\n') || 'No campaign history yet.'
 
     let systemPrompt
     if (agent_type === 'strategy') {
-      systemPrompt =
-        `You are a content strategy agent for ${brand.name}. ` +
-        `Your job is to analyze trends and create a 7-day content brief. ` +
-        `Brand context: ${memoryDump}. ` +
-        `Output a JSON object with: { brief: string, angles: array of 3 strings, recommended_formats: array }`
+      systemPrompt = `You are a content strategy agent for ${brand.name}.
+
+BRAND VOICE:
+${voiceRules}
+
+TARGET AUDIENCE:
+${audience}
+
+TOP PERFORMING CONTENT:
+${topPerformers}
+
+CAMPAIGN HISTORY:
+${campaignHistory}
+
+Your job: analyze what content will perform best for this brand right now and create a detailed 7-day content brief.
+
+Output ONLY a valid JSON object with no extra text:
+{
+  "brief": "overall weekly strategy in 2-3 sentences",
+  "angles": ["angle 1", "angle 2", "angle 3"],
+  "daily_topics": ["Monday topic", "Tuesday topic", "Wednesday topic", "Thursday topic", "Friday topic", "Saturday topic", "Sunday topic"],
+  "recommended_formats": ["format 1", "format 2", "format 3"],
+  "key_message": "the one core message for this week"
+}`
     } else if (agent_type === 'writer') {
-      systemPrompt =
-        `You are a copywriter for ${brand.name}. ` +
-        `Brand voice: ${voiceRules}. ` +
-        `Write content that matches this brand exactly. ` +
-        `Output a JSON object with: { hooks: array of 5 strings, captions: array of 3 strings, cta: string }`
+      systemPrompt = `You are a professional copywriter for ${brand.name}.
+
+BRAND VOICE — follow this exactly:
+${voiceRules}
+
+TARGET AUDIENCE:
+${audience}
+
+BEST PERFORMING CONTENT FOR REFERENCE:
+${topPerformers}
+
+Your job: write high-performing social media content that matches this brand voice exactly.
+
+Output ONLY a valid JSON object with no extra text:
+{
+  "hooks": [
+    "hook 1",
+    "hook 2",
+    "hook 3",
+    "hook 4",
+    "hook 5"
+  ],
+  "captions": [
+    "caption 1",
+    "caption 2",
+    "caption 3"
+  ],
+  "scripts": [
+    "script 1 - full reel script with open, body, and CTA",
+    "script 2 - full reel script with open, body, and CTA"
+  ],
+  "cta": "one strong call to action for this brand"
+}`
     } else if (agent_type === 'analytics') {
-      systemPrompt =
-        `You are an analytics agent for ${brand.name}. ` +
-        `Review the content performance and write a learning summary. ` +
-        `Output a JSON object with: { top_performer: string, key_insight: string, recommendation: string, memory_update: string }`
+      systemPrompt = `You are an analytics and learning agent for ${brand.name}.
+
+BRAND VOICE:
+${voiceRules}
+
+TOP PERFORMERS SO FAR:
+${topPerformers}
+
+Your job: analyze content performance and write actionable learnings that will improve future content.
+
+Output ONLY a valid JSON object with no extra text:
+{
+  "top_performer": "description of best performing content",
+  "key_insight": "what is working and why",
+  "recommendation": "what to do more of next week",
+  "memory_update": "new learning to add to brand memory",
+  "avoid": "what is not working"
+}`
     } else {
       return res.status(400).json({ error: `unsupported agent_type: ${agent_type}` })
     }
@@ -77,7 +147,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 2000,
         system: systemPrompt,
         messages: [
           { role: 'user', content: input || 'Run your scheduled task now.' },
@@ -99,9 +169,17 @@ export default async function handler(req, res) {
     let parsed
     try {
       const match = rawText.match(/\{[\s\S]*\}/)
-      parsed = match ? JSON.parse(match[0]) : { raw: rawText }
+      if (!match) {
+        parsed = { raw_output: rawText }
+      } else {
+        try {
+          parsed = JSON.parse(match[0])
+        } catch {
+          parsed = { raw_output: rawText }
+        }
+      }
     } catch {
-      parsed = { raw: rawText }
+      parsed = { raw_output: rawText }
     }
 
     await sql.query(
@@ -119,6 +197,7 @@ export default async function handler(req, res) {
     if (agent_type === 'writer' && parsed && typeof parsed === 'object') {
       const hooks = Array.isArray(parsed.hooks) ? parsed.hooks : []
       const captions = Array.isArray(parsed.captions) ? parsed.captions : []
+      const scripts = Array.isArray(parsed.scripts) ? parsed.scripts : []
 
       for (const hookText of hooks) {
         if (!hookText) continue
@@ -134,6 +213,14 @@ export default async function handler(req, res) {
           `INSERT INTO content (brand_id, type, caption, status)
            VALUES ($1, 'caption', $2, 'pending')`,
           [brand_id, String(captionText)],
+        )
+      }
+      for (const scriptText of scripts) {
+        if (!scriptText) continue
+        await sql.query(
+          `INSERT INTO content (brand_id, type, script, status)
+           VALUES ($1, 'script', $2, 'pending')`,
+          [brand_id, String(scriptText)],
         )
       }
     }
