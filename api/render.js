@@ -1,6 +1,6 @@
-const { renderMediaOnLambda, getRenderProgress } = require('@remotion/lambda-client')
+import { renderMediaOnLambda, getRenderProgress } from '@remotion/lambda-client'
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
