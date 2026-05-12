@@ -57,83 +57,11 @@ export default async function handler(req, res) {
 
     let systemPrompt
     if (agent_type === 'strategy') {
-      systemPrompt = `You are a content strategy agent for ${brand.name}.
-
-BRAND VOICE:
-${voiceRules}
-
-TARGET AUDIENCE:
-${audience}
-
-TOP PERFORMING CONTENT:
-${topPerformers}
-
-CAMPAIGN HISTORY:
-${campaignHistory}
-
-Your job: analyze what content will perform best for this brand right now and create a detailed 7-day content brief.
-
-Output ONLY a valid JSON object with no extra text:
-{
-  "brief": "overall weekly strategy in 2-3 sentences",
-  "angles": ["angle 1", "angle 2", "angle 3"],
-  "daily_topics": ["Monday topic", "Tuesday topic", "Wednesday topic", "Thursday topic", "Friday topic", "Saturday topic", "Sunday topic"],
-  "recommended_formats": ["format 1", "format 2", "format 3"],
-  "key_message": "the one core message for this week"
-}`
+      systemPrompt = `You are a content strategy agent for ${brand.name}. BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
     } else if (agent_type === 'writer') {
-      systemPrompt = `You are a professional copywriter for ${brand.name}.
-
-BRAND VOICE — follow this exactly:
-${voiceRules}
-
-TARGET AUDIENCE:
-${audience}
-
-BEST PERFORMING CONTENT FOR REFERENCE:
-${topPerformers}
-
-Your job: write high-performing social media content that matches this brand voice exactly.
-
-Output ONLY a valid JSON object with no extra text:
-{
-  "hooks": [
-    "hook 1",
-    "hook 2",
-    "hook 3",
-    "hook 4",
-    "hook 5"
-  ],
-  "captions": [
-    "caption 1",
-    "caption 2",
-    "caption 3"
-  ],
-  "scripts": [
-    "script 1 - full reel script with open, body, and CTA",
-    "script 2 - full reel script with open, body, and CTA"
-  ],
-  "cta": "one strong call to action for this brand"
-}`
+      systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers} Write high-performing social media content matching this brand voice exactly. Output ONLY valid JSON: { hooks: array of 5 strings, captions: array of 3 strings, scripts: array of 2 full reel scripts, cta: string }`
     } else if (agent_type === 'analytics') {
-      systemPrompt = `You are an analytics and learning agent for ${brand.name}.
-
-BRAND VOICE:
-${voiceRules}
-
-TOP PERFORMERS SO FAR:
-${topPerformers}
-
-Your job: analyze content performance and write actionable learnings that will improve future content.
-
-Output ONLY a valid JSON object with no extra text:
-{
-  "top_performer": "description of best performing content",
-  "key_insight": "what is working and why",
-  "recommendation": "what to do more of next week",
-  "memory_update": "new learning to add to brand memory",
-  "avoid": "what is not working"
-}`
+      systemPrompt = `You are an analytics agent for ${brand.name}. BRAND VOICE: ${voiceRules} TOP PERFORMERS: ${topPerformers} Output ONLY valid JSON: { top_performer: string, key_insight: string, recommendation: string, memory_update: string, avoid: string }`
     } else {
       return res.status(400).json({ error: `unsupported agent_type: ${agent_type}` })
     }
