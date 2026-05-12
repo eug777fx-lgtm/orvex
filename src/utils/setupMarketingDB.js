@@ -82,13 +82,13 @@ export async function setupMarketingDB() {
 
   await db.query(
     `INSERT INTO brands (name, color, platforms)
-     VALUES ('LIMITLESS', '#c084fc', '["instagram","tiktok","linkedin"]')
+     VALUES ('LIMITLESS', '#ffffff', '["instagram","tiktok","linkedin"]')
      ON CONFLICT (name) DO NOTHING`,
   )
 
   await db.query(
     `INSERT INTO brands (name, color, platforms)
-     VALUES ('AWATEC', '#4ade80', '["instagram","facebook"]')
+     VALUES ('AWATEC', '#ffffff', '["instagram","facebook"]')
      ON CONFLICT (name) DO NOTHING`,
   )
 }

@@ -987,7 +987,7 @@ export default function Scripts() {
               padding: '12px 20px',
               fontSize: 14,
               fontWeight: 500,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.5), 0 0 30px rgba(99,120,255,0.06)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5), 0 0 30px rgba(255,255,255,0.06)',
               zIndex: 200,
             }}
           >

@@ -28,15 +28,15 @@ const MONO = "ui-monospace, 'SFMono-Regular', Menlo, monospace"
 
 // ===== Data =====
 const BRANDS = [
-  { name: 'LIMITLESS', color: '#a855f7' },
-  { name: 'AWATEC', color: '#10b981' },
+  { name: 'LIMITLESS', color: '#ffffff' },
+  { name: 'AWATEC', color: '#ffffff' },
 ]
 
 const AGENTS = [
   {
     key: 'strategy',
     name: 'Strategy',
-    color: '#a855f7',
+    color: '#ffffff',
     icon: Brain,
     pos: { left: '5%', top: '8%' },
     statuses: [
@@ -48,7 +48,7 @@ const AGENTS = [
   {
     key: 'writer',
     name: 'Writer',
-    color: '#06b6d4',
+    color: '#ffffff',
     icon: PenLine,
     pos: { left: '36%', top: '8%' },
     statuses: [
@@ -60,7 +60,7 @@ const AGENTS = [
   {
     key: 'video',
     name: 'Video Director',
-    color: '#f59e0b',
+    color: '#ffffff',
     icon: Video,
     pos: { left: '67%', top: '8%' },
     statuses: [
@@ -72,7 +72,7 @@ const AGENTS = [
   {
     key: 'distribution',
     name: 'Distribution',
-    color: '#10b981',
+    color: '#ffffff',
     icon: Send,
     pos: { left: '14%', top: '60%' },
     statuses: [
@@ -84,7 +84,7 @@ const AGENTS = [
   {
     key: 'analytics',
     name: 'Analytics',
-    color: '#ef4444',
+    color: '#ffffff',
     icon: BarChart3,
     pos: { left: '58%', top: '60%' },
     statuses: [
@@ -98,12 +98,12 @@ const AGENTS = [
 const AGENT_COLOR = Object.fromEntries(AGENTS.map((a) => [a.name, a.color]))
 
 const SCHEDULE = [
-  { time: '7:00', task: 'Trend scan', agent: 'Strategy', color: '#a855f7', status: 'done' },
-  { time: '8:00', task: 'Write hooks', agent: 'Writer', color: '#06b6d4', status: 'done' },
-  { time: '9:00', task: 'Post Instagram', agent: 'Distribution', color: '#10b981', status: 'active' },
-  { time: '12:00', task: 'Video briefs', agent: 'Video', color: '#f59e0b', status: 'pending' },
-  { time: '3:00', task: 'Post TikTok', agent: 'Distribution', color: '#10b981', status: 'pending' },
-  { time: '8:00', task: 'Score posts', agent: 'Analytics', color: '#ef4444', status: 'pending' },
+  { time: '7:00', task: 'Trend scan', agent: 'Strategy', color: '#ffffff', status: 'done' },
+  { time: '8:00', task: 'Write hooks', agent: 'Writer', color: '#ffffff', status: 'done' },
+  { time: '9:00', task: 'Post Instagram', agent: 'Distribution', color: '#ffffff', status: 'active' },
+  { time: '12:00', task: 'Video briefs', agent: 'Video', color: '#ffffff', status: 'pending' },
+  { time: '3:00', task: 'Post TikTok', agent: 'Distribution', color: '#ffffff', status: 'pending' },
+  { time: '8:00', task: 'Score posts', agent: 'Analytics', color: '#ffffff', status: 'pending' },
 ]
 
 const INITIAL_REVIEW = [
@@ -510,9 +510,9 @@ function Toast({ toast }) {
             WebkitBackdropFilter: 'blur(12px)',
             border:
               toast.kind === 'error'
-                ? '0.5px solid rgba(239,68,68,0.45)'
+                ? '0.5px solid rgba(255,255,255,0.45)'
                 : '0.5px solid rgba(255,255,255,0.15)',
-            color: toast.kind === 'error' ? '#fca5a5' : 'rgba(255,255,255,0.92)',
+            color: toast.kind === 'error' ? '#ffffff' : 'rgba(255,255,255,0.92)',
             fontSize: 12.5,
             fontWeight: 500,
             letterSpacing: '0.01em',
@@ -566,15 +566,15 @@ function PageHeader({ now, loading }) {
             width: 7,
             height: 7,
             borderRadius: '50%',
-            background: '#10b981',
-            boxShadow: '0 0 10px rgba(16,185,129,0.7)',
+            background: '#ffffff',
+            boxShadow: '0 0 10px rgba(255,255,255,0.7)',
           }}
         />
         <span
           style={{
             fontSize: 11,
             fontWeight: 600,
-            color: '#10b981',
+            color: '#ffffff',
             letterSpacing: '0.06em',
           }}
         >
@@ -609,7 +609,7 @@ function BrandSelector({ brands, selected, onSelect }) {
     >
       {brands.map((b) => {
         const active = selected?.id === b.id
-        const color = b.color || '#a855f7'
+        const color = b.color || '#ffffff'
         return (
           <button
             key={b.id}
@@ -675,10 +675,10 @@ function BrandSelector({ brands, selected, onSelect }) {
 // ===== Stats Row =====
 function StatsRow({ stats, loading }) {
   const cells = [
-    { label: 'Content Ready', value: stats.contentReady, sub: 'awaiting approval', accent: '#a855f7' },
-    { label: 'Scheduled', value: stats.scheduled, sub: 'next 30 days', accent: '#06b6d4' },
-    { label: 'Avg Score', value: stats.avgScore, sub: 'AI performance', accent: '#f59e0b' },
-    { label: 'Published', value: stats.published, sub: 'all time', accent: '#10b981' },
+    { label: 'Content Ready', value: stats.contentReady, sub: 'awaiting approval', accent: '#ffffff' },
+    { label: 'Scheduled', value: stats.scheduled, sub: 'next 30 days', accent: '#ffffff' },
+    { label: 'Avg Score', value: stats.avgScore, sub: 'AI performance', accent: '#ffffff' },
+    { label: 'Published', value: stats.published, sub: 'all time', accent: '#ffffff' },
   ]
   return (
     <div
@@ -835,9 +835,9 @@ function AgentOffice({ screenIndex, meetingAgents, brand, onRefresh, showToast }
               fontSize: 10,
               padding: '2px 8px',
               borderRadius: 999,
-              background: 'rgba(16,185,129,0.1)',
-              border: '0.5px solid rgba(16,185,129,0.25)',
-              color: '#10b981',
+              background: 'rgba(255,255,255,0.1)',
+              border: '0.5px solid rgba(255,255,255,0.25)',
+              color: '#ffffff',
               letterSpacing: '0.06em',
               fontWeight: 600,
             }}
@@ -1054,8 +1054,8 @@ function RunAllButton({ disabled, step, onClick }) {
             width: 5,
             height: 5,
             borderRadius: '50%',
-            background: '#10b981',
-            boxShadow: '0 0 6px rgba(16,185,129,0.6)',
+            background: '#ffffff',
+            boxShadow: '0 0 6px rgba(255,255,255,0.6)',
           }}
         />
       )}
@@ -1163,11 +1163,11 @@ function AgentStation({
   let borderColor = 'rgba(255,255,255,0.08)'
   let shadow = 'none'
   if (isError) {
-    borderColor = 'rgba(239,68,68,0.6)'
-    shadow = '0 0 14px rgba(239,68,68,0.3)'
+    borderColor = 'rgba(255,255,255,0.6)'
+    shadow = '0 0 14px rgba(255,255,255,0.3)'
   } else if (isSuccess) {
-    borderColor = 'rgba(74,222,128,0.6)'
-    shadow = '0 0 14px rgba(74,222,128,0.3)'
+    borderColor = 'rgba(255,255,255,0.6)'
+    shadow = '0 0 14px rgba(255,255,255,0.3)'
   } else if (inMeeting) {
     borderColor = 'rgba(255,255,255,0.35)'
     shadow = '0 0 14px rgba(255,255,255,0.18)'
@@ -1197,9 +1197,9 @@ function AgentStation({
     : status[0]
   const line2 = isRunning || isSuccess || isError ? '' : status[1]
   const line1Color = isSuccess
-    ? '#4ade80'
+    ? '#ffffff'
     : isError
-    ? '#fca5a5'
+    ? '#ffffff'
     : 'rgba(255,255,255,0.55)'
 
   return (
@@ -1375,7 +1375,7 @@ function ScheduleStrip({ schedule }) {
         time: fmtTime(s.scheduled_at),
         task: s.hook || s.caption || s.platform || s.type || 'Scheduled post',
         agent: (s.platform || 'Post').toString(),
-        color: '#10b981',
+        color: '#ffffff',
         status: s.published ? 'done' : 'pending',
       }))
   return (
@@ -1437,10 +1437,10 @@ function ScheduleStrip({ schedule }) {
                 minWidth: 140,
                 borderRadius: 10,
                 background: active
-                  ? 'rgba(74,222,128,0.04)'
+                  ? 'rgba(255,255,255,0.04)'
                   : 'rgba(255,255,255,0.02)',
                 border: active
-                  ? '0.5px solid rgba(74,222,128,0.3)'
+                  ? '0.5px solid rgba(255,255,255,0.3)'
                   : '0.5px solid rgba(255,255,255,0.06)',
                 opacity: done ? 0.4 : 1,
                 flexShrink: 0,
@@ -1449,7 +1449,7 @@ function ScheduleStrip({ schedule }) {
               <span
                 style={{
                   fontSize: 10.5,
-                  color: active ? '#4ade80' : TEXT_MUTED,
+                  color: active ? '#ffffff' : TEXT_MUTED,
                   fontFamily: MONO,
                   fontVariantNumeric: 'tabular-nums',
                   letterSpacing: '0.04em',
@@ -1503,10 +1503,10 @@ function ScheduleStrip({ schedule }) {
 
 // ===== Brand Memory =====
 const MEMORY_TYPES = [
-  { key: 'voice_rules', title: 'Voice Rules', color: '#a855f7', tint: 'rgba(168,85,247,0.12)' },
-  { key: 'audience', title: 'Audience', color: '#06b6d4', tint: 'rgba(6,182,212,0.12)' },
-  { key: 'top_performers', title: 'Top Performers', color: '#10b981', tint: 'rgba(16,185,129,0.12)' },
-  { key: 'campaign_history', title: 'Campaign History', color: '#f59e0b', tint: 'rgba(245,158,11,0.12)' },
+  { key: 'voice_rules', title: 'Voice Rules', color: '#ffffff', tint: 'rgba(255,255,255,0.12)' },
+  { key: 'audience', title: 'Audience', color: '#ffffff', tint: 'rgba(255,255,255,0.12)' },
+  { key: 'top_performers', title: 'Top Performers', color: '#ffffff', tint: 'rgba(255,255,255,0.12)' },
+  { key: 'campaign_history', title: 'Campaign History', color: '#ffffff', tint: 'rgba(255,255,255,0.12)' },
 ]
 
 function BrandMemory({ brand, memory, onRefresh }) {
@@ -1561,7 +1561,7 @@ function BrandMemory({ brand, memory, onRefresh }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <Brain size={13} color="#a855f7" />
+          <Brain size={13} color="#ffffff" />
           <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <div
               style={{
@@ -1807,9 +1807,9 @@ function BrandMemory({ brand, memory, onRefresh }) {
                     fontSize: 11,
                     padding: '6px 14px',
                     borderRadius: 8,
-                    border: '0.5px solid rgba(74,222,128,0.4)',
-                    background: 'rgba(74,222,128,0.12)',
-                    color: '#4ade80',
+                    border: '0.5px solid rgba(255,255,255,0.4)',
+                    background: 'rgba(255,255,255,0.12)',
+                    color: '#ffffff',
                     fontWeight: 600,
                     cursor: saving || !content.trim() ? 'not-allowed' : 'pointer',
                     opacity: saving || !content.trim() ? 0.55 : 1,
@@ -1902,7 +1902,7 @@ function ReviewPanel({ items, brand, onApprove, onReject }) {
           marginBottom: 10,
         }}
       >
-        <Sparkles size={11} color="#a855f7" />
+        <Sparkles size={11} color="#ffffff" />
         <span style={{ fontSize: 11, color: TEXT_MUTED }}>
           Generated overnight · needs your approval
         </span>
@@ -1937,9 +1937,9 @@ function ReviewPanel({ items, brand, onApprove, onReject }) {
                   fontSize: 9.5,
                   padding: '2px 7px',
                   borderRadius: 999,
-                  background: 'rgba(168,85,247,0.12)',
-                  border: '0.5px solid rgba(168,85,247,0.3)',
-                  color: '#c084fc',
+                  background: 'rgba(255,255,255,0.12)',
+                  border: '0.5px solid rgba(255,255,255,0.3)',
+                  color: '#ffffff',
                   fontWeight: 600,
                   letterSpacing: '0.06em',
                 }}
@@ -1976,9 +1976,9 @@ function ReviewPanel({ items, brand, onApprove, onReject }) {
                   gap: 4,
                   padding: '5px 9px',
                   borderRadius: 7,
-                  background: 'rgba(16,185,129,0.1)',
-                  border: '0.5px solid rgba(16,185,129,0.4)',
-                  color: '#10b981',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '0.5px solid rgba(255,255,255,0.4)',
+                  color: '#ffffff',
                   fontSize: 11,
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -2123,10 +2123,10 @@ function LogPanel({ entries }) {
 // ===== Right: Stats =====
 function StatsPanel() {
   const cells = [
-    { label: 'Engagement', value: '12.4%', sub: '+2.1% wk', accent: '#a855f7' },
-    { label: 'Reach', value: '184K', sub: '7-day', accent: '#06b6d4' },
-    { label: 'Saves', value: '2.3K', sub: '/1K views', accent: '#f59e0b' },
-    { label: 'Followers', value: '+312', sub: 'this week', accent: '#10b981' },
+    { label: 'Engagement', value: '12.4%', sub: '+2.1% wk', accent: '#ffffff' },
+    { label: 'Reach', value: '184K', sub: '7-day', accent: '#ffffff' },
+    { label: 'Saves', value: '2.3K', sub: '/1K views', accent: '#ffffff' },
+    { label: 'Followers', value: '+312', sub: 'this week', accent: '#ffffff' },
   ]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2199,7 +2199,7 @@ function StatsPanel() {
             marginBottom: 6,
           }}
         >
-          <TrendingUp size={11} color="#f59e0b" />
+          <TrendingUp size={11} color="#ffffff" />
           <span style={{ fontSize: 11, color: TEXT_MUTED }}>Top performers</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -2226,7 +2226,7 @@ function StatsPanel() {
                   minWidth: 0,
                 }}
               >
-                <Star size={10} color="#f59e0b" fill="#f59e0b" />
+                <Star size={10} color="#ffffff" fill="#ffffff" />
                 <span
                   style={{
                     fontSize: 11.5,
@@ -2242,7 +2242,7 @@ function StatsPanel() {
               <span
                 style={{
                   fontSize: 11,
-                  color: '#10b981',
+                  color: '#ffffff',
                   fontWeight: 600,
                   fontVariantNumeric: 'tabular-nums',
                 }}

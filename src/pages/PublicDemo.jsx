@@ -936,7 +936,7 @@ function DashboardPreview({ config, accent }) {
           inset: 0,
           pointerEvents: 'none',
           background:
-            'radial-gradient(ellipse 80% 50% at 20% 10%, rgba(99,102,241,0.05) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 90%, rgba(45,90,180,0.04) 0%, transparent 55%)',
+            'radial-gradient(ellipse 80% 50% at 20% 10%, rgba(255,255,255,0.05) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 90%, rgba(255,255,255,0.04) 0%, transparent 55%)',
           zIndex: 0,
         }}
       />
@@ -1755,7 +1755,7 @@ function GenericDashboard({ Icon, businessName, accent, sidebarItems, stats, sec
           inset: 0,
           pointerEvents: 'none',
           background:
-            'radial-gradient(ellipse 80% 50% at 20% 10%, rgba(99,102,241,0.05) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 90%, rgba(45,90,180,0.04) 0%, transparent 55%)',
+            'radial-gradient(ellipse 80% 50% at 20% 10%, rgba(255,255,255,0.05) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 90%, rgba(255,255,255,0.04) 0%, transparent 55%)',
           zIndex: 0,
         }}
       />
@@ -3493,7 +3493,7 @@ export default function PublicDemo() {
       ...cfg,
       business_name: cfg.business_name || demo.business_name || 'Your Gym',
       tagline: cfg.tagline || 'Train hard. Look great. Feel unstoppable.',
-      primary_color: cfg.primary_color || '#6378ff',
+      primary_color: cfg.primary_color || '#ffffff',
       phone: cfg.phone || null,
       email: cfg.email || null,
       location: cfg.location || null,

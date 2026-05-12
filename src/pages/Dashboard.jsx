@@ -45,7 +45,7 @@ const cardStyle = {
   border: '0.5px solid var(--border-default)',
   borderRadius: 'var(--radius-lg)',
   padding: '1.5rem',
-  boxShadow: 'var(--shadow-card), 0 0 30px rgba(99,120,255,0.05)',
+  boxShadow: 'var(--shadow-card), 0 0 30px rgba(255,255,255,0.05)',
   backdropFilter: 'blur(12px) saturate(160%)',
   WebkitBackdropFilter: 'blur(12px) saturate(160%)',
   transition: 'border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease',
@@ -210,7 +210,7 @@ function StatCard({ label, value, sub, loading, trend, ambient = false }) {
       style={{
         ...cardStyle,
         boxShadow: ambient
-          ? 'var(--shadow-card), 0 0 30px rgba(99,120,255,0.05)'
+          ? 'var(--shadow-card), 0 0 30px rgba(255,255,255,0.05)'
           : 'var(--shadow-card)',
       }}
     >

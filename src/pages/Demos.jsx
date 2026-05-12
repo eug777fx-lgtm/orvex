@@ -155,9 +155,9 @@ const THEME_BADGES = {
   eclipse: {
     label: 'Eclipse',
     glyph: '\u{1F311}',
-    bg: 'rgba(99,120,255,0.10)',
+    bg: 'rgba(255,255,255,0.10)',
     color: 'rgba(180,195,255,0.95)',
-    border: 'rgba(99,120,255,0.22)',
+    border: 'rgba(255,255,255,0.22)',
   },
   ember: {
     label: 'Ember',
@@ -545,8 +545,8 @@ export default function Demos() {
                         key: 'eclipse',
                         title: 'Eclipse · Dark Glass',
                         bg: 'linear-gradient(135deg, #0a0a0a 0%, #1f1f24 100%)',
-                        border: 'rgba(99,120,255,0.18)',
-                        accent: 'radial-gradient(circle at 80% 50%, rgba(99,120,255,0.25), transparent 60%)',
+                        border: 'rgba(255,255,255,0.18)',
+                        accent: 'radial-gradient(circle at 80% 50%, rgba(255,255,255,0.25), transparent 60%)',
                       },
                       {
                         key: 'ember',

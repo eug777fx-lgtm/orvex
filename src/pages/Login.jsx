@@ -31,7 +31,7 @@ const cardStyle = {
   borderRadius: 24,
   padding: '2.5rem',
   boxShadow:
-    '0 0 0 0.5px rgba(255,255,255,0.05), 0 40px 80px rgba(0,0,0,0.6), 0 0 60px rgba(99,120,255,0.06)',
+    '0 0 0 0.5px rgba(255,255,255,0.05), 0 40px 80px rgba(0,0,0,0.6), 0 0 60px rgba(255,255,255,0.06)',
   backdropFilter: 'blur(40px)',
   WebkitBackdropFilter: 'blur(40px)',
   zIndex: 1,
@@ -133,7 +133,7 @@ export default function Login({ onSuccess }) {
           top: '-15%',
           left: '-10%',
           background:
-            'radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 70%)',
+            'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
           animation: 'float 8s ease-in-out infinite',
         }}
       />
@@ -145,7 +145,7 @@ export default function Login({ onSuccess }) {
           bottom: '-10%',
           right: '-10%',
           background:
-            'radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%)',
+            'radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)',
           animation: 'float 12s ease-in-out infinite reverse',
         }}
       />
@@ -157,7 +157,7 @@ export default function Login({ onSuccess }) {
           top: '10%',
           right: '5%',
           background:
-            'radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)',
+            'radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%)',
           animation: 'float 10s ease-in-out infinite 2s',
         }}
       />
@@ -198,8 +198,8 @@ export default function Login({ onSuccess }) {
             onBlur={() => setFocused(false)}
             style={{
               ...inputBaseStyle,
-              borderColor: focused ? 'rgba(99,120,255,0.5)' : 'rgba(255,255,255,0.1)',
-              boxShadow: focused ? '0 0 0 3px rgba(99,120,255,0.1)' : 'none',
+              borderColor: focused ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)',
+              boxShadow: focused ? '0 0 0 3px rgba(255,255,255,0.1)' : 'none',
             }}
           />
 

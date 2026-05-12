@@ -182,7 +182,7 @@ const INITIAL = {
   theme: 'eclipse',
   business_name: '',
   client_name: '',
-  primary_color: '#6378ff',
+  primary_color: '#ffffff',
   tagline: 'Train hard. Look great. Feel unstoppable.',
   phone: '',
   email: '',
@@ -195,7 +195,7 @@ const THEME_OPTIONS = [
     name: 'Eclipse',
     vibe: 'Dark Glass',
     desc: 'Clean monochrome glassmorphism',
-    accent: 'rgba(99,120,255,0.85)',
+    accent: 'rgba(255,255,255,0.85)',
   },
   {
     key: 'ember',
@@ -261,7 +261,7 @@ function ThemePreview({ themeKey }) {
             width: 18,
             height: 18,
             borderRadius: '50%',
-            background: 'rgba(99,120,255,0.3)',
+            background: 'rgba(255,255,255,0.3)',
             filter: 'blur(2px)',
           }}
         />
@@ -470,7 +470,7 @@ export default function CreateDemoModal({ open, onClose, onCreated, defaultTempl
     const config = {
       business_name: form.business_name.trim(),
       tagline: form.tagline.trim() || 'Train hard. Look great. Feel unstoppable.',
-      primary_color: form.primary_color || '#6378ff',
+      primary_color: form.primary_color || '#ffffff',
       phone: form.phone.trim() || null,
       email: form.email.trim() || null,
       location: form.location.trim() || null,
@@ -698,7 +698,7 @@ export default function CreateDemoModal({ open, onClose, onCreated, defaultTempl
                       style={{ ...inputStyle, flex: 1 }}
                       value={form.primary_color}
                       onChange={(e) => update('primary_color', e.target.value)}
-                      placeholder="#6378ff"
+                      placeholder="#ffffff"
                     />
                   </div>
                 </Field>

@@ -1624,7 +1624,7 @@ function Toast({ message, onDismiss }) {
             borderRadius: 12,
             padding: '0.75rem 1.25rem',
             fontSize: 13,
-            boxShadow: '0 20px 40px rgba(0,0,0,0.5), 0 0 30px rgba(99,120,255,0.08)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5), 0 0 30px rgba(255,255,255,0.08)',
             zIndex: 100,
           }}
         >

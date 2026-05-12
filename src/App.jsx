@@ -63,8 +63,8 @@ const dotStyle = {
   width: 6,
   height: 6,
   borderRadius: '50%',
-  background: 'var(--accent-blue)',
-  boxShadow: '0 0 10px var(--accent-blue-glow)',
+  background: '#ffffff',
+  boxShadow: '0 0 10px rgba(255,255,255,0.4)',
   animation: 'glowPulse 2s ease-in-out infinite',
 }
 
