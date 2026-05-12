@@ -16,6 +16,8 @@ import {
   TrendingUp,
   CalendarClock,
   Star,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react'
 
 // ===== Design tokens =====
@@ -203,6 +205,7 @@ export default function MarketingEngine() {
   const [brands, setBrands] = useState([])
   const [selectedBrand, setSelectedBrand] = useState(null)
   const [activeTab, setActiveTab] = useState('review')
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [now, setNow] = useState(new Date())
   const [screenIndex, setScreenIndex] = useState(0)
   const [reviewItems, setReviewItems] = useState([])
@@ -400,13 +403,13 @@ export default function MarketingEngine() {
       style={{
         margin: '-2rem',
         display: 'grid',
-        gridTemplateColumns: '1fr 280px',
+        gridTemplateColumns: '1fr',
         height: 'calc(100vh - 56px)',
         color: '#fff',
         overflow: 'hidden',
       }}
     >
-      {/* ===== LEFT MAIN AREA ===== */}
+      {/* ===== MAIN AREA ===== */}
       <div
         style={{
           display: 'flex',
@@ -430,6 +433,7 @@ export default function MarketingEngine() {
             flexDirection: 'column',
             gap: 12,
             padding: '12px 20px 20px',
+            paddingBottom: 60,
             minHeight: 0,
             overflow: 'auto',
           }}
@@ -451,44 +455,159 @@ export default function MarketingEngine() {
         </div>
       </div>
 
-      {/* ===== RIGHT PANEL ===== */}
-      <aside
-        style={{
-          borderLeft: SOFT_BORDER,
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
-          overflow: 'hidden',
-          background: 'rgba(10,10,12,0.4)',
+      <BottomDrawer
+        open={drawerOpen}
+        onToggle={() => setDrawerOpen((o) => !o)}
+        activeTab={activeTab}
+        onTabChange={(t) => {
+          setActiveTab(t)
+          setDrawerOpen(true)
         }}
+        reviewCount={reviewItems.length}
       >
-        <Tabs active={activeTab} onChange={setActiveTab} />
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '12px 14px 20px',
-          }}
-        >
-          {activeTab === 'review' && (
-            <ReviewPanel
-              items={reviewItems}
-              brand={selectedBrand}
-              onApprove={approve}
-              onReject={reject}
-            />
-          )}
-          {activeTab === 'log' && <LogPanel entries={liveLog} />}
-          {activeTab === 'stats' && <StatsPanel />}
-        </div>
-      </aside>
+        {activeTab === 'review' && (
+          <ReviewPanel
+            items={reviewItems}
+            brand={selectedBrand}
+            onApprove={approve}
+            onReject={reject}
+            wide
+          />
+        )}
+        {activeTab === 'log' && <LogPanel entries={liveLog} wide />}
+        {activeTab === 'stats' && <StatsPanel wide />}
+      </BottomDrawer>
 
-      <Toast toast={toast} />
+      <Toast toast={toast} drawerOpen={drawerOpen} />
     </motion.div>
   )
 }
 
-function Toast({ toast }) {
+function BottomDrawer({ open, onToggle, activeTab, onTabChange, reviewCount, children }) {
+  const tabs = [
+    { key: 'review', label: 'Review', badge: reviewCount },
+    { key: 'log', label: 'Live Log' },
+    { key: 'stats', label: 'Stats' },
+  ]
+  return (
+    <>
+      {/* Drawer panel — slides up */}
+      <motion.div
+        initial={false}
+        animate={{ y: open ? 0 : 380 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        style={{
+          position: 'fixed',
+          bottom: 48,
+          left: 0,
+          right: 0,
+          zIndex: 49,
+          height: 380,
+          background: 'rgba(10,10,12,0.98)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderTop: '0.5px solid rgba(255,255,255,0.08)',
+          padding: '16px 24px',
+          overflowY: 'auto',
+        }}
+      >
+        {children}
+      </motion.div>
+
+      {/* Trigger bar */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 50,
+          height: 48,
+          background: 'rgba(10,10,12,0.95)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderTop: '0.5px solid rgba(255,255,255,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 24px',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          {tabs.map((t) => {
+            const isActive = t.key === activeTab
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => onTabChange(t.key)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '4px 0',
+                  cursor: 'pointer',
+                  color: isActive ? '#fff' : 'rgba(255,255,255,0.35)',
+                  fontSize: 13,
+                  fontWeight: isActive ? 500 : 400,
+                  letterSpacing: '0.01em',
+                  transition: 'color 0.15s ease',
+                }}
+              >
+                {t.label}
+                {t.key === 'review' && typeof t.badge === 'number' && t.badge > 0 && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: 16,
+                      height: 16,
+                      padding: '0 5px',
+                      borderRadius: 999,
+                      background: isActive
+                        ? 'rgba(255,255,255,0.18)'
+                        : 'rgba(255,255,255,0.08)',
+                      color: isActive ? '#fff' : 'rgba(255,255,255,0.6)',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {t.badge}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'rgba(255,255,255,0.45)',
+            fontSize: 11,
+            letterSpacing: '0.04em',
+            padding: '4px 0',
+          }}
+        >
+          {open ? 'Hide' : 'Show'}
+          {open ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+        </button>
+      </div>
+    </>
+  )
+}
+
+function Toast({ toast, drawerOpen }) {
   return (
     <AnimatePresence>
       {toast && (
@@ -501,7 +620,7 @@ function Toast({ toast }) {
           style={{
             position: 'fixed',
             left: '50%',
-            bottom: 32,
+            bottom: drawerOpen ? 440 : 64,
             transform: 'translateX(-50%)',
             zIndex: 1000,
             padding: '10px 18px',
@@ -2079,7 +2198,7 @@ function Tabs({ active, onChange }) {
 }
 
 // ===== Right: Review =====
-function ReviewPanel({ items, brand, onApprove, onReject }) {
+function ReviewPanel({ items, brand, onApprove, onReject, wide }) {
   return (
     <div>
       <div
@@ -2095,6 +2214,17 @@ function ReviewPanel({ items, brand, onApprove, onReject }) {
           Generated overnight · needs your approval
         </span>
       </div>
+      <div
+        style={
+          wide
+            ? {
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: 10,
+              }
+            : undefined
+        }
+      >
       <AnimatePresence>
         {items.map((it) => (
           <motion.div
@@ -2109,7 +2239,7 @@ function ReviewPanel({ items, brand, onApprove, onReject }) {
               border: '0.5px solid rgba(255,255,255,0.07)',
               borderRadius: 10,
               padding: 12,
-              marginBottom: 8,
+              marginBottom: wide ? 0 : 8,
             }}
           >
             <div
@@ -2216,6 +2346,7 @@ function ReviewPanel({ items, brand, onApprove, onReject }) {
           </motion.div>
         ))}
       </AnimatePresence>
+      </div>
       {items.length === 0 && (
         <div
           style={{
@@ -2236,9 +2367,20 @@ function ReviewPanel({ items, brand, onApprove, onReject }) {
 }
 
 // ===== Right: Log =====
-function LogPanel({ entries }) {
+function LogPanel({ entries, wide }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+    <div
+      style={
+        wide
+          ? {
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+              columnGap: 32,
+              rowGap: 1,
+            }
+          : { display: 'flex', flexDirection: 'column', gap: 1 }
+      }
+    >
       <AnimatePresence initial={false}>
         {entries.map((entry, i) => {
           const color = AGENT_COLOR[entry.agent] || '#fff'
@@ -2255,10 +2397,7 @@ function LogPanel({ entries }) {
                 gridTemplateColumns: '38px 1fr',
                 gap: 8,
                 padding: '9px 2px',
-                borderBottom:
-                  i === entries.length - 1
-                    ? 'none'
-                    : '0.5px solid rgba(255,255,255,0.04)',
+                borderBottom: '0.5px solid rgba(255,255,255,0.04)',
                 alignItems: 'baseline',
               }}
             >
@@ -2309,7 +2448,7 @@ function LogPanel({ entries }) {
 }
 
 // ===== Right: Stats =====
-function StatsPanel() {
+function StatsPanel({ wide }) {
   const cells = [
     { label: 'Engagement', value: '12.4%', sub: '+2.1% wk', accent: '#ffffff' },
     { label: 'Reach', value: '184K', sub: '7-day', accent: '#ffffff' },
@@ -2317,12 +2456,25 @@ function StatsPanel() {
     { label: 'Followers', value: '+312', sub: 'this week', accent: '#ffffff' },
   ]
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div
+      style={
+        wide
+          ? {
+              display: 'grid',
+              gridTemplateColumns: '2fr 1fr',
+              gap: 24,
+              alignItems: 'flex-start',
+            }
+          : { display: 'flex', flexDirection: 'column', gap: 12 }
+      }
+    >
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-          gap: 8,
+          gridTemplateColumns: wide
+            ? 'repeat(4, minmax(0, 1fr))'
+            : 'repeat(2, minmax(0, 1fr))',
+          gap: wide ? 10 : 8,
         }}
       >
         {cells.map((c) => (
