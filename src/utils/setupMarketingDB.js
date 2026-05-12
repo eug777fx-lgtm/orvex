@@ -150,6 +150,36 @@ export async function setupMarketingDB() {
       [versionKey],
     )
   }
+
+  // One-time forced refresh of AWATEC memory for existing installs.
+  const awatecVersionKey = 'awatec_memory_v2'
+  const awatecVersionRows = await db.query(
+    'SELECT value FROM app_meta WHERE key = $1 LIMIT 1',
+    [awatecVersionKey],
+  )
+  if (awatecVersionRows.length === 0) {
+    const awatecRows = await db.query(
+      "SELECT id FROM brands WHERE name = 'AWATEC' ORDER BY created_at ASC LIMIT 1",
+    )
+    const awatecId = awatecRows[0]?.id
+    if (awatecId) {
+      await db.query('DELETE FROM brand_memory WHERE brand_id = $1', [
+        awatecId,
+      ])
+      for (const entry of AWATEC_MEMORY) {
+        await db.query(
+          `INSERT INTO brand_memory (brand_id, memory_type, content)
+           VALUES ($1, $2, $3)`,
+          [awatecId, entry.memory_type, entry.content],
+        )
+      }
+    }
+    await db.query(
+      `INSERT INTO app_meta (key, value) VALUES ($1, '1')
+       ON CONFLICT (key) DO NOTHING`,
+      [awatecVersionKey],
+    )
+  }
 }
 
 async function dedupeBrand(brandName) {
@@ -220,16 +250,21 @@ const AWATEC_MEMORY = [
   {
     memory_type: 'voice_rules',
     content:
-      'Tone: trustworthy, professional, local, friendly. Aruba-based family business. Speak like a knowledgeable neighbor not a corporate brand. Clear and direct. Focus on solving problems. Language: English and Papiamento. Never use: corporate jargon, overly technical language, pushy sales tactics. Always: be helpful, be clear about services and pricing, build trust.',
+      "Brand: AWATEC — Aruba's specialized leak detection company. Tone: professional, technical but understandable, honest, practical, helpful, local, trustworthy, solution-focused. Languages: English, Papiamento, Spanish. Never sound like a general plumber — always position as a specialist diagnostic company. Strong brand phrases: 'We don't guess. We test.' 'Find the leak before breaking your floor.' 'Professional leak detection for homes, apartments, hotels and businesses.' 'Is your water meter spinning at night?' 'Clear inspection. Honest recommendation.' Writing style: direct, educational, problem-aware, locally relevant. Never use: hype language, fake urgency, generic plumbing talk. Always: speak to property owners, emphasize non-destructive methods, highlight specialized equipment.",
   },
   {
     memory_type: 'audience',
     content:
-      'Primary audience: homeowners and property managers in Aruba. Age 30-65. Main pain points: water leaks causing damage, high water bills, not knowing who to trust for plumbing work. They want: fast response, fair pricing, professional work, local trustworthy service. Services offered: Leak Detection, Leak Inspection (Afl.150), Pressure Service, Plumbing Repairs. They respond to: before/after results, clear pricing, local references, professional presentation.',
+      'Primary audience: homeowners, landlords, property managers, hotel owners, commercial building managers, vacation rental owners across Aruba. Age 30-65+. Located throughout Aruba — Oranjestad, Noord, Santa Cruz, Paradera, Savaneta, San Nicolas, hotel districts. They contact AWATEC because of: high water bills, water meter moving without usage, water appearing through floors or grout, hidden underground leaks, moisture or damp areas, pressure loss, pool line leaks, failed previous leak investigations. Customer fears: breaking floors unnecessarily, expensive water bills, property damage, mold, wasting money on wrong repairs, not knowing where the leak is. Desired results: accurate leak location, minimal demolition, clear answers, fast response, professional testing, honest recommendations, peace of mind. They respond to: high water bill topics, hidden leak education, real leak cases, short videos, local language captions, equipment demonstrations, before/after cases.',
   },
   {
     memory_type: 'top_performers',
     content:
-      'Best content angles for AWATEC: 1. Warning signs of a hidden water leak 2. How much a slow leak costs you per month 3. Before and after leak detection results 4. Why choose a local specialist over general plumber 5. Customer testimonials and results. Best formats: short educational reels, before/after photos, tip carousels. Hook style: problem-aware, local, practical.',
+      "Best content angles for AWATEC: 1. High water bill hook — 'Is your WEB bill too high? You may have a hidden leak' 2. Water meter test — 'Is your water meter spinning at night?' 3. Before/after leak detection cases 4. Equipment demonstration videos — acoustic detection, helium tracer gas, pressure testing 5. Educational content — signs you have a hidden leak 6. Save your floor messaging — 'Find the leak before breaking your floor' 7. Commercial cases — hotels, apartments, restaurants. Best formats: short educational reels showing equipment in action, before/after photo posts, tip carousels in Papiamento and English, real case studies with results. Hook formulas: 'Your [water bill/floor/property] is telling you something.' 'Most people break their floor before calling us. Here is what we do instead.' 'Sign #1 that you have a hidden leak:' CTA: always include WhatsApp contact or website appointment link.",
+  },
+  {
+    memory_type: 'campaign_history',
+    content:
+      'Business: AWATEC Leak Detection — Aruba. Founded: operating since at least 2022. Location: Primavera 1L #5, Oranjestad, Aruba. Service area: all of Aruba. Services: Leak Inspection (from Afl.175), Residential Leak Detection (Afl.695-825 up to 2 hours), Additional hours Afl.150-325/hr, Pipe Tracing from Afl.400, Commercial custom quote. Contact: WhatsApp Business, website appointment form, phone, social media. Website has appointment request page and service page. Platforms: Facebook primary, Instagram, WhatsApp Business, Google Business Profile. Unique positioning: specialized diagnostic company NOT a general plumber. Uses acoustic detection, helium tracer gas, pipe tracing equipment, pressure testing, water meter diagnostics. Differentiator: non-destructive testing — find the leak without unnecessary demolition. Content languages: English and Papiamento for local audience, Spanish secondary. Strong campaign concepts: High WEB bill campaign, Water meter spinning campaign, Find leak before breaking floor campaign, Professional detection for hotels and apartments campaign.',
   },
 ]
