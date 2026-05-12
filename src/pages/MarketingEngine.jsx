@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import db from '@/lib/db'
 import useIsMobile from '../utils/useIsMobile'
@@ -32,6 +32,10 @@ import {
   Image as ImageIcon,
   LayoutGrid,
   Layers,
+  Search,
+  Film,
+  Eye,
+  CalendarDays,
 } from 'lucide-react'
 
 // ===== Design tokens =====
@@ -396,6 +400,22 @@ export default function MarketingEngine() {
       setLoading(false)
     }
   }, [selectedBrand])
+
+  // Clear all per-brand state immediately when the selected brand changes,
+  // so old data never flashes through during a switch.
+  useEffect(() => {
+    setReviewItems([])
+    setSchedule([])
+    setMemory([])
+    setStats({
+      contentReady: 0,
+      scheduled: 0,
+      avgScore: 0,
+      published: 0,
+      generatedToday: 0,
+    })
+    setLiveLog(LIVE_LOG)
+  }, [selectedBrand?.id])
 
   useEffect(() => {
     refreshBrandData()
@@ -3575,9 +3595,32 @@ const VIDEO_TEMPLATES = [
   },
 ]
 
+function templatesForBrand(brand) {
+  if (!brand) return VIDEO_TEMPLATES
+  const name = String(brand.name || '').toUpperCase()
+  if (name === 'LIMITLESS') {
+    return VIDEO_TEMPLATES.filter((t) =>
+      ['HookOpener', 'TradeInsight', 'QuoteCard', 'BrandPromo'].includes(t.id),
+    )
+  }
+  if (name === 'AWATEC') {
+    return VIDEO_TEMPLATES.filter((t) =>
+      ['ServiceAd', 'BrandPromo', 'QuoteCard'].includes(t.id),
+    )
+  }
+  if ((brand.brand_type || 'own') === 'client') {
+    return VIDEO_TEMPLATES.filter((t) =>
+      ['BrandPromo', 'ServiceAd'].includes(t.id),
+    )
+  }
+  return VIDEO_TEMPLATES
+}
+
 function VideoTemplates({ brand, showToast }) {
   const [preview, setPreview] = useState(null)
   const [generating, setGenerating] = useState(null)
+  const templates = templatesForBrand(brand)
+  const brandColor = brand?.primary_color || brand?.color || '#ffffff'
 
   async function generate(template) {
     setGenerating(template.id)
@@ -3637,7 +3680,7 @@ function VideoTemplates({ brand, showToast }) {
           gap: 10,
         }}
       >
-        {VIDEO_TEMPLATES.map((t) => (
+        {templates.map((t) => (
           <div
             key={t.id}
             style={{
@@ -3652,13 +3695,31 @@ function VideoTemplates({ brand, showToast }) {
           >
             <div
               style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: '#fff',
-                letterSpacing: '-0.01em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
               }}
             >
-              {t.name}
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: brandColor,
+                  boxShadow: `0 0 6px ${brandColor}80`,
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#fff',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {t.name}
+              </span>
             </div>
             <div
               style={{
@@ -3908,6 +3969,36 @@ function Tabs({ active, onChange }) {
 }
 
 // ===== Right: Review =====
+const CONTENT_TYPE_GROUP = {
+  hook: 'scripts',
+  caption: 'scripts',
+  script: 'scripts',
+  cta: 'scripts',
+  repurpose: 'scripts',
+  instagram: 'scripts',
+  tiktok: 'scripts',
+  linkedin: 'scripts',
+  twitter: 'scripts',
+  voiceover: 'scripts',
+  video: 'videos',
+  video_render: 'videos',
+  image: 'static',
+  static_ad: 'static',
+}
+
+const TYPE_PLATFORM = {
+  hook: 'instagram',
+  caption: 'instagram',
+  script: 'tiktok',
+  cta: 'instagram',
+  instagram: 'instagram',
+  tiktok: 'tiktok',
+  linkedin: 'linkedin',
+  facebook: 'facebook',
+  video: 'instagram',
+  image: 'instagram',
+}
+
 function ContentHub({
   brand,
   reviewItems,
@@ -3921,6 +4012,11 @@ function ContentHub({
 }) {
   const [scheduled, setScheduled] = useState([])
   const [generating, setGenerating] = useState(false)
+  const [activeQueue, setActiveQueue] = useState('scripts')
+  const [search, setSearch] = useState('')
+  const [platformFilter, setPlatformFilter] = useState('all')
+  const [showWorkflow, setShowWorkflow] = useState(false)
+  const [videoPreview, setVideoPreview] = useState(null)
 
   useEffect(() => {
     if (!brand?.id) {
@@ -3984,6 +4080,32 @@ function ContentHub({
     }
   }
 
+  // Split + filter reviewItems for queue tabs.
+  const allItems = Array.isArray(reviewItems) ? reviewItems : []
+  const searchLc = search.trim().toLowerCase()
+  const passesSearch = (it) => {
+    if (!searchLc) return true
+    const text = `${it.hook || ''} ${it.caption || ''} ${it.script || ''}`.toLowerCase()
+    return text.includes(searchLc)
+  }
+  const passesPlatform = (it) => {
+    if (platformFilter === 'all') return true
+    return TYPE_PLATFORM[it.type] === platformFilter
+  }
+  const groups = { scripts: [], videos: [], static: [] }
+  for (const it of allItems) {
+    const g = CONTENT_TYPE_GROUP[it.type] || 'scripts'
+    if (passesSearch(it) && passesPlatform(it)) groups[g].push(it)
+  }
+  const filtered = groups
+  const queueCounts = {
+    scripts: groups.scripts.length,
+    videos: groups.videos.length,
+    static: groups.static.length,
+  }
+
+  const brandColor = brand?.primary_color || brand?.color || '#ffffff'
+
   return (
     <div
       style={{
@@ -4009,10 +4131,10 @@ function ContentHub({
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: 8,
-              marginBottom: 4,
+              marginBottom: 8,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
                 Review Queue
               </span>
@@ -4027,22 +4149,103 @@ function ContentHub({
                   fontWeight: 600,
                 }}
               >
-                {reviewItems.length}
+                {allItems.length}
               </span>
+              {brand && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '0.5px solid rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.75)',
+                    fontSize: 10,
+                    fontWeight: 500,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: brandColor,
+                      boxShadow: `0 0 6px ${brandColor}80`,
+                    }}
+                  />
+                  {brand.name}
+                </span>
+              )}
             </div>
-            <span style={{ fontSize: 11, color: TEXT_MUTED }}>
-              Content generated by your agents — approve to schedule
-            </span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'rgba(255,255,255,0.04)',
+                border: '0.5px solid rgba(255,255,255,0.08)',
+                borderRadius: 8,
+                padding: '5px 10px',
+                width: 220,
+                maxWidth: '100%',
+              }}
+            >
+              <Search size={12} color={TEXT_MUTED} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search content..."
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontFamily: 'inherit',
+                }}
+              />
+            </div>
           </div>
+          <QueueTabs
+            counts={queueCounts}
+            active={activeQueue}
+            onChange={setActiveQueue}
+          />
+          <PlatformFilterBar
+            value={platformFilter}
+            onChange={setPlatformFilter}
+          />
           <div style={{ marginTop: 12 }}>
-            <ReviewPanel
-              items={reviewItems}
-              brand={brand}
-              onApprove={onApprove}
-              onReject={onReject}
-              onRepurpose={onRepurpose}
-              wide
-            />
+            {activeQueue === 'scripts' && (
+              <ScriptsAndCopyQueue
+                items={filtered.scripts}
+                brand={brand}
+                onApprove={onApprove}
+                onReject={onReject}
+                onRepurpose={onRepurpose}
+              />
+            )}
+            {activeQueue === 'videos' && (
+              <VideosQueue
+                items={filtered.videos}
+                brand={brand}
+                onApprove={onApprove}
+                onReject={onReject}
+                onPreview={(it) => setVideoPreview(it)}
+              />
+            )}
+            {activeQueue === 'static' && (
+              <StaticAdsQueue
+                items={filtered.static}
+                brand={brand}
+                onApprove={onApprove}
+                onReject={onReject}
+              />
+            )}
           </div>
           <div style={{ marginTop: 12 }}>
             <button
@@ -4218,6 +4421,1096 @@ function ContentHub({
           <LogPanel entries={liveLog} brand={brand} />
         </div>
       </div>
+      <div style={{ gridColumn: '1 / -1' }}>
+        <WorkflowVisualization
+          open={showWorkflow}
+          onToggle={() => setShowWorkflow((s) => !s)}
+        />
+      </div>
+      <AnimatePresence>
+        {videoPreview && (
+          <VideoContentPreviewModal
+            item={videoPreview}
+            onClose={() => setVideoPreview(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function QueueTabs({ counts, active, onChange }) {
+  const tabs = [
+    { key: 'scripts', label: 'Scripts & Copy' },
+    { key: 'videos', label: 'Videos' },
+    { key: 'static', label: 'Static Ads' },
+  ]
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {tabs.map((t) => {
+        const isActive = active === t.key
+        return (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => onChange(t.key)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+              padding: '5px 14px',
+              borderRadius: 999,
+              background: isActive
+                ? 'rgba(255,255,255,0.1)'
+                : 'rgba(255,255,255,0.04)',
+              border: '0.5px solid rgba(255,255,255,0.08)',
+              color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
+              cursor: 'pointer',
+              fontWeight: 500,
+              letterSpacing: '0.01em',
+            }}
+          >
+            {t.label}
+            <span
+              style={{
+                fontSize: 9.5,
+                padding: '1px 6px',
+                borderRadius: 999,
+                background: isActive
+                  ? 'rgba(0,0,0,0.3)'
+                  : 'rgba(255,255,255,0.06)',
+                color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
+                fontWeight: 600,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {counts[t.key] || 0}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function PlatformFilterBar({ value, onChange }) {
+  const platforms = [
+    { key: 'all', label: 'All' },
+    { key: 'instagram', label: 'Instagram' },
+    { key: 'tiktok', label: 'TikTok' },
+    { key: 'linkedin', label: 'LinkedIn' },
+    { key: 'facebook', label: 'Facebook' },
+  ]
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 6,
+        marginTop: 8,
+        flexWrap: 'wrap',
+      }}
+    >
+      {platforms.map((p) => {
+        const isActive = value === p.key
+        const color =
+          p.key === 'all' ? '#ffffff' : platformColor(p.key)
+        return (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => onChange(p.key)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 10.5,
+              padding: '3px 9px',
+              borderRadius: 999,
+              background: isActive
+                ? `${color}1f`
+                : 'transparent',
+              border: isActive
+                ? `0.5px solid ${color}55`
+                : '0.5px solid rgba(255,255,255,0.07)',
+              color: isActive ? color : 'rgba(255,255,255,0.5)',
+              cursor: 'pointer',
+              fontWeight: 500,
+            }}
+          >
+            {p.key !== 'all' && (
+              <span
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: '50%',
+                  background: color,
+                }}
+              />
+            )}
+            {p.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+const SCRIPT_TYPE_COLORS = {
+  hook: '#a78bfa',
+  caption: '#22d3ee',
+  script: '#4ade80',
+  cta: '#fbbf24',
+  voiceover: '#f87171',
+  instagram: '#a78bfa',
+  tiktok: '#22d3ee',
+  linkedin: '#60a5fa',
+  twitter: '#f87171',
+  repurpose: '#ffffff',
+}
+
+function ScriptsAndCopyQueue({ items, brand, onApprove, onReject, onRepurpose }) {
+  if (items.length === 0) {
+    return (
+      <div
+        style={{
+          padding: 24,
+          textAlign: 'center',
+          color: TEXT_MUTED,
+          fontSize: 12,
+          background: 'rgba(255,255,255,0.02)',
+          borderRadius: 10,
+          border: '0.5px dashed rgba(255,255,255,0.08)',
+        }}
+      >
+        No scripts or copy in queue
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <AnimatePresence>
+        {items.map((it) => (
+          <ScriptItem
+            key={it.id}
+            it={it}
+            brand={brand}
+            onApprove={onApprove}
+            onReject={onReject}
+            onRepurpose={onRepurpose}
+          />
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function ScriptItem({ it, brand, onApprove, onReject, onRepurpose }) {
+  const [expanded, setExpanded] = useState(false)
+  const type = reviewItemType(it)
+  const typeColor = SCRIPT_TYPE_COLORS[type] || '#ffffff'
+  const text = reviewItemText(it)
+  const platform = TYPE_PLATFORM[type] || ''
+  const isScript = type === 'script'
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
+      transition={{ duration: 0.22 }}
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '0.5px solid rgba(255,255,255,0.07)',
+        borderRadius: 10,
+        padding: 12,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 8,
+          flexWrap: 'wrap',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 9.5,
+            padding: '2px 8px',
+            borderRadius: 999,
+            background: `${typeColor}1a`,
+            border: `0.5px solid ${typeColor}40`,
+            color: typeColor,
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {type}
+        </span>
+        {platform && (
+          <span
+            style={{
+              fontSize: 9.5,
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: `${platformColor(platform)}14`,
+              border: `0.5px solid ${platformColor(platform)}33`,
+              color: platformColor(platform),
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+            }}
+          >
+            {platform}
+          </span>
+        )}
+        <span style={{ fontSize: 10, color: TEXT_FAINT, letterSpacing: '0.04em' }}>
+          {brand?.name || ''}
+        </span>
+        <span
+          style={{
+            marginLeft: 'auto',
+            fontSize: 10,
+            color: TEXT_FAINT,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {text.length} chars
+        </span>
+      </div>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 12,
+          color: 'rgba(255,255,255,0.88)',
+          lineHeight: 1.5,
+          display: '-webkit-box',
+          WebkitLineClamp: isScript && !expanded ? 3 : 999,
+          WebkitBoxOrient: 'vertical',
+          overflow: isScript && !expanded ? 'hidden' : 'visible',
+          whiteSpace: 'pre-wrap',
+        }}
+      >
+        {text}
+      </p>
+      {isScript && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'rgba(255,255,255,0.55)',
+            fontSize: 10.5,
+            cursor: 'pointer',
+            padding: 0,
+            marginTop: 4,
+          }}
+        >
+          {expanded ? '↑ Collapse' : '↓ Expand'}
+        </button>
+      )}
+      <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => onApprove(it.id)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '5px 9px',
+            borderRadius: 7,
+            background: 'rgba(74,222,128,0.12)',
+            border: '0.5px solid rgba(74,222,128,0.4)',
+            color: '#4ade80',
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <Check size={10} /> Approve
+        </button>
+        <button
+          type="button"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '5px 9px',
+            borderRadius: 7,
+            background: 'rgba(255,255,255,0.04)',
+            border: '0.5px solid rgba(255,255,255,0.08)',
+            color: 'rgba(255,255,255,0.7)',
+            fontSize: 11,
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
+          <Pencil size={10} /> Edit
+        </button>
+        {onRepurpose && (
+          <button
+            type="button"
+            onClick={() => onRepurpose()}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '5px 9px',
+              borderRadius: 7,
+              background: 'rgba(255,255,255,0.04)',
+              border: '0.5px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.75)',
+              fontSize: 11,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <Recycle size={10} /> Repurpose
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => onReject(it.id)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '5px 9px',
+            borderRadius: 7,
+            background: 'transparent',
+            border: '0.5px solid rgba(255,255,255,0.08)',
+            color: TEXT_MUTED,
+            fontSize: 11,
+            fontWeight: 500,
+            cursor: 'pointer',
+            marginLeft: 'auto',
+          }}
+        >
+          <X size={10} /> Reject
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
+function VideosQueue({ items, brand, onApprove, onReject, onPreview }) {
+  if (items.length === 0) {
+    return (
+      <div
+        style={{
+          padding: 28,
+          textAlign: 'center',
+          color: TEXT_MUTED,
+          fontSize: 12,
+          background: 'rgba(255,255,255,0.02)',
+          borderRadius: 10,
+          border: '0.5px dashed rgba(255,255,255,0.08)',
+        }}
+      >
+        <Film size={20} color="rgba(255,255,255,0.4)" style={{ marginBottom: 8 }} />
+        <div>
+          No videos in queue — use Video Templates in the Office tab to generate
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+        gap: 10,
+      }}
+    >
+      <AnimatePresence>
+        {items.map((it) => (
+          <VideoCard
+            key={it.id}
+            it={it}
+            brand={brand}
+            onApprove={onApprove}
+            onReject={onReject}
+            onPreview={onPreview}
+          />
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
+  const url = it.script && /^https?:\/\//.test(it.script) ? it.script : null
+  const isRendering = it.type === 'video_render' || (!url && it.type === 'video')
+  const brandColor = brand?.primary_color || brand?.color || '#ffffff'
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
+      transition={{ duration: 0.22 }}
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '0.5px solid rgba(255,255,255,0.07)',
+        borderRadius: 12,
+        padding: 12,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '9 / 16',
+          maxHeight: 280,
+          background: 'rgba(0,0,0,0.5)',
+          borderRadius: 8,
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {url ? (
+          <video
+            src={url}
+            controls
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 8,
+              color: TEXT_MUTED,
+            }}
+          >
+            <Film size={28} />
+            <span style={{ fontSize: 11 }}>
+              {isRendering ? 'Rendering…' : 'No preview'}
+            </span>
+          </div>
+        )}
+        <span
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            fontSize: 9.5,
+            padding: '2px 8px',
+            borderRadius: 999,
+            background: isRendering
+              ? 'rgba(251,191,36,0.15)'
+              : url
+              ? 'rgba(74,222,128,0.15)'
+              : 'rgba(248,113,113,0.15)',
+            border: `0.5px solid ${
+              isRendering
+                ? 'rgba(251,191,36,0.4)'
+                : url
+                ? 'rgba(74,222,128,0.4)'
+                : 'rgba(248,113,113,0.4)'
+            }`,
+            color: isRendering ? '#fbbf24' : url ? '#4ade80' : '#f87171',
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+          }}
+        >
+          {isRendering ? (
+            <motion.span
+              animate={{ opacity: [1, 0.4, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: '50%',
+                background: '#fbbf24',
+              }}
+            />
+          ) : null}
+          {isRendering ? 'Rendering' : url ? 'Ready' : 'Failed'}
+        </span>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 6,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: brandColor,
+              boxShadow: `0 0 5px ${brandColor}80`,
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontSize: 11.5,
+              color: '#fff',
+              fontWeight: 500,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {it.type === 'video_render' ? 'Render' : 'Video'}
+          </span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          type="button"
+          onClick={() => onPreview(it)}
+          disabled={!url}
+          style={{
+            flex: 1,
+            fontSize: 11,
+            padding: '5px 10px',
+            borderRadius: 7,
+            background: 'rgba(255,255,255,0.04)',
+            border: '0.5px solid rgba(255,255,255,0.1)',
+            color: url ? 'rgba(255,255,255,0.75)' : TEXT_FAINT,
+            fontWeight: 500,
+            cursor: url ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Preview
+        </button>
+        <button
+          type="button"
+          onClick={() => onApprove(it.id)}
+          style={{
+            flex: 1,
+            fontSize: 11,
+            padding: '5px 10px',
+            borderRadius: 7,
+            background: 'rgba(74,222,128,0.12)',
+            border: '0.5px solid rgba(74,222,128,0.4)',
+            color: '#4ade80',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Approve
+        </button>
+        <button
+          type="button"
+          onClick={() => onReject(it.id)}
+          style={{
+            fontSize: 11,
+            padding: '5px 10px',
+            borderRadius: 7,
+            background: 'transparent',
+            border: '0.5px solid rgba(255,255,255,0.1)',
+            color: TEXT_MUTED,
+            cursor: 'pointer',
+          }}
+        >
+          <X size={11} />
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
+function StaticAdsQueue({ items, brand, onApprove, onReject }) {
+  if (items.length === 0) {
+    return (
+      <div
+        style={{
+          padding: 28,
+          textAlign: 'center',
+          color: TEXT_MUTED,
+          fontSize: 12,
+          background: 'rgba(255,255,255,0.02)',
+          borderRadius: 10,
+          border: '0.5px dashed rgba(255,255,255,0.08)',
+        }}
+      >
+        <ImageIcon
+          size={20}
+          color="rgba(255,255,255,0.4)"
+          style={{ marginBottom: 8 }}
+        />
+        <div>No static ads in queue — run Higgsfield to generate brand visuals</div>
+      </div>
+    )
+  }
+  const brandColor = brand?.primary_color || brand?.color || '#ffffff'
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+        gap: 10,
+      }}
+    >
+      <AnimatePresence>
+        {items.map((it) => {
+          const url =
+            it.script && /^https?:\/\//.test(it.script) ? it.script : null
+          return (
+            <motion.div
+              key={it.id}
+              layout
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.22 }}
+              style={{
+                position: 'relative',
+                background: 'rgba(255,255,255,0.03)',
+                border: '0.5px solid rgba(255,255,255,0.07)',
+                borderRadius: 12,
+                overflow: 'hidden',
+                aspectRatio: '9 / 16',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {url ? (
+                <img
+                  src={url}
+                  alt=""
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 6,
+                    color: TEXT_MUTED,
+                  }}
+                >
+                  <ImageIcon size={24} />
+                  <span style={{ fontSize: 10 }}>No preview</span>
+                </div>
+              )}
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 8,
+                  left: 8,
+                  fontSize: 9,
+                  padding: '2px 6px',
+                  borderRadius: 999,
+                  background: 'rgba(0,0,0,0.5)',
+                  color: '#fff',
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                9:16
+              </span>
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: brandColor,
+                  boxShadow: `0 0 6px ${brandColor}`,
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  padding: 8,
+                  display: 'flex',
+                  gap: 6,
+                  background:
+                    'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+                  opacity: 0,
+                  transition: 'opacity 0.2s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = 0)}
+              >
+                <button
+                  type="button"
+                  onClick={(ev) => {
+                    ev.stopPropagation()
+                    onApprove(it.id)
+                  }}
+                  style={{
+                    flex: 1,
+                    fontSize: 10.5,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(74,222,128,0.85)',
+                    color: '#000',
+                    border: 'none',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={(ev) => {
+                    ev.stopPropagation()
+                    onReject(it.id)
+                  }}
+                  style={{
+                    fontSize: 10.5,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(0,0,0,0.6)',
+                    color: '#fff',
+                    border: '0.5px solid rgba(255,255,255,0.2)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            </motion.div>
+          )
+        })}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function VideoContentPreviewModal({ item, onClose }) {
+  const url = item.script && /^https?:\/\//.test(item.script) ? item.script : null
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(10px)',
+        zIndex: 250,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'relative',
+          maxWidth: '90vw',
+          maxHeight: '90vh',
+        }}
+      >
+        {url ? (
+          <video
+            src={url}
+            controls
+            autoPlay
+            style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 12 }}
+          />
+        ) : (
+          <div style={{ color: '#fff' }}>No preview available</div>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: -36,
+            right: 0,
+            background: 'transparent',
+            border: 'none',
+            color: 'rgba(255,255,255,0.7)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <X size={16} /> Close
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
+const WORKFLOW_STAGES = [
+  {
+    key: 'generate',
+    title: 'Generate',
+    icon: Sparkles,
+    tint: 'rgba(96,165,250,0.12)',
+    accent: '#60a5fa',
+    items: [
+      'Strategy Agent runs at 7AM',
+      'Writer Agent creates copy',
+      'Video Director creates briefs',
+      'Higgsfield renders visuals',
+      'Remotion renders motion',
+    ],
+  },
+  {
+    key: 'review',
+    title: 'Review',
+    icon: Eye,
+    tint: 'rgba(251,191,36,0.12)',
+    accent: '#fbbf24',
+    items: [
+      'Scripts & Copy queue',
+      'Videos queue',
+      'Static Ads queue',
+      'You approve or reject',
+      'Edit before approving',
+    ],
+  },
+  {
+    key: 'schedule',
+    title: 'Schedule',
+    icon: CalendarDays,
+    tint: 'rgba(167,139,250,0.12)',
+    accent: '#a78bfa',
+    items: [
+      'Auto-scheduled on approval',
+      'Platform assigned by type',
+      'Time slot auto-selected',
+      'Calendar populated',
+      '3 posts per day max',
+    ],
+  },
+  {
+    key: 'publish',
+    title: 'Publish',
+    icon: Send,
+    tint: 'rgba(74,222,128,0.12)',
+    accent: '#4ade80',
+    items: [
+      'Make.com triggers at scheduled time',
+      'Posts to Instagram/TikTok/LinkedIn',
+      'Webhook confirms published',
+      'Status updates to published',
+    ],
+  },
+  {
+    key: 'learn',
+    title: 'Learn',
+    icon: TrendingUp,
+    tint: 'rgba(248,113,113,0.12)',
+    accent: '#f87171',
+    items: [
+      'Analytics Agent scores posts',
+      'Engagement data pulled',
+      'Brand memory updated',
+      'Next generation improves',
+      'Loop repeats daily',
+    ],
+  },
+]
+
+function WorkflowVisualization({ open, onToggle }) {
+  return (
+    <div
+      style={{
+        background: CARD_BG,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: CARD_BORDER,
+        borderRadius: 16,
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+            How Your Content System Works
+          </div>
+          <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>
+            end to end automation
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          style={{
+            fontSize: 11,
+            padding: '5px 12px',
+            borderRadius: 999,
+            background: 'transparent',
+            border: '0.5px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.7)',
+            cursor: 'pointer',
+            fontWeight: 500,
+            letterSpacing: '0.02em',
+          }}
+        >
+          {open ? 'Hide workflow' : 'Show workflow'}
+        </button>
+      </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                overflowX: 'auto',
+                paddingBottom: 8,
+                paddingTop: 14,
+                alignItems: 'stretch',
+              }}
+            >
+              {WORKFLOW_STAGES.map((s, i) => {
+                const Icon = s.icon
+                return (
+                  <Fragment key={s.key}>
+                    <div
+                      style={{
+                        position: 'relative',
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '0.5px solid rgba(255,255,255,0.07)',
+                        borderRadius: 12,
+                        padding: 14,
+                        minWidth: 180,
+                        flexShrink: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 10,
+                          fontSize: 9,
+                          color: 'rgba(255,255,255,0.15)',
+                          fontWeight: 700,
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        0{i + 1}
+                      </span>
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: s.tint,
+                          border: `0.5px solid ${s.accent}33`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: s.accent,
+                        }}
+                      >
+                        <Icon size={16} />
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: '#fff',
+                          marginTop: 4,
+                        }}
+                      >
+                        {s.title}
+                      </div>
+                      <ul
+                        style={{
+                          margin: 0,
+                          padding: 0,
+                          listStyle: 'none',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4,
+                        }}
+                      >
+                        {s.items.map((it, j) => (
+                          <li
+                            key={j}
+                            style={{
+                              fontSize: 11,
+                              color: 'rgba(255,255,255,0.45)',
+                              display: 'flex',
+                              alignItems: 'baseline',
+                              gap: 6,
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 3,
+                                height: 3,
+                                borderRadius: '50%',
+                                background: 'rgba(255,255,255,0.3)',
+                                flexShrink: 0,
+                              }}
+                            />
+                            {it}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    {i < WORKFLOW_STAGES.length - 1 && (
+                      <div
+                        style={{
+                          alignSelf: 'center',
+                          color: 'rgba(255,255,255,0.2)',
+                          fontSize: 18,
+                          flexShrink: 0,
+                        }}
+                      >
+                        ›
+                      </div>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
