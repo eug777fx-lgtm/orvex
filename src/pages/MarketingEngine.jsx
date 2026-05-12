@@ -30,6 +30,8 @@ import {
   Play,
   Camera,
   Image as ImageIcon,
+  LayoutGrid,
+  Layers,
 } from 'lucide-react'
 
 // ===== Design tokens =====
@@ -219,6 +221,7 @@ export default function MarketingEngine() {
   const [activeTab, setActiveTab] = useState('review')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [scheduleVersion, setScheduleVersion] = useState(0)
+  const [activeSection, setActiveSection] = useState('office')
   const isMobile = useIsMobile()
   const [now, setNow] = useState(new Date())
   const [screenIndex, setScreenIndex] = useState(0)
@@ -286,10 +289,12 @@ export default function MarketingEngine() {
     try {
       const rows = await db.query(
         `SELECT * FROM (
-           SELECT DISTINCT ON (name) id, name, color, COALESCE(brand_type, 'own') AS brand_type,
+           SELECT DISTINCT ON (LOWER(name)) id, name, color, COALESCE(brand_type, 'own') AS brand_type,
                   logo_url, primary_color, secondary_color, visual_style, aesthetic_description, created_at
              FROM brands
-            ORDER BY name, created_at ASC
+            ORDER BY LOWER(name),
+                     CASE WHEN brand_type='own' THEN 0 ELSE 1 END,
+                     created_at ASC
          ) sub
          ORDER BY brand_type ASC, created_at ASC`,
       )
@@ -518,7 +523,12 @@ export default function MarketingEngine() {
         color: '#fff',
       }}
     >
-        <PageHeader now={now} loading={loading} />
+        <PageHeader
+          now={now}
+          loading={loading}
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+        />
         <BrandSelector
           brands={brands}
           selected={selectedBrand}
@@ -530,68 +540,69 @@ export default function MarketingEngine() {
         />
         <StatsRow stats={stats} loading={loading} />
 
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-            padding: '12px 20px',
-            paddingBottom: 80,
-          }}
-        >
-          <AgentOffice
-            screenIndex={screenIndex}
-            meetingAgents={meetingAgents}
-            brand={selectedBrand}
-            onRefresh={refreshBrandData}
-            showToast={showToast}
-            now={now}
-            hasMemory={memory.length > 0}
-            onSetUpMemory={() => {
-              const el = document.getElementById('brand-memory-section')
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            }}
-          />
-          <ScheduleStrip brand={selectedBrand} version={scheduleVersion} />
-          <BrandMemory
-            brand={selectedBrand}
-            memory={memory}
-            onRefresh={refreshBrandData}
-            showToast={showToast}
-          />
-          <VideoTemplates brand={selectedBrand} showToast={showToast} />
-        </div>
+        <AnimatePresence mode="wait">
+          {activeSection === 'office' ? (
+            <motion.div
+              key="office"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+                padding: '12px 20px',
+                paddingBottom: 40,
+              }}
+            >
+              <AgentOffice
+                screenIndex={screenIndex}
+                meetingAgents={meetingAgents}
+                brand={selectedBrand}
+                onRefresh={refreshBrandData}
+                showToast={showToast}
+                now={now}
+                hasMemory={memory.length > 0}
+                onSetUpMemory={() => {
+                  const el = document.getElementById('brand-memory-section')
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
+              />
+              <ScheduleStrip brand={selectedBrand} version={scheduleVersion} />
+              <BrandMemory
+                brand={selectedBrand}
+                memory={memory}
+                onRefresh={refreshBrandData}
+                showToast={showToast}
+              />
+              <VideoTemplates brand={selectedBrand} showToast={showToast} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="content"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ padding: '12px 20px', paddingBottom: 40 }}
+            >
+              <ContentHub
+                brand={selectedBrand}
+                reviewItems={reviewItems}
+                liveLog={liveLog}
+                scheduleVersion={scheduleVersion}
+                onApprove={approve}
+                onReject={reject}
+                onRepurpose={repurpose}
+                onRefresh={refreshBrandData}
+                showToast={showToast}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      <BottomDrawer
-        open={drawerOpen}
-        onToggle={() => setDrawerOpen((o) => !o)}
-        activeTab={activeTab}
-        onTabChange={(t) => {
-          setActiveTab(t)
-          setDrawerOpen(true)
-        }}
-        reviewCount={reviewItems.length}
-        isMobile={isMobile}
-      >
-        {activeTab === 'review' && (
-          <ReviewPanel
-            items={reviewItems}
-            brand={selectedBrand}
-            onApprove={approve}
-            onReject={reject}
-            onRepurpose={repurpose}
-            wide
-          />
-        )}
-        {activeTab === 'log' && (
-          <LogPanel entries={liveLog} wide brand={selectedBrand} />
-        )}
-        {activeTab === 'stats' && (
-          <StatsPanel wide brand={selectedBrand} showToast={showToast} />
-        )}
-      </BottomDrawer>
-
-      <Toast toast={toast} drawerOpen={drawerOpen} />
+      <Toast toast={toast} drawerOpen={false} />
     </motion.div>
   )
 }
@@ -764,7 +775,55 @@ function Toast({ toast, drawerOpen }) {
 }
 
 // ===== Page Header =====
-function PageHeader({ now, loading }) {
+function SectionTabs({ active, onChange }) {
+  const tabs = [
+    { key: 'office', label: 'Office', icon: LayoutGrid },
+    { key: 'content', label: 'Content Hub', icon: Layers },
+  ]
+  return (
+    <div
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '0.5px solid rgba(255,255,255,0.06)',
+        borderRadius: 12,
+        padding: 3,
+        display: 'inline-flex',
+        gap: 2,
+      }}
+    >
+      {tabs.map((t) => {
+        const Icon = t.icon
+        const isActive = active === t.key
+        return (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => onChange(t.key)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 20px',
+              borderRadius: 10,
+              background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+              color: isActive ? '#fff' : 'rgba(255,255,255,0.4)',
+              fontSize: 13,
+              fontWeight: 500,
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            <Icon size={13} />
+            {t.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function PageHeader({ now, loading, activeSection, onSectionChange }) {
   return (
     <div
       style={{
@@ -776,7 +835,7 @@ function PageHeader({ now, loading }) {
         gap: 12,
       }}
     >
-      <div>
+      <div style={{ minWidth: 0 }}>
         <div
           style={{
             fontSize: 15,
@@ -791,6 +850,7 @@ function PageHeader({ now, loading }) {
           5 agents working · always on
         </div>
       </div>
+      <SectionTabs active={activeSection} onChange={onSectionChange} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {loading && <LoadingPulse />}
         <motion.span
@@ -3848,6 +3908,597 @@ function Tabs({ active, onChange }) {
 }
 
 // ===== Right: Review =====
+function ContentHub({
+  brand,
+  reviewItems,
+  liveLog,
+  scheduleVersion,
+  onApprove,
+  onReject,
+  onRepurpose,
+  onRefresh,
+  showToast,
+}) {
+  const [scheduled, setScheduled] = useState([])
+  const [generating, setGenerating] = useState(false)
+
+  useEffect(() => {
+    if (!brand?.id) {
+      setScheduled([])
+      return
+    }
+    let cancelled = false
+    async function load() {
+      try {
+        const rows = await db.query(
+          `SELECT s.id, s.platform, s.scheduled_at, s.published, c.id AS content_id, c.type, c.hook, c.caption, c.script
+             FROM schedules s
+             JOIN content c ON s.content_id = c.id
+            WHERE s.brand_id=$1 AND s.published=false AND c.status='approved'
+            ORDER BY s.scheduled_at ASC
+            LIMIT 30`,
+          [brand.id],
+        )
+        if (!cancelled) setScheduled(rows || [])
+      } catch (e) {
+        console.error('scheduled fetch failed', e)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [brand?.id, scheduleVersion])
+
+  async function cancelSchedule(id) {
+    try {
+      await db.query('DELETE FROM schedules WHERE id=$1', [id])
+      setScheduled((rows) => rows.filter((r) => r.id !== id))
+      showToast?.('Schedule cancelled')
+    } catch (e) {
+      console.error('cancel schedule failed', e)
+      showToast?.('Failed to cancel', 'error')
+    }
+  }
+
+  async function generateMore() {
+    if (!brand?.id || generating) return
+    setGenerating(true)
+    showToast?.('Writer Agent is generating new content…')
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand_id: brand.id, agent_type: 'writer' }),
+      })
+      if (!res.ok) throw new Error('failed')
+      const data = await res.json()
+      const n = data.items_generated || 0
+      showToast?.(`Writer Agent finished — ${n} new items added`)
+      onRefresh?.()
+    } catch (e) {
+      console.error('generate more failed', e)
+      showToast?.('Generate failed', 'error')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) 320px',
+        gap: 16,
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+        <div
+          style={{
+            background: CARD_BG,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: CARD_BORDER,
+            borderRadius: 16,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              marginBottom: 4,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+                Review Queue
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  padding: '2px 7px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '0.5px solid rgba(255,255,255,0.12)',
+                  color: 'rgba(255,255,255,0.7)',
+                  fontWeight: 600,
+                }}
+              >
+                {reviewItems.length}
+              </span>
+            </div>
+            <span style={{ fontSize: 11, color: TEXT_MUTED }}>
+              Content generated by your agents — approve to schedule
+            </span>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <ReviewPanel
+              items={reviewItems}
+              brand={brand}
+              onApprove={onApprove}
+              onReject={onReject}
+              onRepurpose={onRepurpose}
+              wide
+            />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={generateMore}
+              disabled={!brand || generating}
+              style={{
+                background: '#fff',
+                color: '#000',
+                border: 'none',
+                borderRadius: 8,
+                padding: '7px 16px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: !brand || generating ? 'not-allowed' : 'pointer',
+                opacity: !brand || generating ? 0.55 : 1,
+              }}
+            >
+              {generating ? 'Generating…' : 'Generate More'}
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: CARD_BG,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: CARD_BORDER,
+            borderRadius: 16,
+            padding: 16,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+              Scheduled
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                padding: '2px 7px',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.06)',
+                border: '0.5px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.7)',
+                fontWeight: 600,
+              }}
+            >
+              {scheduled.length}
+            </span>
+          </div>
+          {scheduled.length === 0 ? (
+            <div
+              style={{
+                padding: 18,
+                textAlign: 'center',
+                color: TEXT_MUTED,
+                fontSize: 12,
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: 10,
+                border: '0.5px dashed rgba(255,255,255,0.08)',
+              }}
+            >
+              No approved content scheduled yet
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {scheduled.map((s) => {
+                const preview = (s.hook || s.caption || s.script || '').slice(0, 60)
+                const d = new Date(s.scheduled_at)
+                const when = `${d.toLocaleDateString([], {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                })} · ${d.toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}`
+                const color = platformColor(s.platform)
+                return (
+                  <div
+                    key={s.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      background: 'rgba(255,255,255,0.025)',
+                      border: '0.5px solid rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 10,
+                        padding: '2px 8px',
+                        borderRadius: 999,
+                        background: `${color}14`,
+                        border: `0.5px solid ${color}33`,
+                        color,
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {s.platform || 'post'}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: TEXT_MUTED,
+                        fontVariantNumeric: 'tabular-nums',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {when}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: 'rgba(255,255,255,0.85)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      {preview || '(empty)'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => cancelSchedule(s.id)}
+                      title="Cancel schedule"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: TEXT_MUTED,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ContentCalendar brand={brand} version={scheduleVersion} />
+        <div
+          style={{
+            background: CARD_BG,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: CARD_BORDER,
+            borderRadius: 16,
+            padding: 16,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Activity size={13} color="#ffffff" />
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+              Agent Activity
+            </span>
+          </div>
+          <LogPanel entries={liveLog} brand={brand} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ContentCalendar({ brand, version }) {
+  const [items, setItems] = useState([])
+  const [monthOffset, setMonthOffset] = useState(0)
+
+  const now = new Date()
+  const viewDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
+  const monthLabel = viewDate.toLocaleDateString([], { month: 'long', year: 'numeric' })
+
+  useEffect(() => {
+    if (!brand?.id) {
+      setItems([])
+      return
+    }
+    let cancelled = false
+    async function load() {
+      try {
+        const start = new Date(viewDate)
+        const end = new Date(viewDate)
+        end.setMonth(end.getMonth() + 2)
+        const rows = await db.query(
+          `SELECT s.id, s.scheduled_at, s.platform, s.published, c.hook, c.caption
+             FROM schedules s
+             JOIN content c ON s.content_id = c.id
+            WHERE s.brand_id = $1 AND s.scheduled_at >= $2 AND s.scheduled_at < $3
+            ORDER BY s.scheduled_at ASC`,
+          [brand.id, start.toISOString(), end.toISOString()],
+        )
+        if (!cancelled) setItems(rows || [])
+      } catch (e) {
+        console.error('calendar fetch failed', e)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brand?.id, monthOffset, version])
+
+  const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1)
+  const lastDay = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0)
+  const startWeekday = (firstDay.getDay() + 6) % 7 // Monday-first
+  const totalDays = lastDay.getDate()
+
+  const byDate = {}
+  for (const it of items) {
+    const d = new Date(it.scheduled_at)
+    if (d.getMonth() !== viewDate.getMonth()) continue
+    const key = d.getDate()
+    if (!byDate[key]) byDate[key] = []
+    byDate[key].push(it)
+  }
+
+  const [openDay, setOpenDay] = useState(null)
+
+  const cells = []
+  for (let i = 0; i < startWeekday; i++) cells.push(null)
+  for (let d = 1; d <= totalDays; d++) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  return (
+    <div
+      style={{
+        background: CARD_BG,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: CARD_BORDER,
+        borderRadius: 16,
+        padding: 14,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 8,
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+          {monthLabel}
+        </span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button
+            type="button"
+            onClick={() => setMonthOffset((o) => o - 1)}
+            style={iconBtnStyle()}
+          >
+            <ChevronUp size={12} style={{ transform: 'rotate(-90deg)' }} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMonthOffset((o) => o + 1)}
+            style={iconBtnStyle()}
+          >
+            <ChevronUp size={12} style={{ transform: 'rotate(90deg)' }} />
+          </button>
+        </div>
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: 4,
+          marginBottom: 4,
+        }}
+      >
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+          <div
+            key={i}
+            style={{
+              fontSize: 9,
+              color: TEXT_FAINT,
+              textAlign: 'center',
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+            }}
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: 4,
+        }}
+      >
+        {cells.map((day, i) => {
+          if (!day)
+            return <div key={`empty-${i}`} style={{ height: 36 }} />
+          const dayItems = byDate[day] || []
+          const isOpen = openDay === day
+          const isToday =
+            day === now.getDate() &&
+            viewDate.getMonth() === now.getMonth() &&
+            viewDate.getFullYear() === now.getFullYear()
+          return (
+            <button
+              key={day}
+              type="button"
+              onClick={() => setOpenDay(isOpen ? null : day)}
+              style={{
+                position: 'relative',
+                height: 36,
+                background: isOpen
+                  ? 'rgba(255,255,255,0.08)'
+                  : isToday
+                  ? 'rgba(255,255,255,0.04)'
+                  : 'transparent',
+                border: isToday
+                  ? '0.5px solid rgba(255,255,255,0.25)'
+                  : '0.5px solid rgba(255,255,255,0.06)',
+                borderRadius: 6,
+                color: '#fff',
+                fontSize: 11,
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                padding: 2,
+              }}
+            >
+              <span
+                style={{
+                  opacity: dayItems.length === 0 ? 0.3 : 1,
+                  fontWeight: isToday ? 600 : 400,
+                }}
+              >
+                {day}
+              </span>
+              {dayItems.length > 0 && (
+                <span style={{ display: 'flex', gap: 2 }}>
+                  {dayItems.slice(0, 4).map((it, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: '50%',
+                        background: platformColor(it.platform),
+                        opacity: it.published ? 0.4 : 1,
+                      }}
+                    />
+                  ))}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      {openDay && byDate[openDay] && byDate[openDay].length > 0 && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 10,
+            borderRadius: 8,
+            background: 'rgba(255,255,255,0.03)',
+            border: '0.5px solid rgba(255,255,255,0.06)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              color: TEXT_FAINT,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+            }}
+          >
+            {monthLabel.split(' ')[0]} {openDay}
+          </div>
+          {byDate[openDay].map((it) => {
+            const preview = (it.hook || it.caption || '').slice(0, 36)
+            const color = platformColor(it.platform)
+            return (
+              <div
+                key={it.id}
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: color,
+                  }}
+                />
+                <span style={{ fontSize: 10.5, color: TEXT_MUTED }}>
+                  {new Date(it.scheduled_at).toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: '#fff',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    minWidth: 0,
+                    flex: 1,
+                  }}
+                >
+                  {preview || '(empty)'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function iconBtnStyle() {
+  return {
+    width: 22,
+    height: 22,
+    background: 'transparent',
+    border: '0.5px solid rgba(255,255,255,0.12)',
+    borderRadius: 6,
+    color: 'rgba(255,255,255,0.65)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
+}
+
 function VoiceoverControl({ item, state, onGenerate, onPlay }) {
   const status = state?.status
   if (status === 'ready') {
