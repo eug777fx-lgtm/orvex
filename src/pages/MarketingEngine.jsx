@@ -214,6 +214,7 @@ export default function MarketingEngine() {
   const [selectedBrand, setSelectedBrand] = useState(null)
   const [activeTab, setActiveTab] = useState('review')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [scheduleVersion, setScheduleVersion] = useState(0)
   const isMobile = useIsMobile()
   const [now, setNow] = useState(new Date())
   const [screenIndex, setScreenIndex] = useState(0)
@@ -399,14 +400,39 @@ export default function MarketingEngine() {
   }, [drawerOpen, activeTab, reviewItems])
 
   async function approve(id) {
+    if (!selectedBrand) return
     try {
-      await db.query("UPDATE content SET status='approved' WHERE id=$1", [id])
+      const res = await fetch('/api/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_id: id, brand_id: selectedBrand.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'failed' }))
+        throw new Error(err.error || 'approve failed')
+      }
+      const data = await res.json()
       setReviewItems((items) => items.filter((it) => it.id !== id))
       setStats((s) => ({
         ...s,
         contentReady: Math.max(0, s.contentReady - 1),
+        scheduled: s.scheduled + 1,
       }))
-      showToast('Content approved — added to schedule')
+      const d = new Date(data.scheduled_at)
+      const dateStr = d.toLocaleDateString([], {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      })
+      const timeStr = d.toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+      showToast(
+        `Approved — scheduled for ${dateStr} at ${timeStr} on ${data.platform}`,
+      )
+      setScheduleVersion((v) => v + 1)
+      refreshBrandData()
     } catch (e) {
       console.error('approve failed', e)
       showToast('Approve failed', 'error')
@@ -518,7 +544,7 @@ export default function MarketingEngine() {
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
             }}
           />
-          <ScheduleStrip brand={selectedBrand} />
+          <ScheduleStrip brand={selectedBrand} version={scheduleVersion} />
           <BrandMemory
             brand={selectedBrand}
             memory={memory}
