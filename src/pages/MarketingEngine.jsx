@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import db from '@/lib/db'
+import { Player } from '@remotion/player'
+import { HookOpener } from '../remotion/compositions/HookOpener'
+import { TradeInsight } from '../remotion/compositions/TradeInsight'
+import { QuoteCard } from '../remotion/compositions/QuoteCard'
 import {
   Activity,
   Brain,
@@ -484,6 +488,7 @@ export default function MarketingEngine() {
             memory={memory}
             onRefresh={refreshBrandData}
           />
+          <VideoTemplates brand={selectedBrand} showToast={showToast} />
         </div>
       </div>
 
@@ -2257,6 +2262,278 @@ function BrandMemory({ brand, memory, onRefresh }) {
         </AnimatePresence>
       </div>
     </div>
+  )
+}
+
+// ===== Video Templates =====
+const VIDEO_TEMPLATES = [
+  {
+    id: 'HookOpener',
+    name: 'Hook Opener',
+    durationSec: 5,
+    frames: 150,
+    fps: 30,
+    component: HookOpener,
+    defaultProps: {
+      headline: 'Discipline is built quietly.',
+      subtext: 'Most people quit too early.',
+      brandColor: '#ffffff',
+    },
+  },
+  {
+    id: 'TradeInsight',
+    name: 'Trade Insight',
+    durationSec: 8,
+    frames: 240,
+    fps: 30,
+    component: TradeInsight,
+    defaultProps: {
+      title: 'The ICT Concept Nobody Talks About',
+      points: ['Liquidity grabs', 'Order blocks', 'Fair value gaps'],
+      brandColor: '#ffffff',
+    },
+  },
+  {
+    id: 'QuoteCard',
+    name: 'Quote Card',
+    durationSec: 6,
+    frames: 180,
+    fps: 30,
+    component: QuoteCard,
+    defaultProps: {
+      quote: 'Silence reveals character.',
+      author: 'LIMITLESS',
+      brandColor: '#ffffff',
+    },
+  },
+]
+
+function VideoTemplates({ brand, showToast }) {
+  const [preview, setPreview] = useState(null)
+  const [generating, setGenerating] = useState(null)
+
+  async function generate(template) {
+    setGenerating(template.id)
+    showToast(`Queueing ${template.name}...`)
+    try {
+      const res = await fetch('/api/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          composition_id: template.id,
+          props: template.defaultProps,
+          brand_id: brand?.id || null,
+        }),
+      })
+      if (!res.ok) throw new Error('failed')
+      showToast('Video queued — will appear in review queue when ready')
+    } catch (e) {
+      console.error('render failed', e)
+      showToast('Video generation failed', 'error')
+    } finally {
+      setGenerating(null)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        background: CARD_BG,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: CARD_BORDER,
+        borderRadius: 16,
+        padding: 16,
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+        }}
+      >
+        <Video size={13} color={TEXT_MUTED} />
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+          Video Templates
+        </span>
+        <span style={{ fontSize: 10.5, color: TEXT_FAINT, letterSpacing: '0.04em' }}>
+          Remotion · 9:16
+        </span>
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gap: 10,
+        }}
+      >
+        {VIDEO_TEMPLATES.map((t) => (
+          <div
+            key={t.id}
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '0.5px solid rgba(255,255,255,0.07)',
+              borderRadius: 12,
+              padding: 12,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#fff',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {t.name}
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                color: TEXT_MUTED,
+                fontFamily: MONO,
+                letterSpacing: '0.04em',
+              }}
+            >
+              {t.durationSec}s · 9:16
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => setPreview(t)}
+                style={{
+                  flex: 1,
+                  fontSize: 11,
+                  padding: '5px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '0.5px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.75)',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => generate(t)}
+                disabled={generating === t.id}
+                style={{
+                  flex: 1,
+                  fontSize: 11,
+                  padding: '5px 10px',
+                  borderRadius: 8,
+                  background: '#ffffff',
+                  border: '0.5px solid #fff',
+                  color: '#000',
+                  fontWeight: 600,
+                  cursor: generating === t.id ? 'wait' : 'pointer',
+                  opacity: generating === t.id ? 0.6 : 1,
+                }}
+              >
+                {generating === t.id ? '...' : 'Generate'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <AnimatePresence>
+        {preview && (
+          <VideoPreviewModal
+            template={preview}
+            onClose={() => setPreview(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function VideoPreviewModal({ template, onClose }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.7)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#0a0a0c',
+          border: '0.5px solid rgba(255,255,255,0.1)',
+          borderRadius: 16,
+          padding: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+            {template.name}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: TEXT_MUTED,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <Player
+          component={template.component}
+          durationInFrames={template.frames}
+          fps={template.fps}
+          compositionWidth={1080}
+          compositionHeight={1920}
+          style={{ width: 270, height: 480, borderRadius: 8 }}
+          controls
+          autoPlay
+          loop
+          inputProps={template.defaultProps}
+        />
+      </motion.div>
+    </motion.div>
   )
 }
 
