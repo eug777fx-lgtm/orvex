@@ -6,6 +6,8 @@ import { Player } from '@remotion/player'
 import { HookOpener } from '../remotion/compositions/HookOpener'
 import { TradeInsight } from '../remotion/compositions/TradeInsight'
 import { QuoteCard } from '../remotion/compositions/QuoteCard'
+import { BrandPromo } from '../remotion/compositions/BrandPromo'
+import { ServiceAd } from '../remotion/compositions/ServiceAd'
 import {
   Activity,
   Brain,
@@ -26,6 +28,8 @@ import {
   Recycle,
   Mic,
   Play,
+  Camera,
+  Image as ImageIcon,
 } from 'lucide-react'
 
 // ===== Design tokens =====
@@ -281,7 +285,7 @@ export default function MarketingEngine() {
   const loadBrands = useCallback(async (selectIdAfter) => {
     try {
       const rows = await db.query(
-        "SELECT id, name, color, COALESCE(brand_type, 'own') AS brand_type FROM brands ORDER BY brand_type ASC, created_at ASC",
+        "SELECT id, name, color, COALESCE(brand_type, 'own') AS brand_type, logo_url, primary_color, secondary_color, visual_style, aesthetic_description FROM brands ORDER BY brand_type ASC, created_at ASC",
       )
       setBrands(rows || [])
       if (selectIdAfter) {
@@ -844,17 +848,30 @@ const BRAND_PRESET_COLORS = [
 ]
 const BRAND_PLATFORMS = ['instagram', 'tiktok', 'linkedin', 'facebook', 'youtube']
 
-function BrandChip({ brand, active, isClient, onSelect }) {
-  const color = brand.color || '#ffffff'
+function BrandChip({ brand, active, isClient, onSelect, onUploadLogo, uploading }) {
+  const color = brand.primary_color || brand.color || '#ffffff'
+  const fileRef = useRef(null)
+  function triggerFile(e) {
+    e.stopPropagation()
+    fileRef.current?.click()
+  }
+  function onFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      onUploadLogo?.(brand, reader.result)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(brand)}
+    <div
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 7,
-        padding: '6px 12px',
+        gap: 6,
+        padding: '5px 8px 5px 5px',
         borderRadius: 999,
         background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
         border: active
@@ -862,27 +879,76 @@ function BrandChip({ brand, active, isClient, onSelect }) {
           : isClient
           ? '0.5px dashed rgba(255,255,255,0.18)'
           : '0.5px solid rgba(255,255,255,0.08)',
-        color: active ? '#fff' : 'rgba(255,255,255,0.65)',
-        fontSize: 12,
-        fontWeight: 500,
-        letterSpacing: '0.02em',
         cursor: 'pointer',
         whiteSpace: 'nowrap',
         flexShrink: 0,
         transition: 'all 0.15s ease',
+        opacity: uploading ? 0.6 : 1,
       }}
+      onClick={() => onSelect(brand)}
     >
+      {brand.logo_url ? (
+        <img
+          src={brand.logo_url}
+          alt=""
+          style={{
+            width: 20,
+            height: 20,
+            objectFit: 'cover',
+            borderRadius: '50%',
+            border: '0.5px solid rgba(255,255,255,0.15)',
+            flexShrink: 0,
+          }}
+        />
+      ) : (
+        <span
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: color,
+            boxShadow: `0 0 6px ${color}80`,
+            margin: '0 7px',
+          }}
+        />
+      )}
       <span
         style={{
-          width: 6,
-          height: 6,
-          borderRadius: '50%',
-          background: color,
-          boxShadow: `0 0 6px ${color}80`,
+          fontSize: 12,
+          fontWeight: 500,
+          letterSpacing: '0.02em',
+          color: active ? '#fff' : 'rgba(255,255,255,0.65)',
         }}
+      >
+        {brand.name}
+      </span>
+      {!brand.logo_url && (
+        <button
+          type="button"
+          onClick={triggerFile}
+          title="Upload logo"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'rgba(255,255,255,0.35)',
+            cursor: 'pointer',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            marginLeft: 2,
+          }}
+        >
+          <Camera size={11} />
+        </button>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        onChange={onFile}
+        style={{ display: 'none' }}
       />
-      {brand.name}
-    </button>
+    </div>
   )
 }
 
@@ -895,9 +961,30 @@ function BrandSelector({ brands, selected, onSelect, onBrandAdded, showToast }) 
     platforms: ['instagram'],
   })
   const [saving, setSaving] = useState(false)
+  const [uploadingId, setUploadingId] = useState(null)
 
   const ownBrands = brands.filter((b) => (b.brand_type || 'own') === 'own')
   const clientBrands = brands.filter((b) => b.brand_type === 'client')
+
+  async function uploadLogo(brand, dataUrl) {
+    if (!brand?.id || !dataUrl) return
+    setUploadingId(brand.id)
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand_id: brand.id, image_base64: dataUrl }),
+      })
+      if (!res.ok) throw new Error('upload failed')
+      await onBrandAdded?.(brand)
+      showToast?.('Logo uploaded — brand style extracted')
+    } catch (e) {
+      console.error('logo upload failed', e)
+      showToast?.('Logo upload failed', 'error')
+    } finally {
+      setUploadingId(null)
+    }
+  }
 
   function toggle(platform) {
     setForm((f) => ({
@@ -968,6 +1055,8 @@ function BrandSelector({ brands, selected, onSelect, onBrandAdded, showToast }) 
             active={selected?.id === b.id}
             isClient={isClient}
             onSelect={onSelect}
+            onUploadLogo={uploadLogo}
+            uploading={uploadingId === b.id}
           />
         ))}
       </div>
@@ -2573,6 +2662,240 @@ const MEMORY_TYPES = [
   { key: 'campaign_history', title: 'Campaign History', color: '#ffffff', tint: 'rgba(255,255,255,0.12)' },
 ]
 
+function VisualIdentityCard({ brand, showToast, onRefresh }) {
+  const fileRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+  if (!brand) return null
+
+  function pickFile() {
+    fileRef.current?.click()
+  }
+  async function onFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = async () => {
+      setUploading(true)
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brand_id: brand.id,
+            image_base64: reader.result,
+          }),
+        })
+        if (!res.ok) throw new Error('failed')
+        await onRefresh?.()
+        showToast?.('Logo uploaded — brand style extracted')
+      } catch (err) {
+        console.error('logo upload failed', err)
+        showToast?.('Logo upload failed', 'error')
+      } finally {
+        setUploading(false)
+      }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  if (!brand.logo_url) {
+    return (
+      <div
+        style={{
+          background: 'rgba(255,255,255,0.03)',
+          border: '0.5px solid rgba(255,255,255,0.08)',
+          borderRadius: 10,
+          padding: 12,
+          marginBottom: 12,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 8,
+            background: 'rgba(255,255,255,0.04)',
+            border: '0.5px dashed rgba(255,255,255,0.18)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: TEXT_MUTED,
+            flexShrink: 0,
+          }}
+        >
+          <ImageIcon size={16} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>
+            Visual identity
+          </div>
+          <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>
+            Upload your logo to extract brand colors
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={pickFile}
+          disabled={uploading}
+          style={{
+            background: '#fff',
+            color: '#000',
+            border: 'none',
+            borderRadius: 8,
+            padding: '6px 14px',
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: uploading ? 'wait' : 'pointer',
+            opacity: uploading ? 0.6 : 1,
+          }}
+        >
+          {uploading ? 'Uploading…' : 'Upload logo'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          onChange={onFile}
+          style={{ display: 'none' }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '0.5px solid rgba(255,255,255,0.08)',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 12,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      <img
+        src={brand.logo_url}
+        alt=""
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 8,
+          objectFit: 'cover',
+          border: '0.5px solid rgba(255,255,255,0.1)',
+          flexShrink: 0,
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#fff',
+            marginBottom: 4,
+          }}
+        >
+          {brand.name}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {brand.primary_color && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: brand.primary_color,
+                  border: '0.5px solid rgba(255,255,255,0.15)',
+                }}
+              />
+              <span style={{ fontSize: 10, color: TEXT_MUTED, fontFamily: MONO }}>
+                {brand.primary_color}
+              </span>
+            </span>
+          )}
+          {brand.secondary_color && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: brand.secondary_color,
+                  border: '0.5px solid rgba(255,255,255,0.15)',
+                }}
+              />
+              <span style={{ fontSize: 10, color: TEXT_MUTED, fontFamily: MONO }}>
+                {brand.secondary_color}
+              </span>
+            </span>
+          )}
+          {brand.visual_style && (
+            <span
+              style={{
+                fontSize: 10,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.05)',
+                border: '0.5px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.75)',
+                letterSpacing: '0.04em',
+                textTransform: 'capitalize',
+              }}
+            >
+              {brand.visual_style}
+            </span>
+          )}
+        </div>
+        {brand.aesthetic_description && (
+          <div
+            style={{
+              fontSize: 11,
+              color: 'rgba(255,255,255,0.6)',
+              marginTop: 6,
+              lineHeight: 1.4,
+            }}
+          >
+            {brand.aesthetic_description}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={pickFile}
+        disabled={uploading}
+        title="Replace logo"
+        style={{
+          background: 'transparent',
+          color: TEXT_MUTED,
+          border: '0.5px solid rgba(255,255,255,0.12)',
+          borderRadius: 8,
+          padding: '5px 9px',
+          fontSize: 10,
+          fontWeight: 500,
+          cursor: uploading ? 'wait' : 'pointer',
+          opacity: uploading ? 0.6 : 1,
+          flexShrink: 0,
+        }}
+      >
+        <Camera size={11} />
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        onChange={onFile}
+        style={{ display: 'none' }}
+      />
+    </div>
+  )
+}
+
 function relativeTime(iso) {
   if (!iso) return ''
   const diffMs = Date.now() - new Date(iso).getTime()
@@ -2771,6 +3094,8 @@ function BrandMemory({ brand, memory, onRefresh, showToast }) {
           </button>
         </div>
       </div>
+
+      <VisualIdentityCard brand={brand} showToast={showToast} onRefresh={onRefresh} />
 
       {(memory || []).length === 0 ? (
         <div
@@ -3104,40 +3429,96 @@ const VIDEO_TEMPLATES = [
   {
     id: 'HookOpener',
     name: 'Hook Opener',
+    description: 'Short kinetic hook, watermark only',
     durationSec: 5,
     frames: 150,
     fps: 30,
     component: HookOpener,
+    branding: 'watermark',
     defaultProps: {
       headline: 'Discipline is built quietly.',
       subtext: 'Most people quit too early.',
       brandColor: '#ffffff',
+      brandName: 'LIMITLESS',
+      primaryColor: '#ffffff',
+      logoUrl: null,
     },
   },
   {
     id: 'TradeInsight',
     name: 'Trade Insight',
-    durationSec: 8,
-    frames: 240,
+    description: 'Educational reel with full brand intro/outro',
+    durationSec: 12,
+    frames: 360,
     fps: 30,
     component: TradeInsight,
+    branding: 'intro-outro',
     defaultProps: {
       title: 'The ICT Concept Nobody Talks About',
       points: ['Liquidity grabs', 'Order blocks', 'Fair value gaps'],
       brandColor: '#ffffff',
+      brandName: 'LIMITLESS',
+      primaryColor: '#ffffff',
+      logoUrl: null,
+      ctaText: 'Start journaling your trades',
     },
   },
   {
     id: 'QuoteCard',
     name: 'Quote Card',
+    description: 'Cinematic quote, watermark only',
     durationSec: 6,
     frames: 180,
     fps: 30,
     component: QuoteCard,
+    branding: 'watermark',
     defaultProps: {
       quote: 'Silence reveals character.',
       author: 'LIMITLESS',
       brandColor: '#ffffff',
+      brandName: 'LIMITLESS',
+      primaryColor: '#ffffff',
+      logoUrl: null,
+    },
+  },
+  {
+    id: 'BrandPromo',
+    name: 'Brand Promo',
+    description: 'Full branded promo with logo reveal',
+    durationSec: 15,
+    frames: 450,
+    fps: 30,
+    component: BrandPromo,
+    branding: 'intro-outro',
+    defaultProps: {
+      logoUrl: null,
+      brandName: 'LIMITLESS',
+      primaryColor: '#ffffff',
+      secondaryColor: '#a78bfa',
+      headline: 'The smarter way to trade',
+      features: ['Track every trade', 'Spot your patterns', 'Improve your edge'],
+      ctaText: 'Start free today',
+    },
+  },
+  {
+    id: 'ServiceAd',
+    name: 'Service Ad',
+    description: 'Service advertisement with CTA',
+    durationSec: 10,
+    frames: 300,
+    fps: 30,
+    component: ServiceAd,
+    branding: 'intro-outro',
+    defaultProps: {
+      logoUrl: null,
+      brandName: 'AWATEC',
+      primaryColor: '#4ade80',
+      secondaryColor: '#ffffff',
+      problem: 'Hidden leaks are costing you money',
+      solution: 'Professional leak detection in Aruba',
+      serviceName: 'Leak Inspection',
+      price: 'Afl. 150',
+      ctaText: 'Call us today',
     },
   },
 ]
@@ -3229,13 +3610,57 @@ function VideoTemplates({ brand, showToast }) {
             </div>
             <div
               style={{
-                fontSize: 10,
-                color: TEXT_MUTED,
-                fontFamily: MONO,
-                letterSpacing: '0.04em',
+                fontSize: 11,
+                color: 'rgba(255,255,255,0.6)',
+                lineHeight: 1.4,
+                minHeight: 28,
               }}
             >
-              {t.durationSec}s · 9:16
+              {t.description}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  fontSize: 9.5,
+                  padding: '2px 7px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '0.5px solid rgba(255,255,255,0.1)',
+                  color: TEXT_MUTED,
+                  fontFamily: MONO,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {t.durationSec}s
+              </span>
+              <span
+                style={{
+                  fontSize: 9.5,
+                  padding: '2px 7px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '0.5px solid rgba(255,255,255,0.1)',
+                  color: TEXT_MUTED,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {t.branding === 'intro-outro' ? 'Intro / outro' : 'Watermark only'}
+              </span>
+              {brand?.logo_url && (
+                <span
+                  style={{
+                    fontSize: 9.5,
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                    background: 'rgba(74,222,128,0.1)',
+                    border: '0.5px solid rgba(74,222,128,0.3)',
+                    color: '#4ade80',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Brand logo
+                </span>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
               <button
@@ -3282,6 +3707,7 @@ function VideoTemplates({ brand, showToast }) {
         {preview && (
           <VideoPreviewModal
             template={preview}
+            brand={brand}
             onClose={() => setPreview(null)}
           />
         )}
@@ -3290,7 +3716,19 @@ function VideoTemplates({ brand, showToast }) {
   )
 }
 
-function VideoPreviewModal({ template, onClose }) {
+function VideoPreviewModal({ template, brand, onClose }) {
+  const mergedProps = {
+    ...template.defaultProps,
+    ...(brand?.logo_url
+      ? {
+          logoUrl: brand.logo_url,
+          brandName: brand.name,
+          primaryColor: brand.primary_color || template.defaultProps.primaryColor,
+          secondaryColor:
+            brand.secondary_color || template.defaultProps.secondaryColor,
+        }
+      : {}),
+  }
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -3364,7 +3802,7 @@ function VideoPreviewModal({ template, onClose }) {
           controls
           autoPlay
           loop
-          inputProps={template.defaultProps}
+          inputProps={mergedProps}
         />
       </motion.div>
     </motion.div>

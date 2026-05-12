@@ -1,4 +1,5 @@
 import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion'
+import { BrandWatermark } from '../components/BrandWatermark'
 
 const NOISE_SVG = encodeURIComponent(
   `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'>
@@ -10,7 +11,7 @@ const NOISE_SVG = encodeURIComponent(
   </svg>`,
 )
 
-export const QuoteCard = ({ quote, author, brandColor }) => {
+export const QuoteCard = ({ quote, author, brandColor, logoUrl, brandName, primaryColor }) => {
   const frame = useCurrentFrame()
 
   const quoteOpacity = interpolate(frame, [20, 60], [0, 1], {
@@ -106,6 +107,12 @@ export const QuoteCard = ({ quote, author, brandColor }) => {
           {author}
         </div>
       </div>
+      <BrandWatermark
+        logoUrl={logoUrl}
+        brandName={brandName || author}
+        primaryColor={primaryColor || brandColor}
+        position="bottom-right"
+      />
     </AbsoluteFill>
   )
 }

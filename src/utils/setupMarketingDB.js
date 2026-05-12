@@ -25,6 +25,13 @@ export async function setupMarketingDB() {
   await db.query(
     `UPDATE brands SET brand_type = 'own' WHERE brand_type IS NULL`,
   )
+  await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS logo_url TEXT`)
+  await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS primary_color TEXT`)
+  await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS secondary_color TEXT`)
+  await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS visual_style TEXT`)
+  await db.query(
+    `ALTER TABLE brands ADD COLUMN IF NOT EXISTS aesthetic_description TEXT`,
+  )
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS content (

@@ -1,6 +1,7 @@
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion'
+import { BrandWatermark } from '../components/BrandWatermark'
 
-export const HookOpener = ({ headline, subtext, brandColor }) => {
+export const HookOpener = ({ headline, subtext, brandColor, logoUrl, brandName, primaryColor }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
 
@@ -80,8 +81,14 @@ export const HookOpener = ({ headline, subtext, brandColor }) => {
           fontWeight: 600,
         }}
       >
-        LIMITLESS
+        {brandName || 'LIMITLESS'}
       </div>
+      <BrandWatermark
+        logoUrl={logoUrl}
+        brandName={brandName}
+        primaryColor={primaryColor || brandColor}
+        position="bottom-right"
+      />
     </AbsoluteFill>
   )
 }

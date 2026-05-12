@@ -1,4 +1,13 @@
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion'
+import {
+  AbsoluteFill,
+  Sequence,
+  interpolate,
+  spring,
+  useCurrentFrame,
+  useVideoConfig,
+} from 'remotion'
+import { BrandIntro } from '../components/BrandIntro'
+import { BrandOutro } from '../components/BrandOutro'
 
 function Bullet({ text, startFrame, frame, fps }) {
   const progress = spring({
@@ -37,7 +46,7 @@ function Bullet({ text, startFrame, frame, fps }) {
   )
 }
 
-export const TradeInsight = ({ title, points, brandColor }) => {
+function InsightBody({ title, points, brandColor, ctaText }) {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
 
@@ -105,24 +114,50 @@ export const TradeInsight = ({ title, points, brandColor }) => {
             letterSpacing: '-0.01em',
           }}
         >
-          Start journaling your trades
+          {ctaText || 'Start journaling your trades'}
         </div>
       </div>
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 120,
-          left: 0,
-          right: 0,
-          textAlign: 'center',
-          color: 'rgba(255,255,255,0.4)',
-          fontSize: 28,
-          letterSpacing: '0.3em',
-          fontWeight: 600,
-        }}
-      >
-        LIMITLESS
-      </div>
+    </AbsoluteFill>
+  )
+}
+
+export const TradeInsight = ({
+  title,
+  points,
+  brandColor,
+  logoUrl,
+  brandName,
+  primaryColor,
+  ctaText,
+}) => {
+  const intro = 60
+  const body = 240
+  const outro = 60
+  return (
+    <AbsoluteFill style={{ background: '#000' }}>
+      <Sequence from={0} durationInFrames={intro}>
+        <BrandIntro
+          logoUrl={logoUrl}
+          brandName={brandName}
+          primaryColor={primaryColor || brandColor}
+        />
+      </Sequence>
+      <Sequence from={intro} durationInFrames={body}>
+        <InsightBody
+          title={title}
+          points={points}
+          brandColor={brandColor}
+          ctaText={ctaText}
+        />
+      </Sequence>
+      <Sequence from={intro + body} durationInFrames={outro}>
+        <BrandOutro
+          logoUrl={logoUrl}
+          brandName={brandName}
+          primaryColor={primaryColor || brandColor}
+          ctaText={ctaText || 'Start journaling your trades'}
+        />
+      </Sequence>
     </AbsoluteFill>
   )
 }

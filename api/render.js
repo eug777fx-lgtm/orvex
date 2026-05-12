@@ -23,12 +23,32 @@ export default async function handler(req, res) {
     const { neon } = await import('@neondatabase/serverless')
     const sql = neon(process.env.VITE_DATABASE_URL)
 
+    let propsWithBrand = props || {}
+    if (brand_id) {
+      const brandRows = await sql.query(
+        'SELECT logo_url, primary_color, secondary_color, name FROM brands WHERE id = $1',
+        [brand_id],
+      )
+      const brand = (brandRows?.rows ?? brandRows)?.[0]
+      if (brand) {
+        propsWithBrand = {
+          ...propsWithBrand,
+          logoUrl: brand.logo_url ?? propsWithBrand.logoUrl ?? null,
+          brandName: brand.name ?? propsWithBrand.brandName ?? '',
+          primaryColor:
+            brand.primary_color ?? propsWithBrand.primaryColor ?? '#ffffff',
+          secondaryColor:
+            brand.secondary_color ?? propsWithBrand.secondaryColor ?? '#000000',
+        }
+      }
+    }
+
     await sql.query(
       `INSERT INTO agent_runs (brand_id, agent_type, input, output, status, tokens_used)
        VALUES ($1, 'video_render', $2, $3, 'queued', 0)`,
       [
         brand_id || null,
-        JSON.stringify({ composition_id, props: props || null }),
+        JSON.stringify({ composition_id, props: propsWithBrand }),
         JSON.stringify({
           status: 'queued',
           message: 'Remotion Lambda not configured yet',
@@ -40,6 +60,7 @@ export default async function handler(req, res) {
       success: true,
       status: 'queued',
       composition_id,
+      props_with_brand: propsWithBrand,
       message:
         'Remotion Lambda not configured yet — add REMOTION_AWS_BUCKET and REMOTION_AWS_ACCESS_KEY to enable cloud rendering',
       preview_available: false,

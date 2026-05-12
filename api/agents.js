@@ -75,7 +75,7 @@ export default async function handler(req, res) {
 
 async function runAgent({ sql, brand_id, agent_type, input }) {
   const brandRows = await sql.query(
-    'SELECT name, voice_prompt, color, platforms FROM brands WHERE id = $1',
+    'SELECT name, voice_prompt, color, platforms, logo_url, primary_color, secondary_color, visual_style, aesthetic_description FROM brands WHERE id = $1',
     [brand_id],
   )
   const brand = (brandRows?.rows ?? brandRows)?.[0]
@@ -114,15 +114,19 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
       .map((m) => m.content)
       .join('\n') || 'No campaign history yet.'
 
+  const visualContext = brand.logo_url
+    ? ` VISUAL IDENTITY: Primary color: ${brand.primary_color}. Secondary color: ${brand.secondary_color}. Visual style: ${brand.visual_style}. Aesthetic: ${brand.aesthetic_description}. Reference these when suggesting visuals, colors, or video concepts.`
+    : ''
+
   let systemPrompt
   if (agent_type === 'strategy') {
-    systemPrompt = `You are a content strategy agent for ${brand.name}. BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
+    systemPrompt = `You are a content strategy agent for ${brand.name}. BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory}${visualContext} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
   } else if (agent_type === 'writer') {
-    systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers} Write high-performing social media content matching this brand voice exactly. Output ONLY valid JSON: { hooks: array of 5 strings, captions: array of 3 strings, scripts: array of 2 full reel scripts, cta: string }`
+    systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers}${visualContext} Write high-performing social media content matching this brand voice exactly. Output ONLY valid JSON: { hooks: array of 5 strings, captions: array of 3 strings, scripts: array of 2 full reel scripts, cta: string }`
   } else if (agent_type === 'analytics') {
-    systemPrompt = `You are an analytics agent for ${brand.name}. BRAND VOICE: ${voiceRules} TOP PERFORMERS: ${topPerformers} Output ONLY valid JSON: { top_performer: string, key_insight: string, recommendation: string, memory_update: string, avoid: string }`
+    systemPrompt = `You are an analytics agent for ${brand.name}. BRAND VOICE: ${voiceRules} TOP PERFORMERS: ${topPerformers}${visualContext} Output ONLY valid JSON: { top_performer: string, key_insight: string, recommendation: string, memory_update: string, avoid: string }`
   } else if (agent_type === 'video_director') {
-    systemPrompt = `You are a video director agent for ${brand.name}. BRAND VOICE: ${voiceRules} AUDIENCE: ${audience} Your job is to generate a cinematic video prompt for this brand. Output ONLY valid JSON: { video_prompt: string (detailed cinematic prompt for Higgsfield), image_prompt: string (detailed image prompt), style: string, mood: string, duration: 5, type: text_to_video }`
+    systemPrompt = `You are a video director agent for ${brand.name}. BRAND VOICE: ${voiceRules} AUDIENCE: ${audience}${visualContext} Your job is to generate a cinematic video prompt for this brand. Output ONLY valid JSON: { video_prompt: string (detailed cinematic prompt for Higgsfield), image_prompt: string (detailed image prompt), style: string, mood: string, duration: 5, type: text_to_video }`
   } else if (agent_type === 'repurpose') {
     const approvedRows = await sql.query(
       `SELECT id, hook, caption, script FROM content
@@ -139,7 +143,7 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
     const originalContent = [approved.hook, approved.caption, approved.script]
       .filter(Boolean)
       .join('\n')
-    systemPrompt = `You are a content repurposing agent for ${brand.name}. BRAND VOICE: ${voiceRules} Take this original content and repurpose it into 4 platform-native formats. Original content: ${originalContent}. Output ONLY valid JSON: { instagram_caption: string, tiktok_script: string, linkedin_post: string, twitter_thread: array of 3 tweet strings }`
+    systemPrompt = `You are a content repurposing agent for ${brand.name}. BRAND VOICE: ${voiceRules}${visualContext} Take this original content and repurpose it into 4 platform-native formats. Original content: ${originalContent}. Output ONLY valid JSON: { instagram_caption: string, tiktok_script: string, linkedin_post: string, twitter_thread: array of 3 tweet strings }`
   } else {
     const err = new Error(`unsupported agent_type: ${agent_type}`)
     err.status = 400
@@ -209,33 +213,53 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
     const hooks = Array.isArray(parsed.hooks) ? parsed.hooks : []
     const captions = Array.isArray(parsed.captions) ? parsed.captions : []
     const scripts = Array.isArray(parsed.scripts) ? parsed.scripts : []
+    const queued = []
 
     for (const hookText of hooks) {
       if (!hookText) continue
-      await sql.query(
+      const r = await sql.query(
         `INSERT INTO content (brand_id, type, hook, status)
-         VALUES ($1, 'hook', $2, 'pending')`,
+         VALUES ($1, 'hook', $2, 'pending') RETURNING id`,
         [brand_id, String(hookText)],
       )
+      const id = (r?.rows ?? r)?.[0]?.id
+      if (id) queued.push({ id, platform: 'instagram' })
       itemsGenerated += 1
     }
     for (const captionText of captions) {
       if (!captionText) continue
-      await sql.query(
+      const r = await sql.query(
         `INSERT INTO content (brand_id, type, caption, status)
-         VALUES ($1, 'caption', $2, 'pending')`,
+         VALUES ($1, 'caption', $2, 'pending') RETURNING id`,
         [brand_id, String(captionText)],
       )
+      const id = (r?.rows ?? r)?.[0]?.id
+      if (id) queued.push({ id, platform: 'linkedin' })
       itemsGenerated += 1
     }
     for (const scriptText of scripts) {
       if (!scriptText) continue
-      await sql.query(
+      const r = await sql.query(
         `INSERT INTO content (brand_id, type, script, status)
-         VALUES ($1, 'script', $2, 'pending')`,
+         VALUES ($1, 'script', $2, 'pending') RETURNING id`,
         [brand_id, String(scriptText)],
       )
+      const id = (r?.rows ?? r)?.[0]?.id
+      if (id) queued.push({ id, platform: 'tiktok' })
       itemsGenerated += 1
+    }
+
+    // Stagger over the next 7 days starting tomorrow 09:00 UTC, one per day.
+    // If more than 7 items, wrap to day 8+ at the same time.
+    for (let i = 0; i < queued.length; i++) {
+      const slot = new Date()
+      slot.setUTCDate(slot.getUTCDate() + 1 + i)
+      slot.setUTCHours(9, 0, 0, 0)
+      await sql.query(
+        `INSERT INTO schedules (content_id, brand_id, platform, scheduled_at, published)
+         VALUES ($1, $2, $3, $4, false)`,
+        [queued[i].id, brand_id, queued[i].platform, slot.toISOString()],
+      )
     }
   }
 

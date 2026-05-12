@@ -69,8 +69,25 @@ async function pollStatus(generationId) {
   throw new Error('higgsfield_polling_timeout')
 }
 
+async function buildBrandedPrompt(sql, brand_id, type, prompt) {
+  if (!brand_id) return prompt
+  const rows = await sql.query(
+    'SELECT logo_url, primary_color, secondary_color, visual_style, aesthetic_description FROM brands WHERE id = $1',
+    [brand_id],
+  )
+  const brand = (rows?.rows ?? rows)?.[0]
+  if (!brand || !brand.logo_url) return prompt
+  let suffix = ` Visual style: ${brand.visual_style || 'modern'}. Color palette: primary ${brand.primary_color || '#fff'}, accent ${brand.secondary_color || '#000'}. Aesthetic: ${brand.aesthetic_description || ''}. Maintain consistent brand identity.`
+  if (type === 'text_to_image') {
+    suffix +=
+      ' Brand colors should appear subtly in lighting, shadows, or background gradients. Do not add text or logos to the image.'
+  }
+  return `${prompt}${suffix}`
+}
+
 export async function generateVideo({ brand_id, type, prompt, image_url, sql }) {
-  const startResult = await startGeneration(type, prompt, image_url)
+  const brandedPrompt = await buildBrandedPrompt(sql, brand_id, type, prompt)
+  const startResult = await startGeneration(type, brandedPrompt, image_url)
   const generationId = startResult.generation_id || startResult.id
   if (!generationId) {
     throw new Error('higgsfield returned no generation_id')
