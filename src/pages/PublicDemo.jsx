@@ -3694,7 +3694,7 @@ export default function PublicDemo() {
         }}
       >
         Built with <span style={{ color: '#ff6b8b' }}>♥</span> by{' '}
-        <span style={{ color: '#ffffff', fontWeight: 600 }}>COS Studios</span> · Want this for your business?{' '}
+        <span style={{ color: '#ffffff', fontWeight: 600 }}>Lithos Labs</span> · Want this for your business?{' '}
         <a
           href="https://wa.me/2971234567"
           target="_blank"

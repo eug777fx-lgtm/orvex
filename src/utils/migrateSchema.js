@@ -147,7 +147,7 @@ export function migrateSchema() {
             ],
           },
           {
-            name: 'COS Studios CRM',
+            name: 'Lithos Labs CRM',
             type: 'personal',
             stage: 'in_progress',
             progress: 80,
@@ -187,7 +187,7 @@ export function migrateSchema() {
             ],
           },
           {
-            name: 'COS Studios Landing Page',
+            name: 'Lithos Labs Landing Page',
             type: 'personal',
             stage: 'in_progress',
             progress: 60,
@@ -222,7 +222,7 @@ export function migrateSchema() {
             progress: 0,
             priority: 'high',
             description:
-              'Land first paying client for COS Studios. Need to start calling.',
+              'Land first paying client for Lithos Labs. Need to start calling.',
             checklist: [
               { text: 'Fix Google API key', done: false },
               { text: 'Run Discover', done: false },

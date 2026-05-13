@@ -635,7 +635,7 @@ export default function MarketingEngine() {
           padding: 20,
         }}
       >
-        Powered by Claude AI
+        Lithos Labs · Powered by Claude AI
       </div>
 
       <Toast toast={toast} drawerOpen={false} />

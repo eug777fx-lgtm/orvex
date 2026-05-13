@@ -114,8 +114,15 @@ export async function setupMarketingDB() {
      ON CONFLICT (name) DO NOTHING`,
   )
 
+  await db.query(
+    `INSERT INTO brands (name, color, platforms, brand_type)
+     VALUES ('Lithos Labs', '#C2B59B', '["instagram","facebook"]', 'own')
+     ON CONFLICT (name) DO NOTHING`,
+  )
+
   await seedBrandMemory('LIMITLESS', LIMITLESS_MEMORY)
   await seedBrandMemory('AWATEC', AWATEC_MEMORY)
+  await seedBrandMemory('Lithos Labs', LITHOS_MEMORY)
 
   // One-time forced refresh of LIMITLESS memory for existing installs.
   // Gated on app_meta key so it only runs once per database, not every page load.
@@ -266,5 +273,28 @@ const AWATEC_MEMORY = [
     memory_type: 'campaign_history',
     content:
       'Business: AWATEC Leak Detection — Aruba. Founded: operating since at least 2022. Location: Primavera 1L #5, Oranjestad, Aruba. Service area: all of Aruba. Services: Leak Inspection (from Afl.175), Residential Leak Detection (Afl.695-825 up to 2 hours), Additional hours Afl.150-325/hr, Pipe Tracing from Afl.400, Commercial custom quote. Contact: WhatsApp Business, website appointment form, phone, social media. Website has appointment request page and service page. Platforms: Facebook primary, Instagram, WhatsApp Business, Google Business Profile. Unique positioning: specialized diagnostic company NOT a general plumber. Uses acoustic detection, helium tracer gas, pipe tracing equipment, pressure testing, water meter diagnostics. Differentiator: non-destructive testing — find the leak without unnecessary demolition. Content languages: English and Papiamento for local audience, Spanish secondary. Strong campaign concepts: High WEB bill campaign, Water meter spinning campaign, Find leak before breaking floor campaign, Professional detection for hotels and apartments campaign.',
+  },
+]
+
+const LITHOS_MEMORY = [
+  {
+    memory_type: 'voice_rules',
+    content:
+      'Brand: Lithos Labs — CRM and marketing systems agency. Tone: clear, professional, strong, vision-focused, solution-oriented. No overhype, no corporate fluff, no loud guru energy. Calm confidence. Minimal luxury modern tech feel. Tagline: Building the foundation behind scalable brands. Example phrases: Build your business on solid systems. Systems that scale. Strong foundations. Smarter growth. Never use: hype language, fake urgency, buzzword overload. Always: speak to business owners, emphasize structure and systems, reference automation and CRM.',
+  },
+  {
+    memory_type: 'audience',
+    content:
+      'Primary audience: coaches, service businesses, real estate brands, startups, personal brands, local businesses, e-commerce brands. They are business owners struggling with chaos, disorganization, lack of systems. They want: automation, lead generation, authority, better client experience, scalable systems. Pain points: operating in chaos, no CRM, manual processes, inconsistent marketing, poor client onboarding. They respond to: system breakdowns, before/after transformations, automation demos, premium minimal content.',
+  },
+  {
+    memory_type: 'top_performers',
+    content:
+      'Best content angles for Lithos Labs: 1. System breakdowns — how to build a CRM pipeline 2. 5 automations every business needs 3. Why most businesses stay disorganized 4. Client transformation before/after 5. Premium branding strategy content. Best formats: carousel tips, workflow clips, minimal motivational content, brand strategy breakdowns. Hook formulas: Most businesses fail because they have no [system/structure/foundation]. Here is how to fix it. The difference between a 6-figure and 7-figure business is this one system. CTA: Book a strategy call — link in bio.',
+  },
+  {
+    memory_type: 'campaign_history',
+    content:
+      'Agency: Lithos Labs — CRM and marketing systems agency. Services: CRM Setup (GoHighLevel, HubSpot), Marketing Systems (funnels, ads, email, content), Brand Identity (logos, websites, strategy), Automation (AI workflows, appointment booking, follow-up systems). Offer structure: Starter CRM Setup Package, Core Business Infrastructure System, Premium Full Scale Growth Partner monthly retainer. Visual identity: Obsidian Black #0B0B0D, Stone White #F5F5F2, Sandstone Beige #C2B59B accent, minimal luxury modern tech aesthetic inspired by Apple Linear Stripe Framer. Typography: Satoshi or General Sans bold headlines, Inter body. Content pillars: Business Systems, Marketing Psychology, Client Transformations, Premium Branding, Founder Vision. Platforms: Instagram and Facebook.',
   },
 ]

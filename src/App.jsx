@@ -53,10 +53,19 @@ const navItems = [
 const mobileBottomNavItems = navItems.slice(0, 6)
 
 const logoStyle = {
-  color: '#ffffff',
-  fontWeight: 700,
-  fontSize: 16,
+  display: 'inline-flex',
+  alignItems: 'baseline',
+  gap: 5,
+  fontSize: 15,
   letterSpacing: '-0.3px',
+}
+const logoPrimaryStyle = {
+  color: '#ffffff',
+  fontWeight: 600,
+}
+const logoSecondaryStyle = {
+  color: 'rgba(255,255,255,0.4)',
+  fontWeight: 300,
 }
 
 const dotStyle = {
@@ -274,7 +283,10 @@ function Shell() {
             minWidth: isMobile ? 'auto' : 160,
           }}
         >
-          <span style={logoStyle}>COS</span>
+          <span style={logoStyle}>
+            <span style={logoPrimaryStyle}>Lithos</span>
+            <span style={logoSecondaryStyle}>Labs</span>
+          </span>
           <span style={dotStyle} />
         </div>
         {!isMobile && <NavTabs />}

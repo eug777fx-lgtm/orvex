@@ -255,9 +255,9 @@ function CopyLinkButton({ url }) {
 function buildWhatsAppMessage(demo, url, lang) {
   const name = demo.client_name || 'there'
   if (lang === 'pap') {
-    return `Halo ${name}! 👋 Mi a prepara un demo di con bo negoshi por mira online. Echa un vistazo: ${url} — Laga mi sa kico bo ta pensa! Bo por pidi cambionan. — Eugene, COS Studios`
+    return `Halo ${name}! 👋 Mi a prepara un demo di con bo negoshi por mira online. Echa un vistazo: ${url} — Laga mi sa kico bo ta pensa! Bo por pidi cambionan. — Eugene, Lithos Labs`
   }
-  return `Hi ${name}! 👋 I put together a quick demo of what your business could look like online. Take a look: ${url} — Let me know what you think! Feel free to request any changes. — Eugene, COS Studios`
+  return `Hi ${name}! 👋 I put together a quick demo of what your business could look like online. Take a look: ${url} — Let me know what you think! Feel free to request any changes. — Eugene, Lithos Labs`
 }
 
 function SendWhatsAppButton({ demo, url, lang, setLang }) {
