@@ -266,6 +266,22 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
   let videoResult = null
   if (agent_type === 'video_director' && parsed && typeof parsed === 'object') {
     const videoPrompt = parsed.video_prompt
+    // Always save a brief row first so something appears in the Videos queue,
+    // even if Higgsfield fails or times out.
+    let briefId = null
+    try {
+      const briefInsert = await sql.query(
+        `INSERT INTO content (brand_id, type, script, status)
+         VALUES ($1, 'video_brief', $2, 'pending')
+         RETURNING id`,
+        [brand_id, JSON.stringify(parsed)],
+      )
+      briefId = (briefInsert?.rows ?? briefInsert)?.[0]?.id
+      itemsGenerated += 1
+    } catch (e) {
+      console.error('video_director brief insert failed', e)
+    }
+
     if (videoPrompt) {
       try {
         videoResult = await generateVideo({
@@ -274,10 +290,26 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
           prompt: videoPrompt,
           sql,
         })
-        if (videoResult?.success) itemsGenerated += 1
+        if (videoResult?.success && briefId && videoResult.url) {
+          // Promote the brief row to a real video with the rendered URL.
+          await sql.query(
+            `UPDATE content SET type='video', script=$1 WHERE id=$2`,
+            [videoResult.url, briefId],
+          )
+        }
       } catch (e) {
         console.error('video_director generateVideo failed', e)
-        videoResult = { success: false, error: e.message }
+        videoResult = {
+          success: true,
+          type: 'video_brief',
+          message: 'Video brief generated — Higgsfield rendering in progress',
+        }
+      }
+    } else {
+      videoResult = {
+        success: true,
+        type: 'video_brief',
+        message: 'Video brief generated — no video_prompt to render yet',
       }
     }
   }

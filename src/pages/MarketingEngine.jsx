@@ -3977,6 +3977,7 @@ const CONTENT_TYPE_GROUP = {
   voiceover: 'scripts',
   video: 'videos',
   video_render: 'videos',
+  video_brief: 'videos',
   image: 'static',
   static_ad: 'static',
 }
@@ -4832,8 +4833,42 @@ function VideosQueue({ items, brand, onApprove, onReject, onPreview }) {
 
 function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
   const url = it.script && /^https?:\/\//.test(it.script) ? it.script : null
-  const isRendering = it.type === 'video_render' || (!url && it.type === 'video')
+  const isBrief = it.type === 'video_brief'
+  const isRendering =
+    !isBrief && (it.type === 'video_render' || (!url && it.type === 'video'))
   const brandColor = brand?.primary_color || brand?.color || '#ffffff'
+  const [generating, setGenerating] = useState(false)
+
+  // Parse the brief JSON to extract video_prompt for display + manual generate.
+  let parsedBrief = null
+  if (isBrief && it.script) {
+    try {
+      parsedBrief = JSON.parse(it.script)
+    } catch {
+      parsedBrief = null
+    }
+  }
+  const briefPrompt = parsedBrief?.video_prompt || ''
+
+  async function generateFromBrief() {
+    if (!brand || generating || !briefPrompt) return
+    setGenerating(true)
+    try {
+      await fetch('/api/video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand_id: brand.id,
+          type: 'text_to_video',
+          prompt: briefPrompt,
+        }),
+      })
+    } catch (e) {
+      console.error('manual video generate failed', e)
+    } finally {
+      setGenerating(false)
+    }
+  }
   return (
     <motion.div
       layout
@@ -4871,6 +4906,20 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
             controls
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
+        ) : isBrief && briefPrompt ? (
+          <div
+            style={{
+              padding: 14,
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: 11,
+              lineHeight: 1.4,
+              overflow: 'auto',
+              maxHeight: '100%',
+              fontFamily: MONO,
+            }}
+          >
+            {briefPrompt}
+          </div>
         ) : (
           <div
             style={{
@@ -4895,19 +4944,21 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
             fontSize: 9.5,
             padding: '2px 8px',
             borderRadius: 999,
-            background: isRendering
+            background: isBrief
+              ? 'rgba(251,191,36,0.15)'
+              : isRendering
               ? 'rgba(251,191,36,0.15)'
               : url
               ? 'rgba(74,222,128,0.15)'
               : 'rgba(248,113,113,0.15)',
             border: `0.5px solid ${
-              isRendering
+              isBrief || isRendering
                 ? 'rgba(251,191,36,0.4)'
                 : url
                 ? 'rgba(74,222,128,0.4)'
                 : 'rgba(248,113,113,0.4)'
             }`,
-            color: isRendering ? '#fbbf24' : url ? '#4ade80' : '#f87171',
+            color: isBrief || isRendering ? '#fbbf24' : url ? '#4ade80' : '#f87171',
             fontWeight: 600,
             letterSpacing: '0.04em',
             display: 'inline-flex',
@@ -4915,7 +4966,7 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
             gap: 5,
           }}
         >
-          {isRendering ? (
+          {(isBrief || isRendering) && (
             <motion.span
               animate={{ opacity: [1, 0.4, 1] }}
               transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
@@ -4926,8 +4977,14 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
                 background: '#fbbf24',
               }}
             />
-          ) : null}
-          {isRendering ? 'Rendering' : url ? 'Ready' : 'Failed'}
+          )}
+          {isBrief
+            ? 'Brief ready — generating…'
+            : isRendering
+            ? 'Rendering'
+            : url
+            ? 'Ready'
+            : 'Failed'}
         </span>
       </div>
       <div
@@ -4964,24 +5021,46 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
-        <button
-          type="button"
-          onClick={() => onPreview(it)}
-          disabled={!url}
-          style={{
-            flex: 1,
-            fontSize: 11,
-            padding: '5px 10px',
-            borderRadius: 7,
-            background: 'rgba(255,255,255,0.04)',
-            border: '0.5px solid rgba(255,255,255,0.1)',
-            color: url ? 'rgba(255,255,255,0.75)' : TEXT_FAINT,
-            fontWeight: 500,
-            cursor: url ? 'pointer' : 'not-allowed',
-          }}
-        >
-          Preview
-        </button>
+        {isBrief && briefPrompt ? (
+          <button
+            type="button"
+            onClick={generateFromBrief}
+            disabled={generating}
+            style={{
+              flex: 1,
+              fontSize: 11,
+              padding: '5px 10px',
+              borderRadius: 7,
+              background: 'rgba(251,191,36,0.12)',
+              border: '0.5px solid rgba(251,191,36,0.4)',
+              color: '#fbbf24',
+              fontWeight: 600,
+              cursor: generating ? 'wait' : 'pointer',
+              opacity: generating ? 0.6 : 1,
+            }}
+          >
+            {generating ? 'Queueing…' : 'Generate'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onPreview(it)}
+            disabled={!url}
+            style={{
+              flex: 1,
+              fontSize: 11,
+              padding: '5px 10px',
+              borderRadius: 7,
+              background: 'rgba(255,255,255,0.04)',
+              border: '0.5px solid rgba(255,255,255,0.1)',
+              color: url ? 'rgba(255,255,255,0.75)' : TEXT_FAINT,
+              fontWeight: 500,
+              cursor: url ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Preview
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onApprove(it.id)}
