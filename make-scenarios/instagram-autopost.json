@@ -1,0 +1,13 @@
+{
+  "name": "Auto Post to Instagram",
+  "description": "Checks every hour for approved content ready to post and sends to Instagram",
+  "trigger": "Every 1 hour",
+  "steps": [
+    "HTTP GET orvex-three.vercel.app/api/publish?brand_id=LIMITLESS_UUID",
+    "Check if has_content is true",
+    "If true: POST to Instagram Graph API with caption from content",
+    "HTTP POST orvex-three.vercel.app/api/publish to mark as published"
+  ],
+  "limitless_brand_id": "c7de2d2e-c137-4aa4-91f0-0fbad840fa12",
+  "awatec_brand_id": "bddcc405-af41-40dd-9cf7-4666e80810fb"
+}
