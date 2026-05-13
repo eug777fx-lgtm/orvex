@@ -210,8 +210,48 @@ function LoadingPulse() {
   )
 }
 
+function extractText(content) {
+  if (!content) return ''
+  if (typeof content === 'string') {
+    try {
+      const parsed = JSON.parse(content)
+      if (typeof parsed === 'object' && parsed !== null) {
+        return (
+          parsed.script ||
+          parsed.text ||
+          parsed.content ||
+          parsed.hook ||
+          parsed.caption ||
+          parsed.video_prompt ||
+          JSON.stringify(parsed)
+        )
+      }
+      return String(parsed)
+    } catch {
+      return content
+    }
+  }
+  if (typeof content === 'object') {
+    return (
+      content.script ||
+      content.text ||
+      content.content ||
+      content.hook ||
+      content.caption ||
+      content.video_prompt ||
+      JSON.stringify(content)
+    )
+  }
+  return String(content)
+}
+
 function reviewItemText(item) {
-  return item.hook || item.caption || item.script || '(empty)'
+  return (
+    extractText(item.hook) ||
+    extractText(item.caption) ||
+    extractText(item.script) ||
+    '(empty)'
+  )
 }
 
 function reviewItemType(item) {
@@ -352,7 +392,7 @@ export default function MarketingEngine() {
           [selectedBrand.id],
         ),
         db.query(
-          "SELECT COUNT(*) AS count FROM content WHERE brand_id=$1 AND status='published'",
+          "SELECT COUNT(*) AS count FROM content WHERE brand_id=$1 AND status IN ('published','approved')",
           [selectedBrand.id],
         ),
         db.query(
@@ -2647,8 +2687,14 @@ function ScheduleStrip({ brand, version }) {
             const isPublished = !!s.published
             const isPending = !isPublished && t < now - 30 * 60 * 1000
             const preview =
-              (s.hook || s.caption || s.script || '').slice(0, 35) +
-              ((s.hook || s.caption || s.script || '').length > 35 ? '…' : '')
+              (() => {
+                const txt =
+                  extractText(s.hook) ||
+                  extractText(s.caption) ||
+                  extractText(s.script) ||
+                  ''
+                return txt.slice(0, 35) + (txt.length > 35 ? '…' : '')
+              })()
             const platform = s.platform || 'post'
             const pColor = platformColor(platform)
             return (
@@ -4389,7 +4435,12 @@ function ContentHub({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {scheduled.map((s) => {
-                const preview = (s.hook || s.caption || s.script || '').slice(0, 60)
+                const preview = (
+                  extractText(s.hook) ||
+                  extractText(s.caption) ||
+                  extractText(s.script) ||
+                  ''
+                ).slice(0, 60)
                 const d = new Date(s.scheduled_at)
                 const when = `${d.toLocaleDateString([], {
                   weekday: 'short',
@@ -5881,7 +5932,9 @@ function ContentCalendar({ brand, version }) {
             {monthLabel.split(' ')[0]} {openDay}
           </div>
           {byDate[openDay].map((it) => {
-            const preview = (it.hook || it.caption || '').slice(0, 36)
+            const preview = (
+              extractText(it.hook) || extractText(it.caption) || ''
+            ).slice(0, 36)
             const color = platformColor(it.platform)
             return (
               <div
@@ -6514,7 +6567,7 @@ function StatsPanel({ wide, brand, showToast }) {
         const [pubRows, avgRows, weekRows, platformRows, dailyRows, topRows, typeRows] =
           await Promise.all([
             db.query(
-              "SELECT COUNT(*)::int AS c FROM content WHERE brand_id=$1 AND status='published'",
+              "SELECT COUNT(*)::int AS c FROM content WHERE brand_id=$1 AND status IN ('published','approved')",
               [brand.id],
             ),
             db.query(
