@@ -1,24 +1,26 @@
-import {
-  AbsoluteFill,
-  Sequence,
-  interpolate,
-  spring,
-  useCurrentFrame,
-  useVideoConfig,
-} from 'remotion'
-import { BrandIntro } from '../components/BrandIntro'
-import { BrandOutro } from '../components/BrandOutro'
+import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion'
+import { BrandWatermark } from '../components/BrandWatermark'
 
-function AdBody({ problem, solution, serviceName, price, primaryColor, secondaryColor }) {
+export const ServiceAd = ({
+  problem,
+  solution,
+  serviceName,
+  price,
+  logoUrl,
+  brandName,
+  primaryColor,
+  secondaryColor,
+  ctaText,
+}) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
 
-  const problemOpacity = interpolate(frame, [0, 30], [0, 1], {
+  const problemOpacity = interpolate(frame, [10, 30], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   })
   const solutionSpring = spring({
-    frame: frame - 60,
+    frame: frame - 50,
     fps,
     config: { damping: 22, stiffness: 80 },
   })
@@ -26,12 +28,17 @@ function AdBody({ problem, solution, serviceName, price, primaryColor, secondary
   const solutionOpacity = interpolate(solutionSpring, [0, 1], [0, 1])
 
   const offerSpring = spring({
-    frame: frame - 120,
+    frame: frame - 90,
     fps,
     config: { damping: 22, stiffness: 80 },
   })
   const offerScale = interpolate(offerSpring, [0, 1], [0.85, 1])
   const offerOpacity = interpolate(offerSpring, [0, 1], [0, 1])
+
+  const ctaOpacity = interpolate(frame, [140, 160], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  })
 
   return (
     <AbsoluteFill
@@ -103,48 +110,23 @@ function AdBody({ problem, solution, serviceName, price, primaryColor, secondary
           {price}
         </div>
       </div>
-    </AbsoluteFill>
-  )
-}
-
-export const ServiceAd = ({
-  logoUrl,
-  brandName,
-  primaryColor,
-  secondaryColor,
-  problem,
-  solution,
-  serviceName,
-  price,
-  ctaText,
-}) => {
-  return (
-    <AbsoluteFill style={{ background: '#000' }}>
-      <Sequence from={0} durationInFrames={60}>
-        <BrandIntro
-          logoUrl={logoUrl}
-          brandName={brandName}
-          primaryColor={primaryColor}
-        />
-      </Sequence>
-      <Sequence from={60} durationInFrames={180}>
-        <AdBody
-          problem={problem}
-          solution={solution}
-          serviceName={serviceName}
-          price={price}
-          primaryColor={primaryColor}
-          secondaryColor={secondaryColor}
-        />
-      </Sequence>
-      <Sequence from={240} durationInFrames={60}>
-        <BrandOutro
-          logoUrl={logoUrl}
-          brandName={brandName}
-          primaryColor={primaryColor}
-          ctaText={ctaText}
-        />
-      </Sequence>
+      <div
+        style={{
+          opacity: ctaOpacity,
+          fontSize: 48,
+          fontWeight: 600,
+          color: primaryColor || '#ffffff',
+          letterSpacing: '-0.01em',
+        }}
+      >
+        {ctaText || 'Call us today'}
+      </div>
+      <BrandWatermark
+        logoUrl={logoUrl}
+        brandName={brandName}
+        primaryColor={primaryColor}
+        position="bottom-right"
+      />
     </AbsoluteFill>
   )
 }

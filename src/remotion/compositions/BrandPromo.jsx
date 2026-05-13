@@ -1,43 +1,42 @@
-import {
-  AbsoluteFill,
-  Sequence,
-  interpolate,
-  spring,
-  useCurrentFrame,
-  useVideoConfig,
-} from 'remotion'
-import { BrandIntro } from '../components/BrandIntro'
-import { BrandOutro } from '../components/BrandOutro'
+import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion'
+import { BrandWatermark } from '../components/BrandWatermark'
 
-function PromoBody({ headline, features, primaryColor, secondaryColor }) {
+export const BrandPromo = ({
+  headline,
+  features,
+  logoUrl,
+  brandName,
+  primaryColor,
+  secondaryColor,
+  ctaText,
+}) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
 
   const headlineSpring = spring({
-    frame: frame - 0,
+    frame: frame - 10,
     fps,
     config: { damping: 22, stiffness: 80 },
   })
   const headlineY = interpolate(headlineSpring, [0, 1], [40, 0])
   const headlineOpacity = interpolate(headlineSpring, [0, 1], [0, 1])
 
-  const showcaseOpacity = interpolate(frame, [180, 220], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
+  const featureStarts = [40, 70, 100]
+  const ctaSpring = spring({
+    frame: frame - 140,
+    fps,
+    config: { damping: 22, stiffness: 90 },
   })
-  const fadeOut = interpolate(frame, [300, 330], [1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  })
+  const ctaY = interpolate(ctaSpring, [0, 1], [30, 0])
+  const ctaOpacity = interpolate(ctaSpring, [0, 1], [0, 1])
 
   return (
     <AbsoluteFill
       style={{
         background: '#000',
         padding: '160px 80px',
-        color: '#fff',
+        color: '#ffffff',
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        opacity: fadeOut,
       }}
     >
       <h1
@@ -56,14 +55,14 @@ function PromoBody({ headline, features, primaryColor, secondaryColor }) {
       </h1>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
         {(features || []).slice(0, 3).map((f, i) => {
-          const start = 60 + i * 40
-          const featureSpring = spring({
-            frame: frame - start,
-            fps,
-            config: { damping: 22, stiffness: 90 },
+          const op = interpolate(frame, [featureStarts[i], featureStarts[i] + 20], [0, 1], {
+            extrapolateLeft: 'clamp',
+            extrapolateRight: 'clamp',
           })
-          const x = interpolate(featureSpring, [0, 1], [40, 0])
-          const op = interpolate(featureSpring, [0, 1], [0, 1])
+          const x = interpolate(frame, [featureStarts[i], featureStarts[i] + 20], [40, 0], {
+            extrapolateLeft: 'clamp',
+            extrapolateRight: 'clamp',
+          })
           return (
             <div
               key={i}
@@ -94,55 +93,25 @@ function PromoBody({ headline, features, primaryColor, secondaryColor }) {
       <div
         style={{
           position: 'absolute',
-          bottom: 200,
+          bottom: 220,
           left: 80,
           right: 80,
-          opacity: showcaseOpacity,
-          textAlign: 'center',
-          fontSize: 36,
-          color: secondaryColor || 'rgba(255,255,255,0.7)',
+          transform: `translateY(${ctaY}px)`,
+          opacity: ctaOpacity,
+          fontSize: 52,
+          fontWeight: 600,
+          color: secondaryColor || '#ffffff',
+          letterSpacing: '-0.01em',
         }}
       >
-        Built for what matters
+        {ctaText || 'Start free today'}
       </div>
-    </AbsoluteFill>
-  )
-}
-
-export const BrandPromo = ({
-  logoUrl,
-  brandName,
-  primaryColor,
-  secondaryColor,
-  headline,
-  features,
-  ctaText,
-}) => {
-  return (
-    <AbsoluteFill style={{ background: '#000' }}>
-      <Sequence from={0} durationInFrames={60}>
-        <BrandIntro
-          logoUrl={logoUrl}
-          brandName={brandName}
-          primaryColor={primaryColor}
-        />
-      </Sequence>
-      <Sequence from={60} durationInFrames={330}>
-        <PromoBody
-          headline={headline}
-          features={features}
-          primaryColor={primaryColor}
-          secondaryColor={secondaryColor}
-        />
-      </Sequence>
-      <Sequence from={390} durationInFrames={60}>
-        <BrandOutro
-          logoUrl={logoUrl}
-          brandName={brandName}
-          primaryColor={primaryColor}
-          ctaText={ctaText}
-        />
-      </Sequence>
+      <BrandWatermark
+        logoUrl={logoUrl}
+        brandName={brandName}
+        primaryColor={primaryColor}
+        position="bottom-right"
+      />
     </AbsoluteFill>
   )
 }

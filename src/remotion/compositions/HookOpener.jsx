@@ -1,7 +1,7 @@
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion'
 import { BrandWatermark } from '../components/BrandWatermark'
 
-export const HookOpener = ({ headline, subtext, brandColor, logoUrl, brandName, primaryColor }) => {
+export const HookOpener = ({ headline, subtext, logoUrl, brandName, primaryColor }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
 
@@ -10,7 +10,7 @@ export const HookOpener = ({ headline, subtext, brandColor, logoUrl, brandName, 
     fps,
     config: { damping: 22, stiffness: 80, mass: 1 },
   })
-  const headlineY = interpolate(headlineProgress, [0, 1], [80, 0])
+  const headlineY = interpolate(headlineProgress, [0, 1], [60, 0])
   const headlineOpacity = interpolate(headlineProgress, [0, 1], [0, 1])
 
   const subOpacity = interpolate(frame, [40, 60], [0, 1], {
@@ -18,7 +18,12 @@ export const HookOpener = ({ headline, subtext, brandColor, logoUrl, brandName, 
     extrapolateRight: 'clamp',
   })
 
-  const logoOpacity = interpolate(frame, [80, 110], [0, 1], {
+  const watermarkOpacity = interpolate(frame, [60, 80], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  })
+
+  const accentWidth = interpolate(frame, [30, 90], [0, 100], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   })
@@ -30,16 +35,11 @@ export const HookOpener = ({ headline, subtext, brandColor, logoUrl, brandName, 
         justifyContent: 'center',
         alignItems: 'center',
         padding: '0 80px',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        color: '#ffffff',
       }}
     >
-      <div
-        style={{
-          textAlign: 'center',
-          color: brandColor || '#ffffff',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          maxWidth: 920,
-        }}
-      >
+      <div style={{ textAlign: 'center', maxWidth: 920 }}>
         <h1
           style={{
             transform: `translateY(${headlineY}px)`,
@@ -69,26 +69,22 @@ export const HookOpener = ({ headline, subtext, brandColor, logoUrl, brandName, 
       <div
         style={{
           position: 'absolute',
-          bottom: 120,
-          left: 0,
-          right: 0,
-          textAlign: 'center',
-          opacity: logoOpacity,
-          color: 'rgba(255,255,255,0.6)',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          fontSize: 28,
-          letterSpacing: '0.3em',
-          fontWeight: 600,
+          bottom: 200,
+          height: 2,
+          width: `${accentWidth}%`,
+          maxWidth: 480,
+          background: primaryColor || '#ffffff',
+          borderRadius: 999,
         }}
-      >
-        {brandName || 'LIMITLESS'}
-      </div>
-      <BrandWatermark
-        logoUrl={logoUrl}
-        brandName={brandName}
-        primaryColor={primaryColor || brandColor}
-        position="bottom-right"
       />
+      <div style={{ opacity: watermarkOpacity }}>
+        <BrandWatermark
+          logoUrl={logoUrl}
+          brandName={brandName}
+          primaryColor={primaryColor}
+          position="bottom-right"
+        />
+      </div>
     </AbsoluteFill>
   )
 }
