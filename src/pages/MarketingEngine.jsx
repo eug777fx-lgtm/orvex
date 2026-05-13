@@ -879,8 +879,8 @@ function SectionTabs({ active, onChange, notifyContent }) {
               gap: 6,
               padding: '8px 20px',
               borderRadius: 10,
-              background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-              color: isActive ? '#fff' : 'rgba(255,255,255,0.4)',
+              background: isActive ? 'rgba(194,181,155,0.12)' : 'transparent',
+              color: isActive ? '#F5F5F2' : 'rgba(242,237,228,0.45)',
               fontSize: 13,
               fontWeight: 500,
               border: 'none',
@@ -1019,12 +1019,12 @@ function BrandChip({ brand, active, isClient, onSelect, onUploadLogo, uploading 
         gap: 6,
         padding: '5px 8px 5px 5px',
         borderRadius: 999,
-        background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
+        background: active ? 'rgba(194,181,155,0.08)' : 'transparent',
         border: active
-          ? '0.5px solid rgba(255,255,255,0.35)'
+          ? '0.5px solid rgba(194,181,155,0.4)'
           : isClient
-          ? '0.5px dashed rgba(255,255,255,0.18)'
-          : '0.5px solid rgba(255,255,255,0.08)',
+          ? '0.5px dashed rgba(194,181,155,0.18)'
+          : '0.5px solid rgba(194,181,155,0.1)',
         cursor: 'pointer',
         whiteSpace: 'nowrap',
         flexShrink: 0,
@@ -5218,10 +5218,10 @@ function QueueTabs({ counts, active, onChange }) {
               padding: '5px 14px',
               borderRadius: 999,
               background: isActive
-                ? 'rgba(255,255,255,0.1)'
-                : 'rgba(255,255,255,0.04)',
-              border: '0.5px solid rgba(255,255,255,0.08)',
-              color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
+                ? 'rgba(194,181,155,0.1)'
+                : 'rgba(194,181,155,0.04)',
+              border: '0.5px solid rgba(194,181,155,0.1)',
+              color: isActive ? '#F5F5F2' : 'rgba(242,237,228,0.55)',
               cursor: 'pointer',
               fontWeight: 500,
               letterSpacing: '0.01em',

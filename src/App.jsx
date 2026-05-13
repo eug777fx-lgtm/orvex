@@ -64,7 +64,7 @@ const logoPrimaryStyle = {
   fontWeight: 600,
 }
 const logoSecondaryStyle = {
-  color: 'rgba(255,255,255,0.4)',
+  color: 'rgba(194,181,155,0.6)',
   fontWeight: 300,
 }
 
@@ -72,8 +72,8 @@ const dotStyle = {
   width: 6,
   height: 6,
   borderRadius: '50%',
-  background: '#ffffff',
-  boxShadow: '0 0 10px rgba(255,255,255,0.4)',
+  background: '#C2B59B',
+  boxShadow: '0 0 10px rgba(194,181,155,0.5)',
   animation: 'glowPulse 2s ease-in-out infinite',
 }
 
@@ -114,8 +114,8 @@ function NavTabs() {
         display: 'flex',
         alignItems: 'center',
         gap: 2,
-        background: 'rgba(255,255,255,0.03)',
-        border: '0.5px solid rgba(255,255,255,0.06)',
+        background: 'rgba(194,181,155,0.04)',
+        border: '0.5px solid rgba(194,181,155,0.1)',
         padding: 3,
         borderRadius: 999,
       }}
@@ -136,7 +136,7 @@ function NavTabs() {
               fontSize: 12.5,
               fontWeight: 500,
               letterSpacing: '0.01em',
-              color: active ? '#000000' : 'rgba(255,255,255,0.5)',
+              color: active ? '#0B0B0D' : 'rgba(242,237,228,0.55)',
               transition: 'color 0.15s ease',
             }}
           >
@@ -147,7 +147,7 @@ function NavTabs() {
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: '#ffffff',
+                  background: '#C2B59B',
                   borderRadius: 999,
                   zIndex: 0,
                 }}
