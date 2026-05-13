@@ -548,6 +548,7 @@ export default function MarketingEngine() {
           loading={loading}
           activeSection={activeSection}
           onSectionChange={setActiveSection}
+          notifyContent={reviewItems.length > 0 && activeSection !== 'content'}
         />
         <BrandSelector
           brands={brands}
@@ -621,6 +622,17 @@ export default function MarketingEngine() {
             </motion.div>
           )}
         </AnimatePresence>
+
+      <div
+        style={{
+          fontSize: 10,
+          color: 'rgba(255,255,255,0.1)',
+          textAlign: 'center',
+          padding: 20,
+        }}
+      >
+        Powered by Claude AI
+      </div>
 
       <Toast toast={toast} drawerOpen={false} />
     </motion.div>
@@ -795,10 +807,10 @@ function Toast({ toast, drawerOpen }) {
 }
 
 // ===== Page Header =====
-function SectionTabs({ active, onChange }) {
+function SectionTabs({ active, onChange, notifyContent }) {
   const tabs = [
-    { key: 'office', label: 'Office', icon: LayoutGrid },
-    { key: 'content', label: 'Content Hub', icon: Layers },
+    { key: 'office', label: 'Office', icon: LayoutGrid, notify: false },
+    { key: 'content', label: 'Content Hub', icon: Layers, notify: !!notifyContent },
   ]
   return (
     <div
@@ -820,6 +832,7 @@ function SectionTabs({ active, onChange }) {
             type="button"
             onClick={() => onChange(t.key)}
             style={{
+              position: 'relative',
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
@@ -836,6 +849,22 @@ function SectionTabs({ active, onChange }) {
           >
             <Icon size={13} />
             {t.label}
+            {t.notify && (
+              <motion.span
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 8,
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: '#f87171',
+                  boxShadow: '0 0 6px rgba(248,113,113,0.7)',
+                }}
+              />
+            )}
           </button>
         )
       })}
@@ -843,7 +872,7 @@ function SectionTabs({ active, onChange }) {
   )
 }
 
-function PageHeader({ now, loading, activeSection, onSectionChange }) {
+function PageHeader({ now, loading, activeSection, onSectionChange, notifyContent }) {
   return (
     <div
       style={{
@@ -870,7 +899,11 @@ function PageHeader({ now, loading, activeSection, onSectionChange }) {
           5 agents working · always on
         </div>
       </div>
-      <SectionTabs active={activeSection} onChange={onSectionChange} />
+      <SectionTabs
+        active={activeSection}
+        onChange={onSectionChange}
+        notifyContent={notifyContent}
+      />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {loading && <LoadingPulse />}
         <motion.span
@@ -1583,18 +1616,26 @@ function MeetingPiece({ active, onClick }) {
     <motion.button
       type="button"
       onClick={onClick}
-      animate={{
-        boxShadow: active
-          ? '0 0 20px rgba(255,255,255,0.15)'
-          : '0 0 0px rgba(255,255,255,0)',
-        borderColor: active
-          ? 'rgba(255,255,255,0.35)'
-          : 'rgba(255,255,255,0.1)',
-        backgroundColor: active
-          ? 'rgba(255,255,255,0.05)'
-          : 'rgba(255,255,255,0.03)',
-      }}
-      transition={{ duration: 0.3 }}
+      animate={
+        active
+          ? {
+              boxShadow: '0 0 20px rgba(255,255,255,0.15)',
+              borderColor: 'rgba(255,255,255,0.35)',
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              scale: 1,
+            }
+          : {
+              boxShadow: '0 0 0px rgba(255,255,255,0)',
+              borderColor: 'rgba(255,255,255,0.1)',
+              backgroundColor: 'rgba(255,255,255,0.03)',
+              scale: [1, 1.05, 1],
+            }
+      }
+      transition={
+        active
+          ? { duration: 0.3 }
+          : { duration: 30, times: [0, 0.05, 0.1], repeat: Infinity, ease: 'easeInOut' }
+      }
       style={{
         position: 'absolute',
         left: '50%',
@@ -1826,6 +1867,14 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
   const status = agent.statuses[screenIndex % agent.statuses.length]
   const [runStatus, setRunStatus] = useState('idle')
   const [hover, setHover] = useState(false)
+  const [lastRunAt, setLastRunAt] = useState(null)
+  const [nowTick, setNowTick] = useState(Date.now())
+
+  useEffect(() => {
+    if (!lastRunAt) return
+    const id = setInterval(() => setNowTick(Date.now()), 30000)
+    return () => clearInterval(id)
+  }, [lastRunAt])
 
   async function handleRun() {
     if (!brand || runStatus === 'running') return
@@ -1834,6 +1883,7 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
       const apiAgentType = agent.key === 'video' ? 'video_director' : agent.key
       const data = await callAgent(brand.id, apiAgentType)
       setRunStatus('success')
+      setLastRunAt(Date.now())
       const added = countItemsAdded(data)
       showToast?.(
         added > 0
@@ -1900,9 +1950,24 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
             fontWeight: 500,
             color: '#fff',
             whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: 6,
           }}
         >
           {agent.name}
+          {lastRunAt && (
+            <span
+              style={{
+                fontSize: 9,
+                color: TEXT_FAINT,
+                fontWeight: 400,
+                letterSpacing: '0.04em',
+              }}
+            >
+              · Last run {minsAgo(lastRunAt, nowTick)}
+            </span>
+          )}
         </span>
         <span
           style={{
@@ -2558,7 +2623,10 @@ function ScheduleStrip({ brand, version }) {
           }}
         >
           <Sparkles size={16} color="rgba(255,255,255,0.4)" />
-          <div>No content scheduled today — approve content to schedule it</div>
+          <div>No posts scheduled today</div>
+          <div style={{ fontSize: 11, color: TEXT_FAINT, marginTop: -2 }}>
+            Approve content in Content Hub to schedule your first post
+          </div>
         </div>
       ) : (
         <div
@@ -2963,6 +3031,15 @@ function VisualIdentityCard({ brand, showToast, onRefresh }) {
       />
     </div>
   )
+}
+
+function minsAgo(ts, now = Date.now()) {
+  const m = Math.max(0, Math.floor((now - ts) / 60000))
+  if (m < 1) return 'just now'
+  if (m === 1) return '1 min ago'
+  if (m < 60) return `${m} mins ago`
+  const h = Math.floor(m / 60)
+  return h === 1 ? '1 hr ago' : `${h} hrs ago`
 }
 
 function relativeTime(iso) {
@@ -4573,7 +4650,7 @@ function ScriptsAndCopyQueue({ items, brand, onApprove, onReject, onRepurpose })
           border: '0.5px dashed rgba(255,255,255,0.08)',
         }}
       >
-        No scripts or copy in queue
+        Your agents are working — check back after 7AM or click Run on the Writer Agent
       </div>
     )
   }
@@ -4801,9 +4878,7 @@ function VideosQueue({ items, brand, onApprove, onReject, onPreview }) {
         }}
       >
         <Film size={20} color="rgba(255,255,255,0.4)" style={{ marginBottom: 8 }} />
-        <div>
-          No videos in queue — use Video Templates in the Office tab to generate
-        </div>
+        <div>No videos yet — click Run on the Video Director in the Office tab</div>
       </div>
     )
   }
@@ -5117,7 +5192,7 @@ function StaticAdsQueue({ items, brand, onApprove, onReject }) {
           color="rgba(255,255,255,0.4)"
           style={{ marginBottom: 8 }}
         />
-        <div>No static ads in queue — run Higgsfield to generate brand visuals</div>
+        <div>No static ads yet — run Higgsfield from the Office tab</div>
       </div>
     )
   }
