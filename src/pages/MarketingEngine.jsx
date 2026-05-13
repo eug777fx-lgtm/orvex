@@ -448,10 +448,14 @@ export default function MarketingEngine() {
   async function approve(id) {
     if (!selectedBrand) return
     try {
-      const res = await fetch('/api/approve', {
+      const res = await fetch('/api/workflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content_id: id, brand_id: selectedBrand.id }),
+        body: JSON.stringify({
+          action: 'approve',
+          content_id: id,
+          brand_id: selectedBrand.id,
+        }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'failed' }))
@@ -6268,7 +6272,7 @@ function LogPanel({ entries, wide, brand }) {
     async function load() {
       try {
         const res = await fetch(
-          `/api/logs?brand_id=${encodeURIComponent(brand.id)}&limit=20`,
+          `/api/db?action=logs&brand_id=${encodeURIComponent(brand.id)}&limit=20`,
         )
         if (!res.ok) return
         const data = await res.json()
