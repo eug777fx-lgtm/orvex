@@ -122,7 +122,7 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
   if (agent_type === 'strategy') {
     systemPrompt = `You are a content strategy agent for ${brand.name}. BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory}${visualContext} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
   } else if (agent_type === 'writer') {
-    systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers}${visualContext} Write high-performing social media content matching this brand voice exactly. Output ONLY valid JSON: { hooks: array of 5 strings, captions: array of 3 strings, scripts: array of 2 full reel scripts, cta: string }`
+    systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers}${visualContext} Produce 3 complete post packages — mix of instagram and facebook, mix of image and video. Each package is a fully ready post (hook + caption + CTA + hashtags + visual brief). Output ONLY valid JSON: { packages: array of 3 objects, each { platform: 'instagram' or 'facebook', hook: string (scroll-stopping line), caption: string (full caption that tells the story), cta: string (clear call to action), hashtags: string (5 space-separated hashtags), visual_brief: string (detailed description for Higgsfield or Remotion), visual_type: 'image' or 'video' or 'carousel', remotion_composition: 'HookOpener' or 'QuoteCard' or 'TradeInsight' or 'BrandPromo' or 'ServiceAd' or null } }`
   } else if (agent_type === 'analytics') {
     systemPrompt = `You are an analytics agent for ${brand.name}. BRAND VOICE: ${voiceRules} TOP PERFORMERS: ${topPerformers}${visualContext} Output ONLY valid JSON: { top_performer: string, key_insight: string, recommendation: string, memory_update: string, avoid: string }`
   } else if (agent_type === 'video_director') {
@@ -210,56 +210,63 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
 
   let itemsGenerated = 0
   if (agent_type === 'writer' && parsed && typeof parsed === 'object') {
-    const hooks = Array.isArray(parsed.hooks) ? parsed.hooks : []
-    const captions = Array.isArray(parsed.captions) ? parsed.captions : []
-    const scripts = Array.isArray(parsed.scripts) ? parsed.scripts : []
-    const queued = []
+    const packages = Array.isArray(parsed.packages) ? parsed.packages : []
+    for (const pkg of packages) {
+      if (!pkg) continue
+      const hookText = String(pkg.hook || '')
+      const captionText = String(pkg.caption || '')
+      const ctaText = String(pkg.cta || '')
+      const hashtags = String(pkg.hashtags || '')
+      const platform =
+        pkg.platform === 'facebook' ? 'facebook' : 'instagram'
+      const visualType = ['video', 'carousel'].includes(pkg.visual_type)
+        ? pkg.visual_type
+        : 'image'
+      const visualBrief = String(pkg.visual_brief || '')
+      const composition = pkg.remotion_composition || null
 
-    for (const hookText of hooks) {
-      if (!hookText) continue
-      const r = await sql.query(
-        `INSERT INTO content (brand_id, type, hook, status)
-         VALUES ($1, 'hook', $2, 'pending') RETURNING id`,
-        [brand_id, String(hookText)],
-      )
-      const id = (r?.rows ?? r)?.[0]?.id
-      if (id) queued.push({ id, platform: 'instagram' })
-      itemsGenerated += 1
-    }
-    for (const captionText of captions) {
-      if (!captionText) continue
-      const r = await sql.query(
-        `INSERT INTO content (brand_id, type, caption, status)
-         VALUES ($1, 'caption', $2, 'pending') RETURNING id`,
-        [brand_id, String(captionText)],
-      )
-      const id = (r?.rows ?? r)?.[0]?.id
-      if (id) queued.push({ id, platform: 'facebook' })
-      itemsGenerated += 1
-    }
-    for (const scriptText of scripts) {
-      if (!scriptText) continue
-      const r = await sql.query(
-        `INSERT INTO content (brand_id, type, script, status)
-         VALUES ($1, 'script', $2, 'pending') RETURNING id`,
-        [brand_id, String(scriptText)],
-      )
-      const id = (r?.rows ?? r)?.[0]?.id
-      if (id) queued.push({ id, platform: 'instagram' })
-      itemsGenerated += 1
-    }
+      // Persist the text parts as content rows for backward compat with the
+      // rest of the system (analytics, repurpose, search, etc.).
+      let hookId = null
+      let captionId = null
+      if (hookText) {
+        const r = await sql.query(
+          `INSERT INTO content (brand_id, type, hook, status)
+           VALUES ($1, 'hook', $2, 'pending') RETURNING id`,
+          [brand_id, hookText],
+        )
+        hookId = (r?.rows ?? r)?.[0]?.id
+      }
+      if (captionText) {
+        const r = await sql.query(
+          `INSERT INTO content (brand_id, type, caption, status)
+           VALUES ($1, 'caption', $2, 'pending') RETURNING id`,
+          [brand_id, captionText],
+        )
+        captionId = (r?.rows ?? r)?.[0]?.id
+      }
 
-    // Stagger over the next 7 days starting tomorrow 09:00 UTC, one per day.
-    // If more than 7 items, wrap to day 8+ at the same time.
-    for (let i = 0; i < queued.length; i++) {
-      const slot = new Date()
-      slot.setUTCDate(slot.getUTCDate() + 1 + i)
-      slot.setUTCHours(9, 0, 0, 0)
       await sql.query(
-        `INSERT INTO schedules (content_id, brand_id, platform, scheduled_at, published)
-         VALUES ($1, $2, $3, $4, false)`,
-        [queued[i].id, brand_id, queued[i].platform, slot.toISOString()],
+        `INSERT INTO post_packages
+           (brand_id, status, platform, hook_id, caption_id,
+            hook_text, caption_text, cta_text, hashtags,
+            visual_type, visual_brief, remotion_composition)
+         VALUES ($1, 'needs_visual', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          brand_id,
+          platform,
+          hookId,
+          captionId,
+          hookText,
+          captionText,
+          ctaText,
+          hashtags,
+          visualType,
+          visualBrief,
+          composition,
+        ],
       )
+      itemsGenerated += 1
     }
   }
 

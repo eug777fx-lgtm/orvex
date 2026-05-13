@@ -377,14 +377,11 @@ export default function MarketingEngine() {
         memoryRows,
       ] = await Promise.all([
         db.query(
-          "SELECT COUNT(*) AS count FROM content WHERE brand_id=$1 AND status='pending'",
+          "SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND status IN ('ready','needs_visual') AND published=false",
           [selectedBrand.id],
         ),
         db.query(
-          `SELECT COUNT(*) AS count
-             FROM schedules s
-             JOIN content c ON s.content_id = c.id
-            WHERE s.brand_id=$1 AND s.published=false AND c.status='approved'`,
+          "SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND status='approved' AND published=false",
           [selectedBrand.id],
         ),
         db.query(
@@ -392,7 +389,7 @@ export default function MarketingEngine() {
           [selectedBrand.id],
         ),
         db.query(
-          "SELECT COUNT(*) AS count FROM content WHERE brand_id=$1 AND status IN ('published','approved')",
+          'SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND published=true',
           [selectedBrand.id],
         ),
         db.query(
@@ -4132,12 +4129,169 @@ function ContentHub({
   showToast,
 }) {
   const [scheduled, setScheduled] = useState([])
+  const [packages, setPackages] = useState([])
+  const [packagesVersion, setPackagesVersion] = useState(0)
   const [generating, setGenerating] = useState(false)
   const [activeQueue, setActiveQueue] = useState('scripts')
   const [search, setSearch] = useState('')
   const [platformFilter, setPlatformFilter] = useState('all')
   const [showWorkflow, setShowWorkflow] = useState(false)
   const [videoPreview, setVideoPreview] = useState(null)
+
+  useEffect(() => {
+    if (!brand?.id) {
+      setPackages([])
+      return
+    }
+    let cancelled = false
+    async function load() {
+      try {
+        const rows = await db.query(
+          `SELECT id, brand_id, status, platform, hook_text, caption_text,
+                  cta_text, hashtags, visual_url, visual_type, visual_brief,
+                  remotion_composition, scheduled_at, published, created_at
+             FROM post_packages
+            WHERE brand_id=$1
+              AND status IN ('ready','needs_visual','draft')
+            ORDER BY created_at DESC`,
+          [brand.id],
+        )
+        if (!cancelled) setPackages(rows || [])
+      } catch (e) {
+        console.error('packages fetch failed', e)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [brand?.id, packagesVersion])
+
+  async function approvePackage(pkg) {
+    if (!brand?.id || !pkg?.id) return
+    try {
+      // Compute next slot: 9 AM for instagram, 5 PM for facebook, max 2/day.
+      const platform = pkg.platform || 'instagram'
+      const targetHour = platform === 'facebook' ? 17 : 9
+      const latest = await db.query(
+        `SELECT scheduled_at FROM post_packages
+          WHERE brand_id=$1 AND status='approved' AND published=false
+          ORDER BY scheduled_at DESC LIMIT 1`,
+        [brand.id],
+      )
+      let candidate
+      if (!latest?.[0]?.scheduled_at) {
+        candidate = new Date()
+        candidate.setUTCDate(candidate.getUTCDate() + 1)
+      } else {
+        candidate = new Date(latest[0].scheduled_at)
+        candidate.setUTCDate(candidate.getUTCDate() + 1)
+      }
+      candidate.setUTCHours(targetHour, 0, 0, 0)
+      // 2 per day cap
+      for (let i = 0; i < 30; i++) {
+        const dayStart = new Date(candidate)
+        dayStart.setUTCHours(0, 0, 0, 0)
+        const dayEnd = new Date(dayStart)
+        dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
+        const countRows = await db.query(
+          `SELECT COUNT(*)::int AS c FROM post_packages
+            WHERE brand_id=$1 AND status='approved' AND published=false
+              AND scheduled_at >= $2 AND scheduled_at < $3`,
+          [brand.id, dayStart.toISOString(), dayEnd.toISOString()],
+        )
+        const c = countRows?.[0]?.c ?? 0
+        if (c < 2) break
+        candidate.setUTCDate(candidate.getUTCDate() + 1)
+      }
+      await db.query(
+        `UPDATE post_packages SET status='approved', scheduled_at=$1 WHERE id=$2`,
+        [candidate.toISOString(), pkg.id],
+      )
+      await db.query(
+        `INSERT INTO schedules (brand_id, platform, scheduled_at, published)
+         VALUES ($1, $2, $3, false)`,
+        [brand.id, platform, candidate.toISOString()],
+      )
+      const d = candidate
+      showToast?.(
+        `Package approved — scheduled for ${d.toLocaleDateString([], {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })} on ${platform}`,
+      )
+      setPackagesVersion((v) => v + 1)
+      onRefresh?.()
+    } catch (e) {
+      console.error('approve package failed', e)
+      showToast?.('Approve failed', 'error')
+    }
+  }
+
+  async function rejectPackage(pkg) {
+    if (!pkg?.id) return
+    try {
+      await db.query('DELETE FROM post_packages WHERE id=$1', [pkg.id])
+      setPackagesVersion((v) => v + 1)
+      showToast?.('Package removed')
+    } catch (e) {
+      console.error('reject package failed', e)
+      showToast?.('Remove failed', 'error')
+    }
+  }
+
+  async function generateVisual(pkg, kind) {
+    if (!brand?.id || !pkg?.id) return
+    try {
+      if (kind === 'video' && pkg.remotion_composition) {
+        const r = await fetch('/api/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            composition_id: pkg.remotion_composition,
+            props: { headline: pkg.hook_text, brandName: brand.name },
+            brand_id: brand.id,
+          }),
+        })
+        const data = await r.json()
+        if (data.url) {
+          await db.query(
+            `UPDATE post_packages SET visual_url=$1, visual_type='video', status='ready' WHERE id=$2`,
+            [data.url, pkg.id],
+          )
+          showToast?.('Video ready')
+        } else {
+          showToast?.('Video queued', 'info')
+        }
+      } else {
+        // Image via Higgsfield
+        const r = await fetch('/api/video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brand_id: brand.id,
+            type: 'text_to_image',
+            prompt: pkg.visual_brief || pkg.hook_text || '',
+          }),
+        })
+        const data = await r.json()
+        if (data.url) {
+          await db.query(
+            `UPDATE post_packages SET visual_url=$1, visual_type='image', status='ready' WHERE id=$2`,
+            [data.url, pkg.id],
+          )
+          showToast?.('Image ready')
+        } else {
+          showToast?.(data.error || 'Image generation failed', 'error')
+        }
+      }
+      setPackagesVersion((v) => v + 1)
+    } catch (e) {
+      console.error('generate visual failed', e)
+      showToast?.('Visual generation failed', 'error')
+    }
+  }
 
   useEffect(() => {
     if (!brand?.id) {
@@ -4219,10 +4373,28 @@ function ContentHub({
     if (passesSearch(it) && passesPlatform(it)) groups[g].push(it)
   }
   const filtered = groups
+
+  // Package-based filtering for the new queues
+  const allPackages = Array.isArray(packages) ? packages : []
+  function passesPackage(p) {
+    if (platformFilter !== 'all' && p.platform !== platformFilter) return false
+    if (searchLc) {
+      const text = `${p.hook_text || ''} ${p.caption_text || ''} ${p.cta_text || ''}`.toLowerCase()
+      if (!text.includes(searchLc)) return false
+    }
+    return true
+  }
+  const passedPackages = allPackages.filter(passesPackage)
+  const packagesByLayout = {
+    scripts: passedPackages,
+    videos: passedPackages.filter((p) => p.visual_type === 'video'),
+    static: passedPackages.filter((p) => p.visual_type === 'image'),
+  }
+  const packagesFiltered = packagesByLayout[activeQueue] || passedPackages
   const queueCounts = {
-    scripts: groups.scripts.length,
-    videos: groups.videos.length,
-    static: groups.static.length,
+    scripts: packagesByLayout.scripts.length,
+    videos: packagesByLayout.videos.length,
+    static: packagesByLayout.static.length,
   }
 
   const brandColor = brand?.primary_color || brand?.color || '#ffffff'
@@ -4341,32 +4513,14 @@ function ContentHub({
             onChange={setPlatformFilter}
           />
           <div style={{ marginTop: 12 }}>
-            {activeQueue === 'scripts' && (
-              <ScriptsAndCopyQueue
-                items={filtered.scripts}
-                brand={brand}
-                onApprove={onApprove}
-                onReject={onReject}
-                onRepurpose={onRepurpose}
-              />
-            )}
-            {activeQueue === 'videos' && (
-              <VideosQueue
-                items={filtered.videos}
-                brand={brand}
-                onApprove={onApprove}
-                onReject={onReject}
-                onPreview={(it) => setVideoPreview(it)}
-              />
-            )}
-            {activeQueue === 'static' && (
-              <StaticAdsQueue
-                items={filtered.static}
-                brand={brand}
-                onApprove={onApprove}
-                onReject={onReject}
-              />
-            )}
+            <PackagesList
+              packages={packagesFiltered}
+              brand={brand}
+              onApprove={approvePackage}
+              onReject={rejectPackage}
+              onGenerateVisual={generateVisual}
+              layout={activeQueue}
+            />
           </div>
           <div style={{ marginTop: 12 }}>
             <button
@@ -4562,6 +4716,482 @@ function ContentHub({
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+function PackagesList({ packages, brand, onApprove, onReject, onGenerateVisual, layout }) {
+  if (!packages || packages.length === 0) {
+    const message =
+      layout === 'videos'
+        ? 'No video packages yet — click Run on the Writer Agent in the Office tab'
+        : layout === 'static'
+        ? 'No image packages yet — click Run on the Writer Agent in the Office tab'
+        : 'No packages yet — click Run on the Writer Agent in the Office tab'
+    return (
+      <div
+        style={{
+          padding: 24,
+          textAlign: 'center',
+          color: TEXT_MUTED,
+          fontSize: 12,
+          background: 'rgba(255,255,255,0.02)',
+          borderRadius: 10,
+          border: '0.5px dashed rgba(255,255,255,0.08)',
+        }}
+      >
+        {message}
+      </div>
+    )
+  }
+  const isGrid = layout === 'static'
+  return (
+    <div
+      style={
+        isGrid
+          ? {
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: 10,
+            }
+          : { display: 'flex', flexDirection: 'column', gap: 10 }
+      }
+    >
+      <AnimatePresence>
+        {packages.map((p) => (
+          <PackageCard
+            key={p.id}
+            pkg={p}
+            brand={brand}
+            onApprove={onApprove}
+            onReject={onReject}
+            onGenerateVisual={onGenerateVisual}
+            compact={isGrid}
+          />
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compact }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasVisual = !!pkg.visual_url
+  const statusBadge = hasVisual
+    ? { label: 'Ready to post', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' }
+    : pkg.status === 'needs_visual'
+    ? { label: 'Generating visual…', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' }
+    : { label: 'Draft', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.05)' }
+  const platformAccent = platformColor(pkg.platform)
+  const caption = pkg.caption_text || ''
+
+  if (compact) {
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.22 }}
+        style={{
+          position: 'relative',
+          background: 'rgba(255,255,255,0.03)',
+          border: '0.5px solid rgba(255,255,255,0.07)',
+          borderRadius: 12,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            position: 'relative',
+            aspectRatio: '9 / 16',
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {pkg.visual_url ? (
+            pkg.visual_type === 'video' ? (
+              <video
+                src={pkg.visual_url}
+                controls
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <img
+                src={pkg.visual_url}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            )
+          ) : (
+            <div
+              style={{
+                padding: 10,
+                fontSize: 10,
+                color: TEXT_MUTED,
+                fontFamily: MONO,
+                textAlign: 'center',
+              }}
+            >
+              {pkg.visual_brief || 'No visual yet'}
+            </div>
+          )}
+          <span
+            style={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              fontSize: 9,
+              padding: '2px 7px',
+              borderRadius: 999,
+              background: statusBadge.bg,
+              border: `0.5px solid ${statusBadge.color}55`,
+              color: statusBadge.color,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+            }}
+          >
+            {statusBadge.label}
+          </span>
+        </div>
+        <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: '#fff',
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {pkg.hook_text || '(no hook)'}
+          </div>
+          {!hasVisual && (
+            <button
+              type="button"
+              onClick={() => onGenerateVisual(pkg, 'image')}
+              style={{
+                fontSize: 10,
+                padding: '4px 8px',
+                borderRadius: 6,
+                background: 'rgba(251,191,36,0.12)',
+                border: '0.5px solid rgba(251,191,36,0.4)',
+                color: '#fbbf24',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Generate Image
+            </button>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => onApprove(pkg)}
+              disabled={!hasVisual}
+              style={{
+                flex: 1,
+                fontSize: 10.5,
+                padding: '5px 10px',
+                borderRadius: 6,
+                background: hasVisual ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)',
+                border: hasVisual
+                  ? '0.5px solid rgba(74,222,128,0.4)'
+                  : '0.5px solid rgba(255,255,255,0.1)',
+                color: hasVisual ? '#4ade80' : TEXT_FAINT,
+                fontWeight: 600,
+                cursor: hasVisual ? 'pointer' : 'not-allowed',
+              }}
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              onClick={() => onReject(pkg)}
+              style={{
+                fontSize: 10.5,
+                padding: '5px 10px',
+                borderRadius: 6,
+                background: 'transparent',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                color: TEXT_MUTED,
+                cursor: 'pointer',
+              }}
+            >
+              <X size={11} />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
+      transition={{ duration: 0.22 }}
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '0.5px solid rgba(255,255,255,0.07)',
+        borderRadius: 12,
+        padding: 12,
+        display: 'grid',
+        gridTemplateColumns: '40% 60%',
+        gap: 14,
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            aspectRatio: '9 / 16',
+            background: 'rgba(0,0,0,0.5)',
+            borderRadius: 8,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {pkg.visual_url ? (
+            pkg.visual_type === 'video' ? (
+              <video
+                src={pkg.visual_url}
+                controls
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <img
+                src={pkg.visual_url}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            )
+          ) : (
+            <div
+              style={{
+                padding: 12,
+                fontSize: 10,
+                color: TEXT_MUTED,
+                fontFamily: MONO,
+                textAlign: 'center',
+                lineHeight: 1.4,
+              }}
+            >
+              {pkg.visual_type === 'video' ? (
+                <Film size={20} style={{ marginBottom: 6 }} />
+              ) : (
+                <ImageIcon size={20} style={{ marginBottom: 6 }} />
+              )}
+              <div>{pkg.visual_brief || 'No visual yet'}</div>
+            </div>
+          )}
+        </div>
+        {!hasVisual && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => onGenerateVisual(pkg, 'video')}
+              disabled={!pkg.remotion_composition}
+              style={{
+                flex: 1,
+                fontSize: 10.5,
+                padding: '5px 9px',
+                borderRadius: 6,
+                background: 'rgba(255,255,255,0.04)',
+                border: '0.5px solid rgba(255,255,255,0.12)',
+                color: pkg.remotion_composition ? 'rgba(255,255,255,0.75)' : TEXT_FAINT,
+                fontWeight: 500,
+                cursor: pkg.remotion_composition ? 'pointer' : 'not-allowed',
+              }}
+            >
+              Generate Video
+            </button>
+            <button
+              type="button"
+              onClick={() => onGenerateVisual(pkg, 'image')}
+              style={{
+                flex: 1,
+                fontSize: 10.5,
+                padding: '5px 9px',
+                borderRadius: 6,
+                background: 'rgba(255,255,255,0.04)',
+                border: '0.5px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.75)',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Generate Image
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span
+            style={{
+              fontSize: 9.5,
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: `${platformAccent}14`,
+              border: `0.5px solid ${platformAccent}40`,
+              color: platformAccent,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              textTransform: 'capitalize',
+            }}
+          >
+            {pkg.platform || 'instagram'}
+          </span>
+          <span
+            style={{
+              fontSize: 9.5,
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: statusBadge.bg,
+              border: `0.5px solid ${statusBadge.color}55`,
+              color: statusBadge.color,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            {!hasVisual && pkg.status === 'needs_visual' && (
+              <motion.span
+                animate={{ opacity: [1, 0.4, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: '50%',
+                  background: statusBadge.color,
+                }}
+              />
+            )}
+            {statusBadge.label}
+          </span>
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', lineHeight: 1.3 }}>
+          {pkg.hook_text || '(no hook)'}
+        </div>
+        <div
+          style={{
+            fontSize: 13,
+            color: 'rgba(255,255,255,0.7)',
+            lineHeight: 1.5,
+            display: '-webkit-box',
+            WebkitLineClamp: expanded ? 999 : 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {caption}
+        </div>
+        {caption.length > 180 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            style={{
+              fontSize: 10.5,
+              padding: 0,
+              background: 'transparent',
+              border: 'none',
+              color: 'rgba(255,255,255,0.55)',
+              cursor: 'pointer',
+              alignSelf: 'flex-start',
+            }}
+          >
+            {expanded ? '↑ Show less' : '↓ Show more'}
+          </button>
+        )}
+        {pkg.cta_text && (
+          <span
+            style={{
+              alignSelf: 'flex-start',
+              fontSize: 10.5,
+              padding: '3px 9px',
+              borderRadius: 999,
+              background: 'rgba(255,255,255,0.05)',
+              border: '0.5px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.8)',
+              fontWeight: 500,
+            }}
+          >
+            {pkg.cta_text}
+          </span>
+        )}
+        {pkg.hashtags && (
+          <div style={{ fontSize: 10.5, color: TEXT_FAINT }}>{pkg.hashtags}</div>
+        )}
+        <div
+          style={{
+            fontSize: 10,
+            color: TEXT_FAINT,
+            marginTop: 2,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {caption.length} chars
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <button
+            type="button"
+            onClick={() => onApprove(pkg)}
+            disabled={!hasVisual}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '6px 12px',
+              borderRadius: 7,
+              background: hasVisual ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)',
+              border: hasVisual
+                ? '0.5px solid rgba(74,222,128,0.4)'
+                : '0.5px solid rgba(255,255,255,0.1)',
+              color: hasVisual ? '#4ade80' : TEXT_FAINT,
+              fontSize: 11.5,
+              fontWeight: 600,
+              cursor: hasVisual ? 'pointer' : 'not-allowed',
+            }}
+          >
+            <Check size={11} /> Approve Package
+          </button>
+          <button
+            type="button"
+            onClick={() => onReject(pkg)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '6px 12px',
+              borderRadius: 7,
+              background: 'transparent',
+              border: '0.5px solid rgba(255,255,255,0.1)',
+              color: TEXT_MUTED,
+              fontSize: 11.5,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <X size={11} /> Reject
+          </button>
+        </div>
+      </div>
+    </motion.div>
   )
 }
 

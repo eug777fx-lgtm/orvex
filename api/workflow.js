@@ -127,47 +127,58 @@ async function handleNext(sql, brand_id) {
     throw err
   }
   const result = await sql.query(
-    `SELECT c.id, c.type, c.hook, c.caption, c.script, c.status,
-            s.platform, s.scheduled_at, s.id AS schedule_id
-       FROM schedules s
-       JOIN content c ON s.content_id = c.id
-      WHERE s.brand_id = $1
-        AND s.published = false
-        AND c.status = 'approved'
-        AND s.scheduled_at <= NOW()
-      ORDER BY s.scheduled_at ASC
+    `SELECT pp.id, pp.platform, pp.hook_text, pp.caption_text, pp.cta_text,
+            pp.hashtags, pp.visual_url, pp.visual_type, pp.scheduled_at,
+            b.name AS brand_name
+       FROM post_packages pp
+       JOIN brands b ON pp.brand_id = b.id
+      WHERE pp.brand_id = $1
+        AND pp.status = 'approved'
+        AND pp.published = false
+        AND pp.scheduled_at <= NOW()
+      ORDER BY pp.scheduled_at ASC
       LIMIT 1`,
     [brand_id],
   )
   const rows = result?.rows ?? result
   const row = rows?.[0]
   if (!row) return { has_content: false }
-  return { has_content: true, content: row }
+  return { has_content: true, package: row }
 }
 
 async function handlePublished(sql, body) {
-  const { schedule_id, content_id, brand_id } = body
-  if (!schedule_id || !content_id) {
-    const err = new Error('schedule_id and content_id required')
+  const { schedule_id, content_id, package_id, brand_id } = body
+  if (!schedule_id && !package_id && !content_id) {
+    const err = new Error('package_id or (schedule_id + content_id) required')
     err.status = 400
     throw err
   }
-  await sql.query('UPDATE schedules SET published=true WHERE id=$1', [
-    schedule_id,
-  ])
-  await sql.query("UPDATE content SET status='published' WHERE id=$1", [
-    content_id,
-  ])
-  await sql.query(
-    `CREATE UNIQUE INDEX IF NOT EXISTS analytics_content_id_unique
-       ON analytics(content_id)`,
-  )
-  await sql.query(
-    `INSERT INTO analytics (content_id, brand_id)
-     VALUES ($1, $2)
-     ON CONFLICT (content_id) DO NOTHING`,
-    [content_id, brand_id || null],
-  )
+  if (package_id) {
+    await sql.query(
+      "UPDATE post_packages SET published=true, published_at=NOW() WHERE id=$1",
+      [package_id],
+    )
+  }
+  if (schedule_id) {
+    await sql.query('UPDATE schedules SET published=true WHERE id=$1', [
+      schedule_id,
+    ])
+  }
+  if (content_id) {
+    await sql.query("UPDATE content SET status='published' WHERE id=$1", [
+      content_id,
+    ])
+    await sql.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS analytics_content_id_unique
+         ON analytics(content_id)`,
+    )
+    await sql.query(
+      `INSERT INTO analytics (content_id, brand_id)
+       VALUES ($1, $2)
+       ON CONFLICT (content_id) DO NOTHING`,
+      [content_id, brand_id || null],
+    )
+  }
   return {}
 }
 

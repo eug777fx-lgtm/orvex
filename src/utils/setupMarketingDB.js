@@ -90,6 +90,30 @@ export async function setupMarketingDB() {
   `)
 
   await db.query(`
+    CREATE TABLE IF NOT EXISTS post_packages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      brand_id UUID REFERENCES brands(id),
+      status TEXT DEFAULT 'draft',
+      platform TEXT DEFAULT 'instagram',
+      hook_id UUID REFERENCES content(id),
+      visual_id UUID REFERENCES content(id),
+      caption_id UUID REFERENCES content(id),
+      hook_text TEXT,
+      caption_text TEXT,
+      cta_text TEXT,
+      hashtags TEXT,
+      visual_url TEXT,
+      visual_type TEXT,
+      visual_brief TEXT,
+      remotion_composition TEXT,
+      scheduled_at TIMESTAMPTZ,
+      published BOOLEAN DEFAULT false,
+      published_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS agent_runs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       brand_id UUID REFERENCES brands(id),
