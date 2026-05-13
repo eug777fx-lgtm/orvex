@@ -47,6 +47,8 @@ export default async function handler(req, res) {
       imageFormat: 'jpeg',
       maxRetries: 1,
       privacy: 'public',
+      framesPerLambda: 40,
+      concurrencyPerLambda: 1,
       outName: `${brand_id || 'brand'}-${composition_id}-${Date.now()}.mp4`,
     })
 
