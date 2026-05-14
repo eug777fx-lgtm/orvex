@@ -4090,6 +4090,8 @@ function VideoTemplates({ brand, showToast }) {
           </div>
         ))}
       </div>
+      <FullVideoProduction brand={brand} showToast={showToast} />
+
       <AnimatePresence>
         {preview && (
           <VideoPreviewModal
@@ -4099,6 +4101,265 @@ function VideoTemplates({ brand, showToast }) {
           />
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+const PIPELINE_STEPS = [
+  { key: 'script', label: 'Script', detail: 'Claude writes 4-scene script' },
+  { key: 'audio', label: 'Audio', detail: 'ElevenLabs voiceover + SFX brief' },
+  { key: 'visuals', label: 'Visuals', detail: 'Higgsfield footage / storyboard' },
+  { key: 'editor', label: 'Editor', detail: 'Creatomate timeline assembly' },
+]
+
+function FullVideoProduction({ brand, showToast }) {
+  const [running, setRunning] = useState(false)
+  const [activeStep, setActiveStep] = useState(null)
+  const [completed, setCompleted] = useState({})
+  const [error, setError] = useState(null)
+
+  function reset() {
+    setActiveStep(null)
+    setCompleted({})
+    setError(null)
+  }
+
+  async function runFullPipeline() {
+    if (!brand?.id || running) return
+    setRunning(true)
+    reset()
+    try {
+      // Step 1: pipeline_start
+      setActiveStep('script')
+      const startRes = await fetch('/api/workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'pipeline_start',
+          brand_id: brand.id,
+          type: 'full',
+        }),
+      })
+      if (!startRes.ok) throw new Error('pipeline_start failed')
+      const startData = await startRes.json()
+      const pipelineId = startData.pipeline_id
+      if (!pipelineId) throw new Error('no pipeline_id returned')
+      setCompleted((c) => ({ ...c, script: true }))
+
+      // Step 2: audio
+      setActiveStep('audio')
+      const audioRes = await fetch('/api/workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'pipeline_advance',
+          pipeline_id: pipelineId,
+          stage: 'audio',
+        }),
+      })
+      if (!audioRes.ok) throw new Error('audio stage failed')
+      setCompleted((c) => ({ ...c, audio: true }))
+
+      // Step 3: visuals
+      setActiveStep('visuals')
+      const visualsRes = await fetch('/api/workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'pipeline_advance',
+          pipeline_id: pipelineId,
+          stage: 'visuals',
+        }),
+      })
+      if (!visualsRes.ok) throw new Error('visuals stage failed')
+      setCompleted((c) => ({ ...c, visuals: true }))
+
+      // Step 4: editor agent assembles + edits final video
+      setActiveStep('editor')
+      const editorRes = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand_id: brand.id,
+          agent_type: 'video_editor',
+        }),
+      })
+      if (!editorRes.ok) throw new Error('editor agent failed')
+      setCompleted((c) => ({ ...c, editor: true }))
+
+      setActiveStep(null)
+      showToast?.('Video ready — check Videos queue')
+    } catch (e) {
+      console.error('full pipeline failed', e)
+      setError(e.message || 'pipeline failed')
+      showToast?.(`Pipeline failed at ${activeStep || 'start'}`, 'error')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 18,
+        paddingTop: 14,
+        borderTop: '0.5px solid rgba(255,255,255,0.07)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 4,
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+          Video Editor
+        </span>
+        <span
+          style={{
+            fontSize: 9.5,
+            padding: '2px 7px',
+            borderRadius: 999,
+            background: 'rgba(245,158,11,0.1)',
+            border: '0.5px solid rgba(245,158,11,0.3)',
+            color: '#f59e0b',
+            letterSpacing: '0.04em',
+          }}
+        >
+          Full pipeline
+        </span>
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          color: 'rgba(255,255,255,0.55)',
+          lineHeight: 1.4,
+          marginBottom: 12,
+        }}
+      >
+        Combines Higgsfield footage + Remotion motion graphics + ElevenLabs audio
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 6,
+          flexWrap: 'wrap',
+          marginBottom: 12,
+        }}
+      >
+        {PIPELINE_STEPS.map((step) => {
+          const isComplete = !!completed[step.key]
+          const isActive = activeStep === step.key
+          const dotChar = isComplete ? '✓' : isActive ? '●' : '○'
+          const color = isComplete
+            ? '#4ade80'
+            : isActive
+            ? '#f59e0b'
+            : 'rgba(255,255,255,0.35)'
+          return (
+            <div
+              key={step.key}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 10px',
+                borderRadius: 10,
+                background: isActive
+                  ? 'rgba(245,158,11,0.07)'
+                  : 'rgba(255,255,255,0.03)',
+                border: isActive
+                  ? '0.5px solid rgba(245,158,11,0.35)'
+                  : '0.5px solid rgba(255,255,255,0.07)',
+                flex: '1 1 140px',
+                minWidth: 140,
+              }}
+            >
+              <motion.span
+                animate={
+                  isActive
+                    ? { opacity: [1, 0.35, 1] }
+                    : { opacity: 1 }
+                }
+                transition={
+                  isActive
+                    ? { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }
+                    : { duration: 0.2 }
+                }
+                style={{
+                  fontSize: 12,
+                  color,
+                  width: 14,
+                  textAlign: 'center',
+                  lineHeight: 1,
+                }}
+              >
+                {dotChar}
+              </motion.span>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: isComplete || isActive ? '#fff' : 'rgba(255,255,255,0.6)',
+                  }}
+                >
+                  {step.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: 9.5,
+                    color: 'rgba(255,255,255,0.4)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {step.detail}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={runFullPipeline}
+        disabled={!brand?.id || running}
+        style={{
+          width: '100%',
+          fontSize: 12,
+          padding: '10px 14px',
+          borderRadius: 10,
+          background: running ? 'rgba(245,158,11,0.15)' : '#f59e0b',
+          border: '0.5px solid rgba(245,158,11,0.6)',
+          color: running ? '#f59e0b' : '#0B0B0D',
+          fontWeight: 700,
+          cursor: !brand?.id || running ? 'default' : 'pointer',
+          letterSpacing: '0.02em',
+          opacity: !brand?.id ? 0.5 : 1,
+        }}
+      >
+        {running
+          ? `Running ${activeStep || 'pipeline'}…`
+          : 'Start Full Video Production'}
+      </button>
+
+      {error && (
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 10.5,
+            color: '#f87171',
+          }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   )
 }
