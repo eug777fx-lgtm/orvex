@@ -106,8 +106,11 @@ async function buildStoryboardFallback(sql, brand_id, prompt) {
       primary: brand?.primary_color || '#C2B59B',
       secondary: brand?.secondary_color || '#F5F5F2',
     },
+    // No Higgsfield footage available — Remotion will render on its pure dark
+    // base layer instead. Compositions still look professional without footage.
+    backgroundVideoUrl: null,
     production_notes:
-      'Visual brief ready — generate using Remotion or record manually',
+      'Visual brief ready — Remotion renders on dark background (no Higgsfield footage)',
     status: 'awaiting_visual_production',
   }
   try {

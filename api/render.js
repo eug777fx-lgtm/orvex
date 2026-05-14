@@ -1,5 +1,43 @@
 import { renderMediaOnLambda, getRenderProgress } from '@remotion/lambda-client'
 
+// Fire-and-forget render kickoff used by agents (e.g. video_director) that
+// can't afford to block on the full Lambda render time. Returns the renderId
+// immediately so callers can persist it and poll via getRenderProgress later.
+// Returns null when REMOTION_FUNCTION_NAME / REMOTION_SERVE_URL aren't set,
+// so callers can degrade gracefully.
+export async function startRemotionRender({
+  composition_id,
+  props,
+  backgroundVideoUrl,
+  brand_id,
+  brandData,
+}) {
+  if (!process.env.REMOTION_FUNCTION_NAME || !process.env.REMOTION_SERVE_URL) {
+    return null
+  }
+  const finalProps = {
+    ...(props || {}),
+    ...(brandData || {}),
+    backgroundVideoUrl:
+      backgroundVideoUrl ?? props?.backgroundVideoUrl ?? null,
+  }
+  const { renderId, bucketName } = await renderMediaOnLambda({
+    region: process.env.REMOTION_AWS_REGION || 'us-east-1',
+    functionName: process.env.REMOTION_FUNCTION_NAME,
+    serveUrl: process.env.REMOTION_SERVE_URL,
+    composition: composition_id,
+    inputProps: finalProps,
+    codec: 'h264',
+    imageFormat: 'jpeg',
+    maxRetries: 1,
+    privacy: 'public',
+    framesPerLambda: 40,
+    concurrencyPerLambda: 1,
+    outName: `${brand_id || 'brand'}-${composition_id}-${Date.now()}.mp4`,
+  })
+  return { renderId, bucketName }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -7,7 +45,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { composition_id, props, brand_id } = req.body || {}
+  const { composition_id, props, brand_id, backgroundVideoUrl } = req.body || {}
 
   if (!composition_id) return res.status(400).json({ error: 'composition_id required' })
 
@@ -33,8 +71,16 @@ export default async function handler(req, res) {
       }
     }
 
-    // Merge brand data with props
-    const finalProps = { ...props, ...brandData }
+    // Merge brand data with props. backgroundVideoUrl (Higgsfield footage)
+    // is passed explicitly so callers can supply it at the top level without
+    // nesting it inside props. Falls back to null when missing — the
+    // composition then renders on its dark base layer.
+    const finalProps = {
+      ...props,
+      ...brandData,
+      backgroundVideoUrl:
+        backgroundVideoUrl ?? props?.backgroundVideoUrl ?? null,
+    }
 
     // Start Lambda render
     const { renderId, bucketName } = await renderMediaOnLambda({

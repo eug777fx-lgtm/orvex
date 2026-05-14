@@ -9,6 +9,7 @@
 
 import { generateVideo } from './video.js'
 import { handleEditVideo } from './workflow.js'
+import { startRemotionRender } from './render.js'
 
 function validateBrandContext(brand /*, agentType */) {
   const required = ['id', 'name']
@@ -508,6 +509,57 @@ Output ONLY valid JSON:
             `UPDATE content SET type='video', script=$1 WHERE id=$2`,
             [videoResult.url, briefId],
           )
+        }
+
+        // Wire the Higgsfield footage into a Remotion render as
+        // backgroundVideoUrl. The composition draws motion-graphic text on
+        // top of the footage. Fire-and-forget — we don't block on the
+        // Lambda render here; the renderId is saved so it can be polled
+        // later via /api/render.
+        const backgroundVideoUrl = videoResult?.success ? videoResult.url : null
+        const composition_id = parsed.remotion_composition || 'HookOpener'
+        const remotionProps = parsed.remotion_props || {
+          headline: parsed.video_prompt?.slice(0, 80) || '',
+          subtext: parsed.mood || '',
+          brandName: brand.name,
+          primaryColor: brand.primary_color || '#ffffff',
+          secondaryColor: brand.secondary_color || '#0B0B0D',
+          logoUrl: brand.logo_url || null,
+        }
+        try {
+          const renderKick = await startRemotionRender({
+            composition_id,
+            props: remotionProps,
+            backgroundVideoUrl,
+            brand_id,
+            brandData: {
+              brandName: brand.name,
+              logoUrl: brand.logo_url || null,
+              primaryColor: brand.primary_color || '#ffffff',
+              secondaryColor: brand.secondary_color || '#000000',
+            },
+          })
+          if (renderKick?.renderId) {
+            await sql.query(
+              `INSERT INTO agent_runs (brand_id, agent_type, input, output, status)
+               VALUES ($1, 'video_render', $2, $3, 'rendering')`,
+              [
+                brand_id,
+                JSON.stringify({
+                  composition_id,
+                  backgroundVideoUrl,
+                  props: remotionProps,
+                }),
+                JSON.stringify(renderKick),
+              ],
+            )
+            if (videoResult && typeof videoResult === 'object') {
+              videoResult.remotion_render = renderKick
+              videoResult.backgroundVideoUrl = backgroundVideoUrl
+            }
+          }
+        } catch (rerr) {
+          console.error('startRemotionRender failed', rerr)
         }
       } catch (e) {
         console.error('video_director generateVideo failed', e)
