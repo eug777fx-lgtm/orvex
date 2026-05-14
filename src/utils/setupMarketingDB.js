@@ -114,6 +114,30 @@ export async function setupMarketingDB() {
   `)
 
   await db.query(`
+    CREATE TABLE IF NOT EXISTS content_pipeline (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      brand_id UUID REFERENCES brands(id) NOT NULL,
+      post_package_id UUID REFERENCES post_packages(id),
+      stage TEXT NOT NULL DEFAULT 'script',
+      script_data JSONB,
+      audio_data JSONB,
+      visual_data JSONB,
+      assembly_data JSONB,
+      fallback_used BOOLEAN DEFAULT false,
+      fallback_type TEXT,
+      error_log JSONB DEFAULT '[]',
+      created_at TIMESTAMPTZ DEFAULT now(),
+      updated_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+  await db.query(
+    `CREATE INDEX IF NOT EXISTS idx_pipeline_brand ON content_pipeline(brand_id)`,
+  )
+  await db.query(
+    `CREATE INDEX IF NOT EXISTS idx_pipeline_stage ON content_pipeline(stage)`,
+  )
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS agent_runs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       brand_id UUID REFERENCES brands(id),
