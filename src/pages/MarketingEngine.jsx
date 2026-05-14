@@ -90,6 +90,24 @@ const AGENTS = [
     ],
   },
   {
+    key: 'video_editor',
+    name: 'Editor',
+    color: '#C2B59B',
+    icon: Film,
+    role: 'Assembly · Color grade · Final cut',
+    pos: { left: '38%', top: '58%' },
+    bobDelay: 1.5,
+    requiresPipeline: true,
+    statuses: [
+      ['Cutting scene 2...', 'Pipeline #04'],
+      ['Adding voiceover...', 'Audio synced'],
+      ['Color grading...', 'Lithos warmth'],
+      ['Final render ready', 'Export queued'],
+      ['Sequencing scenes...', 'Timeline draft'],
+      ['Mixing audio tracks', 'Stems aligned'],
+    ],
+  },
+  {
     key: 'distribution',
     name: 'Distribution',
     color: '#ffffff',
@@ -1571,6 +1589,11 @@ const HUD_COLORS = {
   strategy: { glow: 'rgba(139,92,246,0.08)', accent: '#a78bfa', soft: 'rgba(139,92,246,0.5)' },
   writer: { glow: 'rgba(6,182,212,0.08)', accent: '#22d3ee', soft: 'rgba(6,182,212,0.5)' },
   video: { glow: 'rgba(251,191,36,0.08)', accent: '#fbbf24', soft: 'rgba(251,191,36,0.5)' },
+  video_editor: {
+    glow: 'rgba(194,181,155,0.1)',
+    accent: '#C2B59B',
+    soft: 'rgba(194,181,155,0.55)',
+  },
   distribution: { glow: 'rgba(74,222,128,0.08)', accent: '#4ade80', soft: 'rgba(74,222,128,0.5)' },
   analytics: { glow: 'rgba(248,113,113,0.08)', accent: '#f87171', soft: 'rgba(248,113,113,0.5)' },
 }
@@ -1579,6 +1602,7 @@ const DESK_POSITIONS = {
   strategy: { left: '8%', top: '12%' },
   writer: { left: '38%', top: '12%' },
   video: { left: '68%', top: '12%' },
+  video_editor: { left: '40%', top: '54%' },
   distribution: { left: '18%', top: '62%' },
   analytics: { left: '62%', top: '62%' },
 }
@@ -1587,6 +1611,7 @@ const HOME_POSITIONS = {
   strategy: { left: '6%', top: '18%' },
   writer: { left: '36%', top: '18%' },
   video: { left: '66%', top: '18%' },
+  video_editor: { left: '38%', top: '58%' },
   distribution: { left: '16%', top: '68%' },
   analytics: { left: '60%', top: '68%' },
 }
@@ -1595,8 +1620,9 @@ const MEETING_POSITIONS = {
   strategy: { left: '40%', top: '40%' },
   writer: { left: '54%', top: '40%' },
   video: { left: '36%', top: '50%' },
+  video_editor: { left: '47%', top: '47%' },
   distribution: { left: '57%', top: '50%' },
-  analytics: { left: '47%', top: '58%' },
+  analytics: { left: '47%', top: '60%' },
 }
 
 const ROOM_RECTS = [
@@ -1803,7 +1829,15 @@ function AgentCharacter({ agent, position, mode, screenIndex }) {
   const [hover, setHover] = useState(false)
   const isAtDesk = mode === 'desk'
   const isMeetingWalk = mode === 'meeting-walk'
-  const bubble = isMeetingWalk ? 'Checking in...' : status[0] || ''
+  // The Editor gets a slow cycling thought bubble (always visible) so its
+  // creative-lead role reads at a glance — other agents only show on hover.
+  const alwaysShowBubble = agent.key === 'video_editor'
+  const bubble = isMeetingWalk
+    ? 'Checking in...'
+    : Array.isArray(status)
+    ? status[0] || ''
+    : status || ''
+  const bobDelay = typeof agent.bobDelay === 'number' ? agent.bobDelay : 0
 
   return (
     <motion.div
@@ -1826,7 +1860,7 @@ function AgentCharacter({ agent, position, mode, screenIndex }) {
     >
       {/* Thought bubble */}
       <motion.div
-        animate={{ opacity: hover || isMeetingWalk ? 1 : 0 }}
+        animate={{ opacity: hover || isMeetingWalk || alwaysShowBubble ? 1 : 0 }}
         transition={{ duration: 0.2 }}
         style={{
           position: 'absolute',
@@ -1834,11 +1868,15 @@ function AgentCharacter({ agent, position, mode, screenIndex }) {
           left: '50%',
           transform: 'translateX(-50%)',
           background: 'rgba(20,20,28,0.95)',
-          border: '0.5px solid rgba(255,255,255,0.1)',
+          border: alwaysShowBubble
+            ? `0.5px solid ${colors.soft || 'rgba(255,255,255,0.1)'}`
+            : '0.5px solid rgba(255,255,255,0.1)',
           borderRadius: 6,
           padding: '3px 7px',
           fontSize: 8,
-          color: 'rgba(255,255,255,0.6)',
+          color: alwaysShowBubble
+            ? colors.accent || 'rgba(255,255,255,0.6)'
+            : 'rgba(255,255,255,0.6)',
           whiteSpace: 'nowrap',
           pointerEvents: 'none',
         }}
@@ -1857,6 +1895,7 @@ function AgentCharacter({ agent, position, mode, screenIndex }) {
           duration: isAtDesk ? 0.8 : 0.6,
           repeat: Infinity,
           ease: 'easeInOut',
+          delay: bobDelay,
         }}
         style={{
           display: 'flex',
@@ -1903,15 +1942,27 @@ function AgentCharacter({ agent, position, mode, screenIndex }) {
   )
 }
 
-function EditorAgentPill({ brand, showToast, onRefresh }) {
-  const [hasReadyPipeline, setHasReadyPipeline] = useState(false)
+function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMemory }) {
+  const colors = HUD_COLORS[agent.key] || { accent: '#ffffff' }
+  const status = agent.statuses[screenIndex % agent.statuses.length]
+  const statusLine = Array.isArray(status) ? status[0] || '' : status || ''
   const [runStatus, setRunStatus] = useState('idle')
   const [hover, setHover] = useState(false)
-  const amber = '#f59e0b'
+  const [lastRunAt, setLastRunAt] = useState(null)
+  const [nowTick, setNowTick] = useState(Date.now())
+  const [pipelineReady, setPipelineReady] = useState(false)
 
   useEffect(() => {
-    if (!brand?.id) {
-      setHasReadyPipeline(false)
+    if (!lastRunAt) return
+    const id = setInterval(() => setNowTick(Date.now()), 30000)
+    return () => clearInterval(id)
+  }, [lastRunAt])
+
+  // Editor (and any future requiresPipeline agent) only runs when the brand
+  // has a pipeline that's reached visuals/assembly stage.
+  useEffect(() => {
+    if (!agent.requiresPipeline || !brand?.id) {
+      setPipelineReady(false)
       return
     }
     let cancelled = false
@@ -1926,9 +1977,9 @@ function EditorAgentPill({ brand, showToast, onRefresh }) {
         const ready =
           Array.isArray(list) &&
           list.some((p) => p.stage === 'visuals' || p.stage === 'assembly')
-        setHasReadyPipeline(ready)
+        setPipelineReady(ready)
       } catch {
-        if (!cancelled) setHasReadyPipeline(false)
+        if (!cancelled) setPipelineReady(false)
       }
     }
     check()
@@ -1937,133 +1988,11 @@ function EditorAgentPill({ brand, showToast, onRefresh }) {
       cancelled = true
       clearInterval(id)
     }
-  }, [brand?.id])
-
-  if (!hasReadyPipeline) return null
-
-  async function handleEdit() {
-    if (!brand?.id || runStatus === 'running') return
-    setRunStatus('running')
-    try {
-      const res = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brand_id: brand.id, agent_type: 'video_editor' }),
-      })
-      if (!res.ok) throw new Error('editor failed')
-      setRunStatus('success')
-      showToast?.('Video edited — check Videos queue')
-      onRefresh?.()
-      setTimeout(() => setRunStatus('idle'), 3000)
-    } catch (e) {
-      console.error('video_editor failed', e)
-      setRunStatus('error')
-      showToast?.('Editor failed — retry', 'error')
-      setTimeout(() => setRunStatus('idle'), 3000)
-    }
-  }
-
-  const isRunning = runStatus === 'running'
-  const statusLabel = isRunning
-    ? 'Editing...'
-    : runStatus === 'success'
-    ? 'Complete ✓'
-    : runStatus === 'error'
-    ? 'Error — retry'
-    : 'Pipeline ready to assemble'
-
-  return (
-    <div
-      style={{
-        background: 'rgba(245,158,11,0.06)',
-        border: '0.5px solid rgba(245,158,11,0.25)',
-        borderRadius: 10,
-        padding: '8px 12px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        flexShrink: 0,
-        minWidth: 220,
-      }}
-    >
-      <motion.span
-        animate={{ opacity: [1, 0.4, 1] }}
-        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: '50%',
-          background: amber,
-          boxShadow: `0 0 6px ${amber}`,
-          flexShrink: 0,
-        }}
-      />
-      <div
-        style={{
-          minWidth: 0,
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1,
-        }}
-      >
-        <span style={{ fontSize: 11, fontWeight: 500, color: '#fff', whiteSpace: 'nowrap' }}>
-          Editor
-        </span>
-        <span
-          style={{
-            fontSize: 10,
-            color: 'rgba(255,255,255,0.4)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {statusLabel}
-        </span>
-      </div>
-      <button
-        type="button"
-        onClick={handleEdit}
-        disabled={!brand || isRunning}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-        title={isRunning ? 'Editing…' : 'Assemble final video from pipeline'}
-        style={{
-          fontSize: 9,
-          padding: '3px 8px',
-          borderRadius: 999,
-          border: `0.5px solid ${amber}55`,
-          background:
-            hover && !isRunning && brand ? 'rgba(245,158,11,0.12)' : 'transparent',
-          color: !brand || isRunning ? 'rgba(255,255,255,0.25)' : amber,
-          cursor: !brand || isRunning ? 'default' : 'pointer',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-        }}
-      >
-        {isRunning ? '…' : 'Edit'}
-      </button>
-    </div>
-  )
-}
-
-function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMemory }) {
-  const colors = HUD_COLORS[agent.key] || { accent: '#ffffff' }
-  const status = agent.statuses[screenIndex % agent.statuses.length]
-  const [runStatus, setRunStatus] = useState('idle')
-  const [hover, setHover] = useState(false)
-  const [lastRunAt, setLastRunAt] = useState(null)
-  const [nowTick, setNowTick] = useState(Date.now())
-
-  useEffect(() => {
-    if (!lastRunAt) return
-    const id = setInterval(() => setNowTick(Date.now()), 30000)
-    return () => clearInterval(id)
-  }, [lastRunAt])
+  }, [agent.requiresPipeline, brand?.id])
 
   async function handleRun() {
     if (!brand || runStatus === 'running') return
+    if (agent.requiresPipeline && !pipelineReady) return
     setRunStatus('running')
     try {
       const apiAgentType = agent.key === 'video' ? 'video_director' : agent.key
@@ -2071,12 +2000,16 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
       setRunStatus('success')
       setLastRunAt(Date.now())
       const added = countItemsAdded(data)
+      const baseLabel = agent.name === 'Editor' ? 'Editor' : `${agent.name} Agent`
       showToast?.(
-        added > 0
-          ? `${agent.name} Agent finished — ${added} items added to queue`
-          : `${agent.name} Agent finished`,
+        agent.key === 'video_editor'
+          ? 'Video edited — check Videos queue'
+          : added > 0
+          ? `${baseLabel} finished — ${added} items added to queue`
+          : `${baseLabel} finished`,
       )
       if (agent.key === 'writer' || agent.key === 'strategy') onRefresh?.()
+      if (agent.key === 'video_editor') onRefresh?.()
       setTimeout(() => setRunStatus('idle'), 3000)
     } catch (e) {
       console.error(`${agent.key} run failed`, e)
@@ -2087,13 +2020,20 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
   }
 
   const isRunning = runStatus === 'running'
+  const requiresPipeline = !!agent.requiresPipeline
+  const disabled =
+    !brand || isRunning || (requiresPipeline && !pipelineReady)
+  const idleStatusLabel = requiresPipeline && !pipelineReady
+    ? 'Waiting for pipeline assets'
+    : statusLine
+  const runningLabel = agent.key === 'video_editor' ? 'Editing...' : 'Running...'
   const statusLabel = isRunning
-    ? 'Running...'
+    ? runningLabel
     : runStatus === 'success'
     ? 'Complete ✓'
     : runStatus === 'error'
     ? 'Error — retry'
-    : status[0] || ''
+    : idleStatusLabel
 
   return (
     <div
@@ -2170,11 +2110,13 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
       <button
         type="button"
         onClick={handleRun}
-        disabled={!brand || isRunning}
+        disabled={disabled}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
         title={
-          hasMemory === false
+          requiresPipeline && !pipelineReady
+            ? 'Run Video Director first to generate assets'
+            : hasMemory === false
             ? 'Add brand memory first for best results'
             : isRunning
             ? 'Running…'
@@ -2184,25 +2126,30 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
           fontSize: 9,
           padding: '3px 8px',
           borderRadius: 999,
-          border: '0.5px solid rgba(255,255,255,0.15)',
+          border: agent.key === 'video_editor'
+            ? `0.5px solid ${colors.soft || colors.accent}55`
+            : '0.5px solid rgba(255,255,255,0.15)',
           background:
-            hover && !isRunning && brand
-              ? 'rgba(255,255,255,0.06)'
+            hover && !disabled
+              ? agent.key === 'video_editor'
+                ? `${colors.accent}1f`
+                : 'rgba(255,255,255,0.06)'
               : 'transparent',
-          color:
-            !brand || isRunning
-              ? 'rgba(255,255,255,0.25)'
-              : hover
-              ? '#fff'
-              : 'rgba(255,255,255,0.5)',
+          color: disabled
+            ? 'rgba(255,255,255,0.25)'
+            : agent.key === 'video_editor'
+            ? colors.accent
+            : hover
+            ? '#fff'
+            : 'rgba(255,255,255,0.5)',
           fontWeight: 500,
           letterSpacing: '0.04em',
-          cursor: !brand || isRunning ? 'not-allowed' : 'pointer',
+          cursor: disabled ? 'not-allowed' : 'pointer',
           flexShrink: 0,
           transition: 'all 0.15s ease',
         }}
       >
-        {isRunning ? '...' : 'Run'}
+        {isRunning ? '...' : agent.key === 'video_editor' ? 'Edit' : 'Run'}
       </button>
     </div>
   )
@@ -2433,7 +2380,7 @@ function AgentOffice({
               fontWeight: 600,
             }}
           >
-            5 AGENTS ACTIVE
+            6 AGENTS ACTIVE
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2469,6 +2416,50 @@ function AgentOffice({
           backgroundSize: '28px 28px',
         }}
       >
+        {/* Connecting flow lines: Video Director → Editor → Distribution.
+            Drawn under desks/characters so they read as a subtle floor accent. */}
+        <svg
+          aria-hidden
+          width="100%"
+          height="100%"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="flow-video-editor" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="rgba(251,191,36,0.32)" />
+              <stop offset="100%" stopColor="rgba(194,181,155,0.32)" />
+            </linearGradient>
+            <linearGradient id="flow-editor-distribution" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="rgba(194,181,155,0.32)" />
+              <stop offset="100%" stopColor="rgba(74,222,128,0.32)" />
+            </linearGradient>
+          </defs>
+          <line
+            x1="70%"
+            y1="14%"
+            x2="42%"
+            y2="58%"
+            stroke="url(#flow-video-editor)"
+            strokeWidth="1"
+            strokeDasharray="3 5"
+          />
+          <line
+            x1="42%"
+            y1="60%"
+            x2="20%"
+            y2="66%"
+            stroke="url(#flow-editor-distribution)"
+            strokeWidth="1"
+            strokeDasharray="3 5"
+          />
+        </svg>
+
         {/* Room rectangles + labels */}
         {ROOM_RECTS.map((r) => (
           <div key={r.name} aria-hidden>
@@ -2566,24 +2557,16 @@ function AgentOffice({
           borderTop: '0.5px solid rgba(255,255,255,0.06)',
         }}
       >
-        {AGENTS.map((agent, idx) => (
-          <Fragment key={agent.key}>
-            <AgentInfoPill
-              agent={agent}
-              screenIndex={screenIndex}
-              brand={brand}
-              onRefresh={onRefresh}
-              showToast={showToast}
-              hasMemory={hasMemory}
-            />
-            {agent.key === 'video' && (
-              <EditorAgentPill
-                brand={brand}
-                showToast={showToast}
-                onRefresh={onRefresh}
-              />
-            )}
-          </Fragment>
+        {AGENTS.map((agent) => (
+          <AgentInfoPill
+            key={agent.key}
+            agent={agent}
+            screenIndex={screenIndex}
+            brand={brand}
+            onRefresh={onRefresh}
+            showToast={showToast}
+            hasMemory={hasMemory}
+          />
         ))}
       </div>
 
