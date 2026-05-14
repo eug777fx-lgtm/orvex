@@ -4137,6 +4137,71 @@ function ContentHub({
   const [platformFilter, setPlatformFilter] = useState('all')
   const [showWorkflow, setShowWorkflow] = useState(false)
   const [videoPreview, setVideoPreview] = useState(null)
+  const [pipelines, setPipelines] = useState([])
+  const [pipelinesVersion, setPipelinesVersion] = useState(0)
+  const [startingPipeline, setStartingPipeline] = useState(false)
+
+  useEffect(() => {
+    if (!brand?.id) {
+      setPipelines([])
+      return
+    }
+    let cancelled = false
+    async function loadPipelines() {
+      try {
+        const res = await fetch(
+          `/api/pipeline?brand_id=${encodeURIComponent(brand.id)}`,
+        )
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled && Array.isArray(data)) setPipelines(data)
+      } catch (e) {
+        console.error('pipelines fetch failed', e)
+      }
+    }
+    loadPipelines()
+    return () => {
+      cancelled = true
+    }
+  }, [brand?.id, pipelinesVersion])
+
+  async function startPipeline() {
+    if (!brand?.id || startingPipeline) return
+    setStartingPipeline(true)
+    showToast?.('Pipeline started — generating script…')
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand_id: brand.id, type: 'full' }),
+      })
+      if (!res.ok) throw new Error('pipeline start failed')
+      setPipelinesVersion((v) => v + 1)
+      showToast?.('Script ready — check Pipeline tab for progress')
+    } catch (e) {
+      console.error('start pipeline failed', e)
+      showToast?.('Pipeline failed to start', 'error')
+    } finally {
+      setStartingPipeline(false)
+    }
+  }
+
+  async function advancePipeline(pipelineId, stage) {
+    try {
+      showToast?.(`Running ${stage} stage…`)
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipeline_id: pipelineId, stage }),
+      })
+      if (!res.ok) throw new Error(`stage ${stage} failed`)
+      setPipelinesVersion((v) => v + 1)
+      showToast?.(`Stage ${stage} complete`)
+    } catch (e) {
+      console.error('advance pipeline failed', e)
+      showToast?.(`Stage ${stage} failed`, 'error')
+    }
+  }
 
   useEffect(() => {
     if (!brand?.id) {
@@ -4393,6 +4458,7 @@ function ContentHub({
   const packagesFiltered = packagesByLayout[activeQueue] || passedPackages
   const queueCounts = {
     scripts: packagesByLayout.scripts.length,
+    pipeline: pipelines.length,
     videos: packagesByLayout.videos.length,
     static: packagesByLayout.static.length,
   }
@@ -4513,14 +4579,24 @@ function ContentHub({
             onChange={setPlatformFilter}
           />
           <div style={{ marginTop: 12 }}>
-            <PackagesList
-              packages={packagesFiltered}
-              brand={brand}
-              onApprove={approvePackage}
-              onReject={rejectPackage}
-              onGenerateVisual={generateVisual}
-              layout={activeQueue}
-            />
+            {activeQueue === 'pipeline' ? (
+              <PipelineList
+                pipelines={pipelines}
+                brand={brand}
+                onStart={startPipeline}
+                onAdvance={advancePipeline}
+                starting={startingPipeline}
+              />
+            ) : (
+              <PackagesList
+                packages={packagesFiltered}
+                brand={brand}
+                onApprove={approvePackage}
+                onReject={rejectPackage}
+                onGenerateVisual={generateVisual}
+                layout={activeQueue}
+              />
+            )}
           </div>
           <div style={{ marginTop: 12 }}>
             <button
@@ -4715,6 +4791,218 @@ function ContentHub({
           />
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+const PIPELINE_STAGES = ['script', 'audio', 'visuals', 'assembly', 'approved']
+
+function PipelineList({ pipelines, brand, onStart, onAdvance, starting }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <button
+        type="button"
+        onClick={onStart}
+        disabled={!brand || starting}
+        style={{
+          alignSelf: 'flex-start',
+          background: '#C2B59B',
+          color: '#0B0B0D',
+          border: 'none',
+          borderRadius: 8,
+          padding: '7px 16px',
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: !brand || starting ? 'not-allowed' : 'pointer',
+          opacity: !brand || starting ? 0.55 : 1,
+        }}
+      >
+        {starting ? 'Starting…' : 'Generate Video Pipeline'}
+      </button>
+      {pipelines.length === 0 ? (
+        <div
+          style={{
+            padding: 24,
+            textAlign: 'center',
+            color: TEXT_MUTED,
+            fontSize: 12,
+            background: 'rgba(194,181,155,0.03)',
+            borderRadius: 10,
+            border: '0.5px dashed rgba(194,181,155,0.1)',
+          }}
+        >
+          No pipelines yet — click Generate Video Pipeline to start
+        </div>
+      ) : (
+        pipelines.map((p) => (
+          <PipelineCard key={p.id} pipeline={p} brand={brand} onAdvance={onAdvance} />
+        ))
+      )}
+    </div>
+  )
+}
+
+function PipelineCard({ pipeline, brand, onAdvance }) {
+  const stage = pipeline.stage || 'script'
+  const stageIdx = PIPELINE_STAGES.indexOf(stage)
+  const created = pipeline.created_at ? new Date(pipeline.created_at) : null
+  const brandColor = brand?.primary_color || brand?.color || '#C2B59B'
+  const nextStage = {
+    script: 'audio',
+    audio: 'visuals',
+    visuals: 'assembly',
+  }[stage]
+  return (
+    <div
+      style={{
+        background: 'rgba(194,181,155,0.03)',
+        border: '0.5px solid rgba(194,181,155,0.1)',
+        borderRadius: 12,
+        padding: 12,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: brandColor,
+            boxShadow: `0 0 6px ${brandColor}80`,
+          }}
+        />
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#F5F5F2' }}>
+          {brand?.name || 'Brand'}
+        </span>
+        <span
+          style={{
+            fontSize: 10,
+            color: TEXT_FAINT,
+            fontFamily: MONO,
+            letterSpacing: '0.04em',
+          }}
+        >
+          #{String(pipeline.id || '').slice(0, 8)}
+        </span>
+        {pipeline.fallback_used && (
+          <span
+            style={{
+              fontSize: 9.5,
+              padding: '2px 7px',
+              borderRadius: 999,
+              background: 'rgba(251,191,36,0.12)',
+              border: '0.5px solid rgba(251,191,36,0.4)',
+              color: '#fbbf24',
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              marginLeft: 'auto',
+            }}
+          >
+            {pipeline.fallback_type === 'storyboard'
+              ? 'Storyboard fallback'
+              : pipeline.fallback_type === 'text_only'
+              ? 'Audio text fallback'
+              : 'Fallback'}
+          </span>
+        )}
+        {created && (
+          <span
+            style={{
+              fontSize: 10,
+              color: TEXT_FAINT,
+              marginLeft: pipeline.fallback_used ? 0 : 'auto',
+            }}
+          >
+            {minsAgo(created.getTime())}
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {PIPELINE_STAGES.map((s, i) => {
+          const isDone = i < stageIdx
+          const isActive = i === stageIdx
+          const dotColor = isDone
+            ? '#C2B59B'
+            : isActive
+            ? '#fbbf24'
+            : 'rgba(194,181,155,0.18)'
+          return (
+            <Fragment key={s}>
+              <div
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
+              >
+                <motion.div
+                  animate={
+                    isActive
+                      ? { scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }
+                      : { scale: 1, opacity: 1 }
+                  }
+                  transition={
+                    isActive
+                      ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
+                      : { duration: 0.2 }
+                  }
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    background: dotColor,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: isActive ? '#fbbf24' : isDone ? '#C2B59B' : TEXT_FAINT,
+                    textTransform: 'capitalize',
+                    fontWeight: 500,
+                  }}
+                >
+                  {s}
+                </span>
+              </div>
+              {i < PIPELINE_STAGES.length - 1 && (
+                <div
+                  style={{
+                    flex: 1,
+                    height: 1,
+                    background: i < stageIdx ? '#C2B59B' : 'rgba(194,181,155,0.15)',
+                    marginBottom: 14,
+                  }}
+                />
+              )}
+            </Fragment>
+          )
+        })}
+      </div>
+      {pipeline.script_data?.title && (
+        <div style={{ fontSize: 13, color: '#F5F5F2', fontWeight: 500 }}>
+          {pipeline.script_data.title}
+        </div>
+      )}
+      {nextStage && (
+        <button
+          type="button"
+          onClick={() => onAdvance(pipeline.id, nextStage)}
+          style={{
+            alignSelf: 'flex-start',
+            background: 'rgba(194,181,155,0.1)',
+            border: '0.5px solid rgba(194,181,155,0.4)',
+            color: '#C2B59B',
+            borderRadius: 7,
+            padding: '5px 12px',
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: 'pointer',
+            letterSpacing: '0.02em',
+            textTransform: 'capitalize',
+          }}
+        >
+          Continue · Run {nextStage}
+        </button>
+      )}
     </div>
   )
 }
@@ -5198,6 +5486,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
 function QueueTabs({ counts, active, onChange }) {
   const tabs = [
     { key: 'scripts', label: 'Scripts & Copy' },
+    { key: 'pipeline', label: 'Pipeline' },
     { key: 'videos', label: 'Videos' },
     { key: 'static', label: 'Static Ads' },
   ]
