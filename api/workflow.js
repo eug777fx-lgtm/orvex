@@ -2,6 +2,7 @@
 //   VITE_DATABASE_URL    — Neon Postgres connection string
 //   ANTHROPIC_API_KEY    — Claude API key (for pipeline script stage)
 //   ELEVENLABS_API_KEY   — ElevenLabs TTS (optional; falls back if missing)
+//   CREATOMATE_API_KEY   — Creatomate video render API (optional; falls back if missing)
 //
 // GET  /api/workflow?action=next&brand_id=<uuid>
 //   Returns the next approved+unpublished content ready to post.
@@ -25,6 +26,10 @@
 //     { pipeline_id, stage: 'script', script }.
 //   Body: { action: 'pipeline_advance', pipeline_id, stage }
 //     Advances an existing pipeline. stage 'audio' | 'visuals' | 'assembly'.
+//   Body: { action: 'edit_video', brand_id, scenes, audio_url, composition_type }
+//     Builds a Creatomate timeline from scenes and renders an MP4. Returns
+//     { url, content_id, duration, scenes_count } or a structured fallback
+//     when CREATOMATE_API_KEY is missing.
 
 const MAX_PER_DAY = 3
 const SLOT_GAP_HOURS = 4
@@ -549,6 +554,153 @@ async function handlePipelineStart(sql, body) {
   return { ...scriptOut, next: 'audio' }
 }
 
+async function handleEditVideo(sql, body) {
+  const { brand_id, scenes, audio_url } = body
+  if (!brand_id || !Array.isArray(scenes) || scenes.length === 0) {
+    const err = new Error('brand_id and non-empty scenes array required')
+    err.status = 400
+    throw err
+  }
+
+  if (!process.env.CREATOMATE_API_KEY) {
+    return {
+      success: false,
+      fallback: true,
+      message:
+        'Creatomate not configured — add CREATOMATE_API_KEY to Vercel env vars',
+      scenes_received: scenes.length,
+    }
+  }
+
+  const brandRows = await sql.query('SELECT * FROM brands WHERE id = $1', [
+    brand_id,
+  ])
+  const brand = (brandRows?.rows ?? brandRows)?.[0]
+  if (!brand) {
+    const err = new Error('Brand not found')
+    err.status = 404
+    throw err
+  }
+
+  const { Client } = await import('creatomate')
+  const client = new Client(process.env.CREATOMATE_API_KEY)
+
+  const elements = []
+  let currentTime = 0
+
+  for (const scene of scenes) {
+    const sceneDuration = scene.duration || 5
+
+    if (scene.visual_url) {
+      elements.push({
+        type: scene.visual_type === 'video' ? 'video' : 'image',
+        source: scene.visual_url,
+        time: currentTime,
+        duration: sceneDuration,
+        fit: 'cover',
+        animations: [{ type: 'fade', duration: 0.5 }],
+      })
+    } else {
+      elements.push({
+        type: 'rectangle',
+        width: '100%',
+        height: '100%',
+        fill_color: brand.primary_color || '#0B0B0D',
+        time: currentTime,
+        duration: sceneDuration,
+      })
+    }
+
+    if (scene.text_overlay) {
+      elements.push({
+        type: 'text',
+        text: scene.text_overlay,
+        time: currentTime + 0.3,
+        duration: sceneDuration - 0.5,
+        font_family: 'Montserrat',
+        font_weight: '700',
+        font_size: '8 vmin',
+        fill_color: '#FFFFFF',
+        x_alignment: '50%',
+        y_alignment: '50%',
+        width: '80%',
+        animations: [
+          {
+            type: 'text-slide',
+            duration: 0.4,
+            direction: 'up',
+            scope: 'split-clip',
+          },
+        ],
+      })
+    }
+
+    if (brand.name) {
+      elements.push({
+        type: 'text',
+        text: brand.name,
+        time: currentTime,
+        duration: sceneDuration,
+        font_family: 'Montserrat',
+        font_weight: '300',
+        font_size: '3 vmin',
+        fill_color: 'rgba(255,255,255,0.5)',
+        x_alignment: '95%',
+        y_alignment: '95%',
+        animations: [{ type: 'fade', duration: 0.3 }],
+      })
+    }
+
+    currentTime += sceneDuration
+  }
+
+  if (audio_url) {
+    elements.push({
+      type: 'audio',
+      source: audio_url,
+      time: 0,
+      duration: currentTime,
+      audio_fade_out: 0.5,
+    })
+  }
+
+  elements.push({
+    type: 'audio',
+    source: 'https://cdn.creatomate.com/demo/ambient-cinematic.mp3',
+    time: 0,
+    duration: currentTime,
+    volume: audio_url ? '15%' : '40%',
+    audio_fade_in: 1,
+    audio_fade_out: 1,
+  })
+
+  const renders = await client.render({
+    outputFormat: 'mp4',
+    width: 1080,
+    height: 1920,
+    frameRate: 30,
+    duration: currentTime,
+    elements,
+  })
+
+  const outputUrl = renders?.[0]?.url
+  if (!outputUrl) throw new Error('No output URL from Creatomate')
+
+  const contentRows = await sql.query(
+    `INSERT INTO content (brand_id, type, script, status)
+     VALUES ($1, $2, $3, $4) RETURNING id`,
+    [brand_id, 'video', outputUrl, 'pending'],
+  )
+  const contentId = (contentRows?.rows ?? contentRows)?.[0]?.id
+
+  return {
+    url: outputUrl,
+    content_id: contentId,
+    duration: currentTime,
+    scenes_count: scenes.length,
+  }
+}
+
 async function handlePipelineAdvance(sql, body) {
   const { pipeline_id, stage } = body
   if (!pipeline_id || !stage) {
@@ -621,11 +773,15 @@ export default async function handler(req, res) {
         const result = await handlePipelineAdvance(sql, body)
         return res.status(200).json({ success: true, ...result })
       }
+      if (action === 'edit_video') {
+        const result = await handleEditVideo(sql, body)
+        return res.status(200).json({ success: true, ...result })
+      }
       return res
         .status(400)
         .json({
           error:
-            "body.action must be 'approve', 'reject', 'published', 'pipeline_start', or 'pipeline_advance'",
+            "body.action must be 'approve', 'reject', 'published', 'pipeline_start', 'pipeline_advance', or 'edit_video'",
         })
     }
 
