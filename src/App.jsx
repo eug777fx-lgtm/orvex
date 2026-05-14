@@ -52,31 +52,6 @@ const navItems = [
 
 const mobileBottomNavItems = navItems.slice(0, 6)
 
-const logoStyle = {
-  display: 'inline-flex',
-  alignItems: 'baseline',
-  gap: 5,
-  fontSize: 15,
-  letterSpacing: '-0.3px',
-}
-const logoPrimaryStyle = {
-  color: '#ffffff',
-  fontWeight: 600,
-}
-const logoSecondaryStyle = {
-  color: 'rgba(194,181,155,0.6)',
-  fontWeight: 300,
-}
-
-const dotStyle = {
-  width: 6,
-  height: 6,
-  borderRadius: '50%',
-  background: '#C2B59B',
-  boxShadow: '0 0 10px rgba(194,181,155,0.5)',
-  animation: 'glowPulse 2s ease-in-out infinite',
-}
-
 const avatarStyle = {
   width: 32,
   height: 32,
@@ -283,11 +258,39 @@ function Shell() {
             minWidth: isMobile ? 'auto' : 160,
           }}
         >
-          <span style={logoStyle}>
-            <span style={logoPrimaryStyle}>Lithos</span>
-            <span style={logoSecondaryStyle}>Labs</span>
-          </span>
-          <span style={dotStyle} />
+          <img
+            src="/lithos-logo.png"
+            alt="Lithos Labs"
+            style={{
+              width: 24,
+              height: 24,
+              objectFit: 'contain',
+              filter: 'brightness(0) invert(1)',
+              opacity: 0.9,
+            }}
+          />
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+            <span
+              style={{
+                fontWeight: 600,
+                fontSize: 15,
+                color: '#ffffff',
+                letterSpacing: '-0.3px',
+              }}
+            >
+              Lithos
+            </span>
+            <span
+              style={{
+                fontWeight: 300,
+                fontSize: 15,
+                color: 'rgba(194,181,155,0.6)',
+                letterSpacing: '-0.3px',
+              }}
+            >
+              Labs
+            </span>
+          </div>
         </div>
         {!isMobile && <NavTabs />}
         <div
