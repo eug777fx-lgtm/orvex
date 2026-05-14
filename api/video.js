@@ -85,6 +85,43 @@ async function buildBrandedPrompt(sql, brand_id, type, prompt) {
   return `${prompt}${suffix}`
 }
 
+async function buildStoryboardFallback(sql, brand_id, prompt) {
+  let brand = null
+  if (brand_id) {
+    try {
+      const rows = await sql.query(
+        'SELECT primary_color, secondary_color FROM brands WHERE id = $1',
+        [brand_id],
+      )
+      brand = (rows?.rows ?? rows)?.[0] || null
+    } catch {
+      brand = null
+    }
+  }
+  const storyboard = {
+    prompt_used: prompt,
+    visual_description: prompt,
+    suggested_composition: 'HookOpener',
+    brand_colors: {
+      primary: brand?.primary_color || '#C2B59B',
+      secondary: brand?.secondary_color || '#F5F5F2',
+    },
+    production_notes:
+      'Visual brief ready — generate using Remotion or record manually',
+    status: 'awaiting_visual_production',
+  }
+  try {
+    await sql.query(
+      `INSERT INTO content (brand_id, type, script, status)
+       VALUES ($1, 'storyboard', $2, 'pending')`,
+      [brand_id || null, JSON.stringify(storyboard)],
+    )
+  } catch (e) {
+    console.error('storyboard content insert failed:', e.message)
+  }
+  return storyboard
+}
+
 export async function generateVideo({ brand_id, type, prompt, image_url, sql }) {
   const brandedPrompt = await buildBrandedPrompt(sql, brand_id, type, prompt)
   const startResult = await startGeneration(type, brandedPrompt, image_url)
@@ -130,7 +167,46 @@ export default async function handler(req, res) {
     const { neon } = await import('@neondatabase/serverless')
     const sql = neon(process.env.VITE_DATABASE_URL)
 
-    const result = await generateVideo({ brand_id, type, prompt, image_url, sql })
+    // No key configured — return a structured storyboard fallback.
+    if (!process.env.HIGGSFIELD_API_KEY) {
+      const storyboard = await buildStoryboardFallback(sql, brand_id, prompt)
+      return res.status(200).json({
+        success: true,
+        fallback: true,
+        fallback_type: 'storyboard',
+        storyboard,
+        message: 'Higgsfield unavailable — storyboard generated as fallback',
+      })
+    }
+
+    let result
+    try {
+      result = await Promise.race([
+        generateVideo({ brand_id, type, prompt, image_url, sql }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('higgsfield_timeout')), 55000),
+        ),
+      ])
+    } catch (err) {
+      const msg = String(err?.message || err)
+      const isCreditOrAuth =
+        msg.includes('401') ||
+        msg.includes('403') ||
+        msg.includes('429') ||
+        msg.includes('timeout') ||
+        msg.includes('higgsfield_generate_failed') ||
+        msg.includes('higgsfield_status_failed') ||
+        msg.includes('higgsfield_polling_timeout')
+      if (!isCreditOrAuth) throw err
+      const storyboard = await buildStoryboardFallback(sql, brand_id, prompt)
+      return res.status(200).json({
+        success: true,
+        fallback: true,
+        fallback_type: 'storyboard',
+        storyboard,
+        message: 'Higgsfield unavailable — storyboard generated as fallback',
+      })
+    }
     return res.status(200).json(result)
   } catch (error) {
     console.error('video handler error:', error.message)

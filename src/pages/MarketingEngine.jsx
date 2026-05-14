@@ -4102,6 +4102,7 @@ const CONTENT_TYPE_GROUP = {
   video: 'videos',
   video_render: 'videos',
   video_brief: 'videos',
+  storyboard: 'videos',
   image: 'static',
   static_ad: 'static',
 }
@@ -5883,8 +5884,11 @@ function VideosQueue({ items, brand, onApprove, onReject, onPreview }) {
 function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
   const url = it.script && /^https?:\/\//.test(it.script) ? it.script : null
   const isBrief = it.type === 'video_brief'
+  const isStoryboard = it.type === 'storyboard'
   const isRendering =
-    !isBrief && (it.type === 'video_render' || (!url && it.type === 'video'))
+    !isBrief &&
+    !isStoryboard &&
+    (it.type === 'video_render' || (!url && it.type === 'video'))
   const brandColor = brand?.primary_color || brand?.color || '#ffffff'
   const [generating, setGenerating] = useState(false)
 
@@ -5898,6 +5902,41 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
     }
   }
   const briefPrompt = parsedBrief?.video_prompt || ''
+
+  // Parse storyboard payload for storyboard rows.
+  let parsedStoryboard = null
+  if (isStoryboard && it.script) {
+    try {
+      parsedStoryboard = JSON.parse(it.script)
+    } catch {
+      parsedStoryboard = null
+    }
+  }
+  const storyboardPrompt = parsedStoryboard?.visual_description || ''
+  const suggestedComposition = parsedStoryboard?.suggested_composition || 'HookOpener'
+
+  async function generateWithRemotion() {
+    if (!brand || generating) return
+    setGenerating(true)
+    try {
+      await fetch('/api/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          composition_id: suggestedComposition,
+          props: {
+            headline: storyboardPrompt.slice(0, 80),
+            brandName: brand.name,
+          },
+          brand_id: brand.id,
+        }),
+      })
+    } catch (e) {
+      console.error('storyboard remotion render failed', e)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   async function generateFromBrief() {
     if (!brand || generating || !briefPrompt) return
@@ -5969,6 +6008,44 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
           >
             {briefPrompt}
           </div>
+        ) : isStoryboard ? (
+          <div
+            style={{
+              padding: 14,
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: 11,
+              lineHeight: 1.5,
+              overflow: 'auto',
+              maxHeight: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <Film size={18} color="rgba(255,255,255,0.45)" />
+            <div style={{ color: '#fff', fontWeight: 500 }}>
+              {storyboardPrompt || 'Storyboard ready for production'}
+            </div>
+            <span
+              style={{
+                alignSelf: 'flex-start',
+                fontSize: 9.5,
+                padding: '2px 7px',
+                borderRadius: 999,
+                background: 'rgba(194,181,155,0.1)',
+                border: '0.5px solid rgba(194,181,155,0.3)',
+                color: '#C2B59B',
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+              }}
+            >
+              {suggestedComposition}
+            </span>
+            <div style={{ fontSize: 10, color: TEXT_FAINT, lineHeight: 1.4 }}>
+              {parsedStoryboard?.production_notes ||
+                'Visual brief ready — generate using Remotion or record manually'}
+            </div>
+          </div>
         ) : (
           <div
             style={{
@@ -5993,7 +6070,9 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
             fontSize: 9.5,
             padding: '2px 8px',
             borderRadius: 999,
-            background: isBrief
+            background: isStoryboard
+              ? 'rgba(194,181,155,0.12)'
+              : isBrief
               ? 'rgba(251,191,36,0.15)'
               : isRendering
               ? 'rgba(251,191,36,0.15)'
@@ -6001,13 +6080,21 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
               ? 'rgba(74,222,128,0.15)'
               : 'rgba(248,113,113,0.15)',
             border: `0.5px solid ${
-              isBrief || isRendering
+              isStoryboard
+                ? 'rgba(194,181,155,0.35)'
+                : isBrief || isRendering
                 ? 'rgba(251,191,36,0.4)'
                 : url
                 ? 'rgba(74,222,128,0.4)'
                 : 'rgba(248,113,113,0.4)'
             }`,
-            color: isBrief || isRendering ? '#fbbf24' : url ? '#4ade80' : '#f87171',
+            color: isStoryboard
+              ? '#C2B59B'
+              : isBrief || isRendering
+              ? '#fbbf24'
+              : url
+              ? '#4ade80'
+              : '#f87171',
             fontWeight: 600,
             letterSpacing: '0.04em',
             display: 'inline-flex',
@@ -6027,7 +6114,9 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
               }}
             />
           )}
-          {isBrief
+          {isStoryboard
+            ? 'Higgsfield unavailable'
+            : isBrief
             ? 'Brief ready — generating…'
             : isRendering
             ? 'Rendering'
@@ -6070,7 +6159,27 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
-        {isBrief && briefPrompt ? (
+        {isStoryboard ? (
+          <button
+            type="button"
+            onClick={generateWithRemotion}
+            disabled={generating}
+            style={{
+              flex: 1,
+              fontSize: 11,
+              padding: '5px 10px',
+              borderRadius: 7,
+              background: 'rgba(194,181,155,0.12)',
+              border: '0.5px solid rgba(194,181,155,0.4)',
+              color: '#C2B59B',
+              fontWeight: 600,
+              cursor: generating ? 'wait' : 'pointer',
+              opacity: generating ? 0.6 : 1,
+            }}
+          >
+            {generating ? 'Queueing…' : 'Generate with Remotion'}
+          </button>
+        ) : isBrief && briefPrompt ? (
           <button
             type="button"
             onClick={generateFromBrief}
