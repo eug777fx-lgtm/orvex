@@ -4151,7 +4151,7 @@ function ContentHub({
     async function loadPipelines() {
       try {
         const res = await fetch(
-          `/api/pipeline?brand_id=${encodeURIComponent(brand.id)}`,
+          `/api/workflow?action=pipeline_list&brand_id=${encodeURIComponent(brand.id)}`,
         )
         if (!res.ok) return
         const data = await res.json()
@@ -4171,10 +4171,10 @@ function ContentHub({
     setStartingPipeline(true)
     showToast?.('Pipeline started — generating script…')
     try {
-      const res = await fetch('/api/pipeline', {
+      const res = await fetch('/api/workflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brand_id: brand.id, type: 'full' }),
+        body: JSON.stringify({ action: 'pipeline_start', brand_id: brand.id, type: 'full' }),
       })
       if (!res.ok) throw new Error('pipeline start failed')
       setPipelinesVersion((v) => v + 1)
@@ -4190,10 +4190,10 @@ function ContentHub({
   async function advancePipeline(pipelineId, stage) {
     try {
       showToast?.(`Running ${stage} stage…`)
-      const res = await fetch('/api/pipeline', {
+      const res = await fetch('/api/workflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pipeline_id: pipelineId, stage }),
+        body: JSON.stringify({ action: 'pipeline_advance', pipeline_id: pipelineId, stage }),
       })
       if (!res.ok) throw new Error(`stage ${stage} failed`)
       setPipelinesVersion((v) => v + 1)
