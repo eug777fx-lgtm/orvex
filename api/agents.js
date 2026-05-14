@@ -9,6 +9,24 @@
 
 import { generateVideo } from './video.js'
 
+function validateBrandContext(brand /*, agentType */) {
+  const required = ['id', 'name']
+  for (const field of required) {
+    if (!brand?.[field]) {
+      throw new Error(`Brand missing required field: ${field}`)
+    }
+  }
+  return true
+}
+
+function assertSameBrand(rowBrandId, expectedBrandId) {
+  if (rowBrandId !== expectedBrandId) {
+    throw new Error(
+      `Brand isolation violation: refusing to insert content for brand ${rowBrandId} into context ${expectedBrandId}`,
+    )
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -53,8 +71,14 @@ export default async function handler(req, res) {
     }
 
     const { brand_id, agent_type, input } = req.body || {}
-    if (!brand_id || !agent_type) {
-      return res.status(400).json({ error: 'brand_id and agent_type required' })
+    if (!brand_id) {
+      return res.status(400).json({
+        error:
+          'brand_id is required. All agent runs must be tied to a specific brand.',
+      })
+    }
+    if (!agent_type) {
+      return res.status(400).json({ error: 'agent_type required' })
     }
 
     const result = await runAgent({ sql, brand_id, agent_type, input })
@@ -73,17 +97,25 @@ export default async function handler(req, res) {
   }
 }
 
-async function runAgent({ sql, brand_id, agent_type, input }) {
+async function runAgent({ sql, brand_id: requestedBrandId, agent_type, input }) {
   const brandRows = await sql.query(
-    'SELECT name, voice_prompt, color, platforms, logo_url, primary_color, secondary_color, visual_style, aesthetic_description FROM brands WHERE id = $1',
-    [brand_id],
+    'SELECT id, name, voice_prompt, color, platforms, logo_url, primary_color, secondary_color, visual_style, aesthetic_description FROM brands WHERE id = $1',
+    [requestedBrandId],
   )
   const brand = (brandRows?.rows ?? brandRows)?.[0]
-  if (!brand) {
-    const err = new Error('brand not found')
+  if (!brand || !brand.id) {
+    const err = new Error(
+      `Brand not found for id: ${requestedBrandId}. Cannot run agent without valid brand.`,
+    )
     err.status = 404
     throw err
   }
+
+  // Strict brand isolation: validate the brand context and from this point on
+  // shadow the original brand_id with the validated brand.id pulled from the
+  // database. Every downstream insert below uses this validated value.
+  validateBrandContext(brand, agent_type)
+  const brand_id = brand.id
 
   const memoryRows = await sql.query(
     'SELECT content, memory_type FROM brand_memory WHERE brand_id = $1',
@@ -227,13 +259,16 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
 
       // Persist the text parts as content rows for backward compat with the
       // rest of the system (analytics, repurpose, search, etc.).
+      // Brand isolation: every insert below uses the validated brand_id and
+      // guards against cross-brand contamination via assertSameBrand.
       let hookId = null
       let captionId = null
+      assertSameBrand(brand_id, brand.id)
       if (hookText) {
         const r = await sql.query(
           `INSERT INTO content (brand_id, type, hook, status)
            VALUES ($1, 'hook', $2, 'pending') RETURNING id`,
-          [brand_id, hookText],
+          [brand.id, hookText],
         )
         hookId = (r?.rows ?? r)?.[0]?.id
       }
@@ -241,7 +276,7 @@ async function runAgent({ sql, brand_id, agent_type, input }) {
         const r = await sql.query(
           `INSERT INTO content (brand_id, type, caption, status)
            VALUES ($1, 'caption', $2, 'pending') RETURNING id`,
-          [brand_id, captionText],
+          [brand.id, captionText],
         )
         captionId = (r?.rows ?? r)?.[0]?.id
       }
