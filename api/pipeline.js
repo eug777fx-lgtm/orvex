@@ -48,6 +48,28 @@ async function fetchBrandWithMemory(sql, brand_id) {
   }
 }
 
+function buildSceneSfx(scene) {
+  const desc = String(scene?.visual_description || '').toLowerCase()
+  const suggestions = []
+  const timing = []
+  const add = (cue, time) => {
+    suggestions.push(cue)
+    if (time != null) timing.push({ time_seconds: time, effect_description: cue })
+  }
+  if (/water|leak|drip|rain/.test(desc)) add('Drip / water flow ambience', 0)
+  if (/keyboard|typing|computer|laptop/.test(desc)) add('Keyboard typing taps', 1)
+  if (/phone|notification|message|dm/.test(desc)) add('Soft notification chime', 0.5)
+  if (/trade|chart|graph|line moving/.test(desc)) add('Subtle chart/graph movement whoosh', 0.75)
+  if (/door|enter|walk in/.test(desc)) add('Door open + footsteps', 0)
+  if (/text overlay|hook appears|word appears/.test(desc)) add('Text-stamp whoosh', 0.25)
+  if (suggestions.length === 0) add('Ambient cinematic bed', 0)
+  return {
+    background_music: scene?.sound_direction || '',
+    sfx_suggestions: suggestions,
+    timing,
+  }
+}
+
 function safeParseJSON(text) {
   if (!text) return null
   try {
@@ -114,13 +136,19 @@ async function runAudioStage(sql, pipelineId) {
   let fallbackType = pipeline.fallback_type || null
   const sceneAudio = []
   const hasKey = !!process.env.ELEVENLABS_API_KEY
+  let voiceoverScenes = 0
 
   for (const scene of scenes) {
+    const sfx = buildSceneSfx(scene)
+    const baseSceneAudio = {
+      scene_number: scene.scene_number,
+      music_direction: scene.sound_direction || '',
+      sound_effects: sfx,
+    }
     if (!scene.dialogue) {
       sceneAudio.push({
-        scene_number: scene.scene_number,
+        ...baseSceneAudio,
         has_voiceover: false,
-        music_direction: scene.sound_direction || '',
       })
       continue
     }
@@ -128,10 +156,9 @@ async function runAudioStage(sql, pipelineId) {
       fallbackUsed = true
       fallbackType = fallbackType || 'text_only'
       sceneAudio.push({
-        scene_number: scene.scene_number,
+        ...baseSceneAudio,
         has_voiceover: false,
         script_fallback: scene.dialogue,
-        music_direction: scene.sound_direction || '',
       })
       continue
     }
@@ -156,27 +183,43 @@ async function runAudioStage(sql, pipelineId) {
       const buf = await res.arrayBuffer()
       const base64 = Buffer.from(buf).toString('base64')
       sceneAudio.push({
-        scene_number: scene.scene_number,
+        ...baseSceneAudio,
         has_voiceover: true,
         audio_url: `data:audio/mpeg;base64,${base64}`,
         duration: scene.duration || null,
       })
+      voiceoverScenes += 1
     } catch (e) {
       fallbackUsed = true
       fallbackType = fallbackType || 'text_only'
       sceneAudio.push({
-        scene_number: scene.scene_number,
+        ...baseSceneAudio,
         has_voiceover: false,
         script_fallback: scene.dialogue,
-        music_direction: scene.sound_direction || '',
         error: String(e.message || e),
       })
     }
   }
 
+  const totalDuration = scenes.reduce((s, sc) => s + (sc.duration || 0), 0)
+  const musicDirections = Array.from(
+    new Set(scenes.map((s) => s.sound_direction).filter(Boolean)),
+  )
   const audio_data = {
     scenes: sceneAudio,
-    total_audio_duration: scenes.reduce((s, sc) => s + (sc.duration || 0), 0),
+    total_audio_duration: totalDuration,
+    final_brief: {
+      total_duration: totalDuration,
+      has_voiceover: voiceoverScenes > 0,
+      voiceover_scenes: voiceoverScenes,
+      music_direction: musicDirections.join(' · ') || 'No music direction set',
+      production_notes: voiceoverScenes
+        ? `Mix ${voiceoverScenes} voiceover scene(s) over ambient bed matching: ${musicDirections.join(', ') || 'cinematic'}. Layer in scene SFX at the timing notes per scene.`
+        : `Pure music + SFX edit. Use ${musicDirections.join(', ') || 'cinematic'} as the bed. Show dialogue/text as on-screen overlay per scene.`,
+    },
+    fallback_note: fallbackUsed
+      ? 'Audio ready for production — voiceover text and music direction provided'
+      : null,
   }
 
   await sql.query(
