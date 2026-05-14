@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@remotion/lambda-client": "^4.0.460",
+    "@remotion/motion-blur": "^4.0.460",
     "@remotion/player": "^4.0.460",
     "@remotion/renderer": "^4.0.460",
+    "@remotion/transitions": "^4.0.460",
     "creatomate": "^1.2.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.8.0",
