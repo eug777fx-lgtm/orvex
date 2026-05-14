@@ -554,7 +554,7 @@ async function handlePipelineStart(sql, body) {
   return { ...scriptOut, next: 'audio' }
 }
 
-async function handleEditVideo(sql, body) {
+export async function handleEditVideo(sql, body) {
   const { brand_id, scenes, audio_url } = body
   if (!brand_id || !Array.isArray(scenes) || scenes.length === 0) {
     const err = new Error('brand_id and non-empty scenes array required')

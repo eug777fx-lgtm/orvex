@@ -8,6 +8,7 @@
 //   GET  /api/agents?scheduled=true&brand=<name>&agent=<type>
 
 import { generateVideo } from './video.js'
+import { handleEditVideo } from './workflow.js'
 
 function validateBrandContext(brand /*, agentType */) {
   const required = ['id', 'name']
@@ -149,6 +150,175 @@ async function runAgent({ sql, brand_id: requestedBrandId, agent_type, input }) 
   const visualContext = brand.logo_url
     ? ` VISUAL IDENTITY: Primary color: ${brand.primary_color}. Secondary color: ${brand.secondary_color}. Visual style: ${brand.visual_style}. Aesthetic: ${brand.aesthetic_description}. Reference these when suggesting visuals, colors, or video concepts.`
     : ''
+
+  // video_editor is an orchestrator agent — it inspects a ready pipeline,
+  // asks Claude to plan an editing timeline, then drives Creatomate via
+  // workflow.handleEditVideo and finalises the post_packages row.
+  if (agent_type === 'video_editor') {
+    const pipelineRows = await sql.query(
+      `SELECT id, brand_id, stage, script_data, audio_data, visual_data, assembly_data, post_package_id
+         FROM content_pipeline
+        WHERE brand_id = $1
+          AND stage IN ('visuals', 'assembly')
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [brand_id],
+    )
+    const pipeline = (pipelineRows?.rows ?? pipelineRows)?.[0]
+    if (!pipeline) {
+      return {
+        parsed: {
+          error: 'No pipeline ready for editing. Run the video pipeline first.',
+        },
+        tokensUsed: 0,
+        itemsGenerated: 0,
+        video: null,
+      }
+    }
+    const script = pipeline.script_data || {}
+    const audio = pipeline.audio_data || {}
+    const visuals = pipeline.visual_data || {}
+
+    const editorSystemPrompt = `You are a professional video editor for ${brand.name}.
+BRAND STYLE: ${brand.visual_style || 'modern'} — ${brand.aesthetic_description || ''}
+PRIMARY COLOR: ${brand.primary_color || '#0B0B0D'}
+
+You have these assets ready:
+SCRIPT: ${JSON.stringify(script)}
+AUDIO: ${JSON.stringify(audio)}
+VISUALS: ${JSON.stringify(visuals)}
+
+Create a precise editing timeline that sequences these assets into a polished final video.
+Output ONLY valid JSON:
+{
+  "total_duration": number,
+  "aspect_ratio": "9:16",
+  "color_grade": { "contrast": number, "saturation": number, "brightness": number, "shadows": string },
+  "scenes": [
+    {
+      "scene_number": number,
+      "start_time": number,
+      "duration": number,
+      "visual_url": string or null,
+      "visual_type": "video" or "image" or "motion_graphic",
+      "text_overlay": string or null,
+      "audio_url": string or null,
+      "transition_in": "fade" or "slide" or "flash" or "blur",
+      "transition_duration": number,
+      "remotion_overlay": boolean,
+      "remotion_composition": string or null,
+      "remotion_props": object or null
+    }
+  ],
+  "background_music": { "mood": string, "volume": number },
+  "final_hook": string,
+  "final_cta": string
+}`
+
+    const aRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2500,
+        system: editorSystemPrompt,
+        messages: [{ role: 'user', content: 'Plan the editing timeline now.' }],
+      }),
+    })
+    if (!aRes.ok) {
+      const errBody = await aRes.text()
+      const err = new Error('anthropic_call_failed: ' + errBody)
+      err.status = 502
+      throw err
+    }
+    const aData = await aRes.json()
+    const aText = aData?.content?.[0]?.text ?? ''
+    const aTokens =
+      (aData?.usage?.input_tokens || 0) + (aData?.usage?.output_tokens || 0)
+    let timeline
+    try {
+      const m = aText.match(/\{[\s\S]*\}/)
+      timeline = m ? JSON.parse(m[0]) : { raw_output: aText }
+    } catch {
+      timeline = { raw_output: aText }
+    }
+
+    await sql.query(
+      `INSERT INTO agent_runs (brand_id, agent_type, input, output, status, tokens_used)
+       VALUES ($1, 'video_editor', $2, $3, 'complete', $4)`,
+      [
+        brand_id,
+        JSON.stringify({ input: input || null, pipeline_id: pipeline.id }),
+        JSON.stringify(timeline),
+        aTokens,
+      ],
+    )
+
+    const timelineScenes = Array.isArray(timeline?.scenes) ? timeline.scenes : []
+    const audioScenes = Array.isArray(audio?.scenes) ? audio.scenes : []
+    const firstAudioUrl =
+      audioScenes.find((s) => s?.audio_url)?.audio_url || null
+
+    const editorResult = await handleEditVideo(sql, {
+      brand_id,
+      scenes: timelineScenes,
+      audio_url: firstAudioUrl,
+      composition_type: timelineScenes[0]?.remotion_composition || null,
+    })
+
+    const outputUrl = editorResult?.url || null
+    const contentId = editorResult?.content_id || null
+
+    await sql.query(
+      `UPDATE content_pipeline
+          SET stage='assembly',
+              assembly_data=$1::jsonb,
+              updated_at=now()
+        WHERE id=$2`,
+      [
+        JSON.stringify({
+          timeline,
+          rendered_url: outputUrl,
+          editor_result: editorResult,
+        }),
+        pipeline.id,
+      ],
+    )
+
+    if (outputUrl) {
+      assertSameBrand(brand_id, brand.id)
+      await sql.query(
+        `INSERT INTO post_packages
+           (brand_id, status, hook_text, caption_text, cta_text, visual_url, visual_type, platform)
+         VALUES ($1, 'ready', $2, $3, $4, $5, 'video', $6)`,
+        [
+          brand_id,
+          String(timeline?.final_hook || script?.hook || ''),
+          String(script?.hook || script?.title || ''),
+          String(timeline?.final_cta || script?.cta || ''),
+          outputUrl,
+          script?.platform === 'facebook' ? 'facebook' : 'instagram',
+        ],
+      )
+    }
+
+    return {
+      parsed: {
+        editing_complete: !!outputUrl,
+        video_url: outputUrl,
+        content_id: contentId,
+        timeline,
+        editor_result: editorResult,
+      },
+      tokensUsed: aTokens,
+      itemsGenerated: outputUrl ? 1 : 0,
+      video: outputUrl ? { url: outputUrl, content_id: contentId } : null,
+    }
+  }
 
   let systemPrompt
   if (agent_type === 'strategy') {
