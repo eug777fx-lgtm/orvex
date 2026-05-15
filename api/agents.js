@@ -321,9 +321,22 @@ Output ONLY valid JSON:
     }
   }
 
+  const NICHE_BY_BRAND = {
+    LIMITLESS: 'futures trading journal accountability',
+    AWATEC: 'leak detection plumbing Aruba',
+    'Lithos Labs': 'CRM marketing agency automation',
+  }
+  const niche = NICHE_BY_BRAND[brand.name] || brand.name
+  const todayStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
   let systemPrompt
   if (agent_type === 'strategy') {
-    systemPrompt = `You are a content strategy agent for ${brand.name}. BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory}${visualContext} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
+    systemPrompt = `You are a content strategy agent for ${brand.name}. Today is ${todayStr}. BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory}${visualContext} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
   } else if (agent_type === 'writer') {
     systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers}${visualContext} Produce 3 complete post packages — mix of instagram and facebook, mix of image and video. Each package is a fully ready post (hook + caption + CTA + hashtags + visual brief). Output ONLY valid JSON: { packages: array of 3 objects, each { platform: 'instagram' or 'facebook', hook: string (scroll-stopping line), caption: string (full caption that tells the story), cta: string (clear call to action), hashtags: string (5 space-separated hashtags), visual_brief: string (detailed description for Higgsfield or Remotion), visual_type: 'image' or 'video' or 'carousel', remotion_composition: 'HookOpener' or 'QuoteCard' or 'TradeInsight' or 'BrandPromo' or 'ServiceAd' or null } }`
   } else if (agent_type === 'analytics') {
@@ -353,6 +366,28 @@ Output ONLY valid JSON:
     throw err
   }
 
+  // Strategy agent researches live trends via web search before writing the
+  // brief. Other agents use a plain single-turn call.
+  const isStrategy = agent_type === 'strategy'
+  const requestBody = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: isStrategy ? 3000 : 2000,
+    system: systemPrompt,
+    messages: isStrategy
+      ? [
+          {
+            role: 'user',
+            content: `Research trending content in the ${niche} niche right now then create a 7-day content brief for ${brand.name}. Use web search to find what is working. Search for: trending ${niche} content ${todayStr}, viral hooks ${niche} instagram, what audiences want to see on social media. Brand context: ${systemPrompt}`,
+          },
+        ]
+      : [{ role: 'user', content: input || 'Run your scheduled task now.' }],
+  }
+  if (isStrategy) {
+    requestBody.tools = [
+      { type: 'web_search_20250305', name: 'web_search' },
+    ]
+  }
+
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -360,14 +395,7 @@ Output ONLY valid JSON:
       'x-api-key': process.env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
     },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      system: systemPrompt,
-      messages: [
-        { role: 'user', content: input || 'Run your scheduled task now.' },
-      ],
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!anthropicRes.ok) {
@@ -379,7 +407,15 @@ Output ONLY valid JSON:
   }
 
   const apiData = await anthropicRes.json()
-  const rawText = apiData?.content?.[0]?.text ?? ''
+  // With web search the response is a mix of text, server_tool_use and
+  // web_search_tool_result blocks — join every text block.
+  const rawText = Array.isArray(apiData?.content)
+    ? apiData.content
+        .filter((b) => b?.type === 'text' && typeof b.text === 'string')
+        .map((b) => b.text)
+        .join('\n')
+        .trim()
+    : apiData?.content?.[0]?.text ?? ''
   const tokensUsed =
     (apiData?.usage?.input_tokens || 0) + (apiData?.usage?.output_tokens || 0)
 
