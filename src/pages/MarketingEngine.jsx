@@ -4945,6 +4945,33 @@ function ContentHub({
     }
   }
 
+  async function postInstagram(pkg) {
+    if (!brand?.id || !pkg?.id) return
+    try {
+      showToast?.('Posting to Instagram…')
+      const res = await fetch('/api/workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'post_instagram',
+          package_id: pkg.id,
+          brand_id: brand.id,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPackages((prev) => prev.filter((p) => p.id !== pkg.id))
+        showToast?.('Posted to Instagram!')
+        onRefresh?.()
+      } else {
+        showToast?.(data.error || 'Instagram post failed', 'error')
+      }
+    } catch (e) {
+      console.error('post instagram failed', e)
+      showToast?.('Instagram post failed', 'error')
+    }
+  }
+
   async function generateVisual(pkg, kind) {
     if (!brand?.id || !pkg?.id) return
     try {
@@ -5240,6 +5267,7 @@ function ContentHub({
                 onApprove={approvePackage}
                 onReject={rejectPackage}
                 onGenerateVisual={generateVisual}
+                onPostNow={postInstagram}
                 layout={activeQueue}
                 renderProgress={renderProgress}
                 renderDoneFlash={renderDoneFlash}
@@ -5655,7 +5683,7 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
   )
 }
 
-function PackagesList({ packages, brand, onApprove, onReject, onGenerateVisual, layout, renderProgress, renderDoneFlash }) {
+function PackagesList({ packages, brand, onApprove, onReject, onGenerateVisual, onPostNow, layout, renderProgress, renderDoneFlash }) {
   if (!packages || packages.length === 0) {
     const message =
       layout === 'videos'
@@ -5701,6 +5729,7 @@ function PackagesList({ packages, brand, onApprove, onReject, onGenerateVisual, 
             onApprove={onApprove}
             onReject={onReject}
             onGenerateVisual={onGenerateVisual}
+            onPostNow={onPostNow}
             compact={isGrid}
             progress={renderProgress?.[p.id]}
             doneFlash={!!renderDoneFlash?.[p.id]}
@@ -5746,7 +5775,7 @@ function RenderProgressBar({ pct }) {
   )
 }
 
-function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compact, progress, doneFlash }) {
+function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPostNow, compact, progress, doneFlash }) {
   const [expanded, setExpanded] = useState(false)
   const hasVisual = !!pkg.visual_url
   const createdMs = pkg.created_at
@@ -5799,6 +5828,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
   const cardBorder = doneFlash
     ? '1px solid rgba(74,222,128,0.8)'
     : '0.5px solid rgba(255,255,255,0.07)'
+  const canPostNow = pkg.status === 'approved' && !!pkg.visual_url
   const platformAccent = platformColor(pkg.platform)
   const caption = pkg.caption_text || ''
 
@@ -5960,6 +5990,24 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
               }}
             >
               Post without visual
+            </button>
+          )}
+          {canPostNow && onPostNow && (
+            <button
+              type="button"
+              onClick={() => onPostNow(pkg)}
+              style={{
+                fontSize: 10.5,
+                padding: '5px 10px',
+                borderRadius: 6,
+                background: 'rgba(194,181,155,0.15)',
+                border: '0.5px solid rgba(194,181,155,0.5)',
+                color: '#C2B59B',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Post Now
             </button>
           )}
         </div>
@@ -6233,6 +6281,27 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
             >
               <X size={11} /> Reject
             </button>
+            {canPostNow && onPostNow && (
+              <button
+                type="button"
+                onClick={() => onPostNow(pkg)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '6px 12px',
+                  borderRadius: 7,
+                  background: 'rgba(194,181,155,0.15)',
+                  border: '0.5px solid rgba(194,181,155,0.5)',
+                  color: '#C2B59B',
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <Send size={11} /> Post Now
+              </button>
+            )}
           </div>
           {showTextOnly && (
             <button

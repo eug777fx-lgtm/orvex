@@ -3,6 +3,8 @@
 //   ANTHROPIC_API_KEY    — Claude API key (for pipeline script stage)
 //   ELEVENLABS_API_KEY   — ElevenLabs TTS (optional; falls back if missing)
 //   CREATOMATE_API_KEY   — Creatomate video render API (optional; falls back if missing)
+//   INSTAGRAM_ACCESS_TOKEN — Instagram Graph API access token (for post_instagram)
+//   INSTAGRAM_USER_ID    — Instagram business account user id (for post_instagram)
 //
 // GET  /api/workflow?action=next&brand_id=<uuid>
 //   Returns the next approved+unpublished content ready to post.
@@ -35,6 +37,13 @@
 //     Builds a Creatomate timeline from scenes and renders an MP4. Returns
 //     { url, content_id, duration, scenes_count } or a structured fallback
 //     when CREATOMATE_API_KEY is missing.
+//   Body: { action: 'post_instagram', package_id, brand_id }
+//     Publishes a package to Instagram (Graph API). Returns { success, post_id }
+//     or { success:false, error }.
+//
+// GET  /api/workflow?action=next_scheduled&brand_id=<uuid>
+//   Next approved package with a visual whose schedule slot is due.
+//   Response: { success, has_content, package? }
 
 const MAX_PER_DAY = 3
 const SLOT_GAP_HOURS = 4
@@ -839,6 +848,138 @@ async function handleRenderStatus(sql, { render_id, bucket, package_id }) {
   return { done: false, progress: progress.overallProgress || 0 }
 }
 
+// Publishes a post_package to Instagram via the Graph API: create a media
+// container, then publish it, then mark the package published.
+async function handlePostInstagram(sql, body) {
+  const { package_id, brand_id } = body
+  if (!package_id || !brand_id) {
+    const err = new Error('package_id and brand_id required')
+    err.status = 400
+    throw err
+  }
+  const pkgRows = await sql.query(
+    'SELECT * FROM post_packages WHERE id=$1 AND brand_id=$2',
+    [package_id, brand_id],
+  )
+  const pkg = (pkgRows?.rows ?? pkgRows)?.[0]
+  if (!pkg) {
+    const err = new Error('package not found')
+    err.status = 404
+    throw err
+  }
+  if (!pkg.visual_url) {
+    return { success: false, error: 'No visual available' }
+  }
+
+  const token = process.env.INSTAGRAM_ACCESS_TOKEN
+  const userId = process.env.INSTAGRAM_USER_ID
+  if (!token || !userId) {
+    return {
+      success: false,
+      error:
+        'Instagram not configured — set INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_USER_ID',
+    }
+  }
+
+  const fullCaption = [pkg.caption_text, pkg.cta_text, pkg.hashtags]
+    .filter(Boolean)
+    .join('\n\n')
+  const isVideo = pkg.visual_type === 'video'
+
+  // Step 1 — create the media container.
+  const containerBody = {
+    caption: fullCaption,
+    access_token: token,
+  }
+  if (isVideo) {
+    containerBody.video_url = pkg.visual_url
+    containerBody.media_type = 'REELS'
+  } else {
+    containerBody.image_url = pkg.visual_url
+    containerBody.media_type = 'IMAGE'
+  }
+  const createRes = await fetch(
+    `https://graph.instagram.com/v21.0/${userId}/media`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(containerBody),
+    },
+  )
+  const createData = await createRes.json()
+  if (!createRes.ok || !createData.id) {
+    return {
+      success: false,
+      error:
+        createData?.error?.message || 'Failed to create Instagram media container',
+    }
+  }
+
+  // Step 2 — publish the container.
+  const publishRes = await fetch(
+    `https://graph.instagram.com/v21.0/${userId}/media_publish`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        creation_id: createData.id,
+        access_token: token,
+      }),
+    },
+  )
+  const publishData = await publishRes.json()
+  if (!publishRes.ok || !publishData.id) {
+    return {
+      success: false,
+      error: publishData?.error?.message || 'Failed to publish to Instagram',
+    }
+  }
+
+  // Step 3 — mark published + ensure an analytics row exists.
+  await sql.query(
+    "UPDATE post_packages SET status='published', published=true, published_at=now() WHERE id=$1",
+    [package_id],
+  )
+  if (pkg.hook_id) {
+    await sql.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS analytics_content_id_unique
+         ON analytics(content_id)`,
+    )
+    await sql.query(
+      `INSERT INTO analytics (content_id, brand_id)
+       VALUES ($1, $2)
+       ON CONFLICT (content_id) DO NOTHING`,
+      [pkg.hook_id, brand_id],
+    )
+  }
+  return { success: true, post_id: publishData.id }
+}
+
+// Next approved+visual package whose schedule slot is due.
+async function handleNextScheduled(sql, brand_id) {
+  if (!brand_id) {
+    const err = new Error('brand_id required')
+    err.status = 400
+    throw err
+  }
+  const result = await sql.query(
+    `SELECT pp.* FROM post_packages pp
+       JOIN schedules s
+         ON s.content_id = pp.hook_id OR s.content_id = pp.caption_id
+      WHERE pp.brand_id=$1
+        AND pp.status='approved'
+        AND pp.visual_url IS NOT NULL
+        AND s.scheduled_at <= NOW()
+        AND s.published=false
+      ORDER BY s.scheduled_at ASC
+      LIMIT 1`,
+    [brand_id],
+  )
+  const row = (result?.rows ?? result)?.[0]
+  if (!row) return { has_content: false }
+  return { has_content: true, package: row }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -868,9 +1009,13 @@ export default async function handler(req, res) {
         })
         return res.status(200).json({ success: true, ...result })
       }
+      if (action === 'next_scheduled') {
+        const result = await handleNextScheduled(sql, brand_id)
+        return res.status(200).json({ success: true, ...result })
+      }
       return res.status(400).json({
         error:
-          'GET requires action=next|pipeline_list|render_status',
+          'GET requires action=next|pipeline_list|render_status|next_scheduled',
       })
     }
 
@@ -901,11 +1046,15 @@ export default async function handler(req, res) {
         const result = await handleEditVideo(sql, body)
         return res.status(200).json({ success: true, ...result })
       }
+      if (action === 'post_instagram') {
+        const result = await handlePostInstagram(sql, body)
+        return res.status(200).json(result)
+      }
       return res
         .status(400)
         .json({
           error:
-            "body.action must be 'approve', 'reject', 'published', 'pipeline_start', 'pipeline_advance', or 'edit_video'",
+            "body.action must be 'approve', 'reject', 'published', 'pipeline_start', 'pipeline_advance', 'edit_video', or 'post_instagram'",
         })
     }
 
