@@ -51,29 +51,9 @@ async function getDb() {
   return neon(process.env.VITE_DATABASE_URL)
 }
 
-async function handleApprove(sql, body) {
-  const { content_id, brand_id } = body
-  if (!content_id || !brand_id) {
-    const err = new Error('content_id and brand_id required')
-    err.status = 400
-    throw err
-  }
-
-  const contentRows = await sql.query(
-    'SELECT type FROM content WHERE id = $1',
-    [content_id],
-  )
-  const content = (contentRows?.rows ?? contentRows)?.[0]
-  if (!content) {
-    const err = new Error('content not found')
-    err.status = 404
-    throw err
-  }
-
-  await sql.query("UPDATE content SET status='approved' WHERE id=$1", [
-    content_id,
-  ])
-
+// Shared slot finder: next unpublished schedule slot for the brand,
+// respecting the 4h cadence and the per-day cap.
+async function findNextSlot(sql, brand_id) {
   const latestRows = await sql.query(
     `SELECT scheduled_at FROM schedules
       WHERE brand_id=$1 AND published=false
@@ -112,7 +92,88 @@ async function handleApprove(sql, body) {
     candidate.setUTCDate(candidate.getUTCDate() + 1)
     candidate.setUTCHours(9, 0, 0, 0)
   }
+  return candidate
+}
 
+async function handleApprove(sql, body) {
+  const { content_id, package_id, brand_id } = body
+
+  // New flow: approving a post_package directly.
+  if (package_id) {
+    if (!brand_id) {
+      const err = new Error('brand_id required')
+      err.status = 400
+      throw err
+    }
+    const pkgRows = await sql.query(
+      'SELECT * FROM post_packages WHERE id=$1 AND brand_id=$2',
+      [package_id, brand_id],
+    )
+    const pkg = (pkgRows?.rows ?? pkgRows)?.[0]
+    if (!pkg) {
+      const err = new Error('package not found')
+      err.status = 404
+      throw err
+    }
+
+    await sql.query(
+      "UPDATE post_packages SET status='approved' WHERE id=$1",
+      [package_id],
+    )
+
+    const candidate = await findNextSlot(sql, brand_id)
+    const platform = pkg.platform || 'instagram'
+
+    // schedules.content_id is a FK to content(id). Use the package's hook or
+    // caption content row; if neither exists, insert a placeholder so the
+    // schedule still has a valid content reference.
+    let scheduleContentId = pkg.hook_id || pkg.caption_id || null
+    if (!scheduleContentId) {
+      const placeholder = await sql.query(
+        `INSERT INTO content (brand_id, type, caption, status)
+         VALUES ($1, 'caption', $2, 'approved')
+         RETURNING id`,
+        [brand_id, pkg.caption_text || pkg.hook_text || ''],
+      )
+      scheduleContentId = (placeholder?.rows ?? placeholder)?.[0]?.id
+    }
+
+    await sql.query(
+      `INSERT INTO schedules (content_id, brand_id, platform, scheduled_at, published)
+       VALUES ($1, $2, $3, $4, false)`,
+      [scheduleContentId, brand_id, platform, candidate.toISOString()],
+    )
+    await sql.query(
+      'UPDATE post_packages SET scheduled_at=$1 WHERE id=$2',
+      [candidate.toISOString(), package_id],
+    )
+
+    return { success: true, scheduled_at: candidate.toISOString(), platform }
+  }
+
+  // Old flow: approving a content row (backward compatible — unchanged).
+  if (!content_id || !brand_id) {
+    const err = new Error('content_id and brand_id required')
+    err.status = 400
+    throw err
+  }
+
+  const contentRows = await sql.query(
+    'SELECT type FROM content WHERE id = $1',
+    [content_id],
+  )
+  const content = (contentRows?.rows ?? contentRows)?.[0]
+  if (!content) {
+    const err = new Error('content not found')
+    err.status = 404
+    throw err
+  }
+
+  await sql.query("UPDATE content SET status='approved' WHERE id=$1", [
+    content_id,
+  ])
+
+  const candidate = await findNextSlot(sql, brand_id)
   const platform = platformForType(content.type)
 
   await sql.query(

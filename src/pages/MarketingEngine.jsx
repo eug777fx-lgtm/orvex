@@ -4610,13 +4610,17 @@ function ContentHub({
     async function load() {
       try {
         const rows = await db.query(
-          `SELECT id, brand_id, status, platform, hook_text, caption_text,
-                  cta_text, hashtags, visual_url, visual_type, visual_brief,
-                  remotion_composition, scheduled_at, published, created_at
-             FROM post_packages
-            WHERE brand_id=$1
-              AND status IN ('ready','needs_visual','draft')
-            ORDER BY created_at DESC`,
+          `SELECT pp.*,
+                  b.name AS brand_name,
+                  b.color AS brand_color,
+                  b.primary_color,
+                  b.logo_url
+             FROM post_packages pp
+             JOIN brands b ON pp.brand_id = b.id
+            WHERE pp.brand_id = $1
+              AND pp.status NOT IN ('published','rejected')
+            ORDER BY pp.created_at DESC
+            LIMIT 20`,
           [brand.id],
         )
         if (!cancelled) setPackages(rows || [])
@@ -4630,62 +4634,37 @@ function ContentHub({
     }
   }, [brand?.id, packagesVersion])
 
-  async function approvePackage(pkg) {
+  async function approvePackage(pkg, textOnly = false) {
     if (!brand?.id || !pkg?.id) return
     try {
-      // Compute next slot: 9 AM for instagram, 5 PM for facebook, max 2/day.
-      const platform = pkg.platform || 'instagram'
-      const targetHour = platform === 'facebook' ? 17 : 9
-      const latest = await db.query(
-        `SELECT scheduled_at FROM post_packages
-          WHERE brand_id=$1 AND status='approved' AND published=false
-          ORDER BY scheduled_at DESC LIMIT 1`,
-        [brand.id],
-      )
-      let candidate
-      if (!latest?.[0]?.scheduled_at) {
-        candidate = new Date()
-        candidate.setUTCDate(candidate.getUTCDate() + 1)
-      } else {
-        candidate = new Date(latest[0].scheduled_at)
-        candidate.setUTCDate(candidate.getUTCDate() + 1)
-      }
-      candidate.setUTCHours(targetHour, 0, 0, 0)
-      // 2 per day cap
-      for (let i = 0; i < 30; i++) {
-        const dayStart = new Date(candidate)
-        dayStart.setUTCHours(0, 0, 0, 0)
-        const dayEnd = new Date(dayStart)
-        dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
-        const countRows = await db.query(
-          `SELECT COUNT(*)::int AS c FROM post_packages
-            WHERE brand_id=$1 AND status='approved' AND published=false
-              AND scheduled_at >= $2 AND scheduled_at < $3`,
-          [brand.id, dayStart.toISOString(), dayEnd.toISOString()],
+      const res = await fetch('/api/workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'approve',
+          package_id: pkg.id,
+          brand_id: brand.id,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPackages((prev) => prev.filter((p) => p.id !== pkg.id))
+        const when = data.scheduled_at
+          ? new Date(data.scheduled_at).toLocaleDateString([], {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })
+          : 'soon'
+        showToast?.(
+          textOnly
+            ? `Approved as text post — add visual later · ${when} on ${data.platform}`
+            : `Approved — scheduled for ${when} on ${data.platform}`,
         )
-        const c = countRows?.[0]?.c ?? 0
-        if (c < 2) break
-        candidate.setUTCDate(candidate.getUTCDate() + 1)
+        onRefresh?.()
+      } else {
+        showToast?.(data.error || 'Approve failed', 'error')
       }
-      await db.query(
-        `UPDATE post_packages SET status='approved', scheduled_at=$1 WHERE id=$2`,
-        [candidate.toISOString(), pkg.id],
-      )
-      await db.query(
-        `INSERT INTO schedules (brand_id, platform, scheduled_at, published)
-         VALUES ($1, $2, $3, false)`,
-        [brand.id, platform, candidate.toISOString()],
-      )
-      const d = candidate
-      showToast?.(
-        `Package approved — scheduled for ${d.toLocaleDateString([], {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        })} on ${platform}`,
-      )
-      setPackagesVersion((v) => v + 1)
-      onRefresh?.()
     } catch (e) {
       console.error('approve package failed', e)
       showToast?.('Approve failed', 'error')
@@ -4849,9 +4828,16 @@ function ContentHub({
   }
   const passedPackages = allPackages.filter(passesPackage)
   const packagesByLayout = {
-    scripts: passedPackages,
-    videos: passedPackages.filter((p) => p.visual_type === 'video'),
-    static: passedPackages.filter((p) => p.visual_type === 'image'),
+    scripts: passedPackages.filter(
+      (p) =>
+        ['image', 'static_ad'].includes(p.visual_type) || !p.visual_url,
+    ),
+    videos: passedPackages.filter(
+      (p) => p.visual_type === 'video' && !!p.visual_url,
+    ),
+    static: passedPackages.filter(
+      (p) => p.visual_type === 'image' && !!p.visual_url,
+    ),
   }
   const packagesFiltered = packagesByLayout[activeQueue] || passedPackages
   const queueCounts = {
@@ -5462,11 +5448,27 @@ function PackagesList({ packages, brand, onApprove, onReject, onGenerateVisual, 
 function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compact }) {
   const [expanded, setExpanded] = useState(false)
   const hasVisual = !!pkg.visual_url
+  const createdMs = pkg.created_at
+    ? new Date(pkg.created_at).getTime()
+    : Date.now()
+  // After 3 minutes a needs_visual package is no longer "generating" — the
+  // auto-render either finished, timed out, or never ran. Swap the infinite
+  // spinner for a static "Visual pending" badge so the card isn't stuck.
+  const visualStale = Date.now() - createdMs > 3 * 60 * 1000
+  const needsVisual = !hasVisual && pkg.status === 'needs_visual'
   const statusBadge = hasVisual
     ? { label: 'Ready to post', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' }
     : pkg.status === 'needs_visual'
-    ? { label: 'Generating visual…', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' }
+    ? visualStale
+      ? {
+          label: 'Visual pending',
+          color: '#fbbf24',
+          bg: 'rgba(251,191,36,0.12)',
+          stale: true,
+        }
+      : { label: 'Generating visual…', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' }
     : { label: 'Draft', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.05)' }
+  const showTextOnly = needsVisual || !pkg.visual_url
   const platformAccent = platformColor(pkg.platform)
   const caption = pkg.caption_text || ''
 
@@ -5579,19 +5581,17 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
             <button
               type="button"
               onClick={() => onApprove(pkg)}
-              disabled={!hasVisual}
+              disabled={false}
               style={{
                 flex: 1,
                 fontSize: 10.5,
                 padding: '5px 10px',
                 borderRadius: 6,
-                background: hasVisual ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)',
-                border: hasVisual
-                  ? '0.5px solid rgba(74,222,128,0.4)'
-                  : '0.5px solid rgba(255,255,255,0.1)',
-                color: hasVisual ? '#4ade80' : TEXT_FAINT,
+                background: 'rgba(74,222,128,0.12)',
+                border: '0.5px solid rgba(74,222,128,0.4)',
+                color: '#4ade80',
                 fontWeight: 600,
-                cursor: hasVisual ? 'pointer' : 'not-allowed',
+                cursor: 'pointer',
               }}
             >
               Approve
@@ -5612,6 +5612,24 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
               <X size={11} />
             </button>
           </div>
+          {showTextOnly && (
+            <button
+              type="button"
+              onClick={() => onApprove(pkg, true)}
+              style={{
+                fontSize: 9.5,
+                padding: '4px 8px',
+                borderRadius: 6,
+                background: 'transparent',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.5)',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Post without visual
+            </button>
+          )}
         </div>
       </motion.div>
     )
@@ -5755,7 +5773,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
               gap: 5,
             }}
           >
-            {!hasVisual && pkg.status === 'needs_visual' && (
+            {needsVisual && !statusBadge.stale && (
               <motion.span
                 animate={{ opacity: [1, 0.4, 1] }}
                 transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
@@ -5833,48 +5851,77 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
         >
           {caption.length} chars
         </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-          <button
-            type="button"
-            onClick={() => onApprove(pkg)}
-            disabled={!hasVisual}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '6px 12px',
-              borderRadius: 7,
-              background: hasVisual ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)',
-              border: hasVisual
-                ? '0.5px solid rgba(74,222,128,0.4)'
-                : '0.5px solid rgba(255,255,255,0.1)',
-              color: hasVisual ? '#4ade80' : TEXT_FAINT,
-              fontSize: 11.5,
-              fontWeight: 600,
-              cursor: hasVisual ? 'pointer' : 'not-allowed',
-            }}
-          >
-            <Check size={11} /> Approve Package
-          </button>
-          <button
-            type="button"
-            onClick={() => onReject(pkg)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '6px 12px',
-              borderRadius: 7,
-              background: 'transparent',
-              border: '0.5px solid rgba(255,255,255,0.1)',
-              color: TEXT_MUTED,
-              fontSize: 11.5,
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            <X size={11} /> Reject
-          </button>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            marginTop: 8,
+          }}
+        >
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => onApprove(pkg)}
+              disabled={false}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '6px 12px',
+                borderRadius: 7,
+                background: 'rgba(74,222,128,0.12)',
+                border: '0.5px solid rgba(74,222,128,0.4)',
+                color: '#4ade80',
+                fontSize: 11.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Check size={11} /> Approve Package
+            </button>
+            <button
+              type="button"
+              onClick={() => onReject(pkg)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '6px 12px',
+                borderRadius: 7,
+                background: 'transparent',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                color: TEXT_MUTED,
+                fontSize: 11.5,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              <X size={11} /> Reject
+            </button>
+          </div>
+          {showTextOnly && (
+            <button
+              type="button"
+              onClick={() => onApprove(pkg, true)}
+              style={{
+                alignSelf: 'flex-start',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '4px 10px',
+                borderRadius: 7,
+                background: 'transparent',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.5)',
+                fontSize: 10.5,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Post without visual
+            </button>
+          )}
         </div>
       </div>
     </motion.div>

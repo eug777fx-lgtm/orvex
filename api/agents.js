@@ -452,12 +452,13 @@ Output ONLY valid JSON:
         captionId = (r?.rows ?? r)?.[0]?.id
       }
 
-      await sql.query(
+      const pkgInsert = await sql.query(
         `INSERT INTO post_packages
            (brand_id, status, platform, hook_id, caption_id,
             hook_text, caption_text, cta_text, hashtags,
             visual_type, visual_brief, remotion_composition)
-         VALUES ($1, 'needs_visual', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+         VALUES ($1, 'needs_visual', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         RETURNING id`,
         [
           brand_id,
           platform,
@@ -472,7 +473,49 @@ Output ONLY valid JSON:
           composition,
         ],
       )
+      const packageId = (pkgInsert?.rows ?? pkgInsert)?.[0]?.id
       itemsGenerated += 1
+
+      // Auto-render a Remotion video for this package. Best-effort: if the
+      // render endpoint times out or fails, the package stays 'needs_visual'
+      // and the UI offers a manual generate / "post without visual" path.
+      const renderComposition = composition || 'HookOpener'
+      const remotionProps = {
+        headline: hookText?.slice(0, 60) || 'Discipline is built quietly.',
+        subtext: ctaText || 'Start journaling your trades.',
+        brandName: brand.name,
+        primaryColor: brand.primary_color || '#c084fc',
+        secondaryColor: brand.secondary_color || '#ffffff',
+        logoUrl: brand.logo_url || null,
+      }
+      if (packageId) {
+        try {
+          const base = process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : 'http://localhost:3000'
+          const renderResponse = await fetch(`${base}/api/render`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              composition_id: renderComposition,
+              props: remotionProps,
+              brand_id: brand.id,
+            }),
+          })
+          const renderData = await renderResponse.json()
+          if (renderData.success && renderData.url) {
+            await sql.query(
+              "UPDATE post_packages SET visual_url=$1, visual_type='video', status='ready' WHERE id=$2",
+              [renderData.url, packageId],
+            )
+          }
+        } catch (renderErr) {
+          console.log(
+            'Auto-render failed, package stays needs_visual:',
+            renderErr.message,
+          )
+        }
+      }
     }
   }
 
