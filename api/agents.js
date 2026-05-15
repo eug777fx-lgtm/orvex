@@ -147,6 +147,10 @@ async function runAgent({ sql, brand_id: requestedBrandId, agent_type, input }) 
       .filter((m) => m.memory_type === 'campaign_history')
       .map((m) => m.content)
       .join('\n') || 'No campaign history yet.'
+  const contentGaps = brandMemory
+    .filter((m) => m.memory_type === 'content_gap')
+    .map((m) => m.content)
+    .join('\n')
 
   const visualContext = brand.logo_url
     ? ` VISUAL IDENTITY: Primary color: ${brand.primary_color}. Secondary color: ${brand.secondary_color}. Visual style: ${brand.visual_style}. Aesthetic: ${brand.aesthetic_description}. Reference these when suggesting visuals, colors, or video concepts.`
@@ -336,7 +340,7 @@ Output ONLY valid JSON:
 
   let systemPrompt
   if (agent_type === 'strategy') {
-    systemPrompt = `You are a content strategy agent for ${brand.name}. Today is ${todayStr}. BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory}${visualContext} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
+    systemPrompt = `You are a content strategy agent for ${brand.name}. Today is ${todayStr}. HIGH PRIORITY CONTENT GAPS (topics with proven demand — prioritize these): ${contentGaps || 'No content gaps added yet — add from TikTok Creator Insights'} BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory}${visualContext} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
   } else if (agent_type === 'writer') {
     systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers}${visualContext} Produce 3 complete post packages — mix of instagram and facebook, mix of image and video. Each package is a fully ready post (hook + caption + CTA + hashtags + visual brief). Output ONLY valid JSON: { packages: array of 3 objects, each { platform: 'instagram' or 'facebook', hook: string (scroll-stopping line), caption: string (full caption that tells the story), cta: string (clear call to action), hashtags: string (5 space-separated hashtags), visual_brief: string (detailed description for Higgsfield or Remotion), visual_type: 'image' or 'video' or 'carousel', remotion_composition: 'HookOpener' or 'QuoteCard' or 'TradeInsight' or 'BrandPromo' or 'ServiceAd' or null } }`
   } else if (agent_type === 'analytics') {

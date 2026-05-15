@@ -3237,6 +3237,188 @@ function relativeTime(iso) {
   return `${d}d ago`
 }
 
+function ContentGapsCard({ brand, memory, onRefresh, showToast }) {
+  const [value, setValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const gaps = (memory || []).filter((m) => m.memory_type === 'content_gap')
+
+  async function save() {
+    const lines = value
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+    if (!brand?.id || lines.length === 0) return
+    setSaving(true)
+    try {
+      for (const line of lines) {
+        await db.query(
+          "INSERT INTO brand_memory (brand_id, memory_type, content) VALUES ($1, 'content_gap', $2)",
+          [brand.id, line],
+        )
+      }
+      setValue('')
+      onRefresh?.()
+      showToast?.(
+        'Content gaps saved — Strategy Agent will use these in next run',
+      )
+    } catch (e) {
+      console.error('content gap save failed', e)
+      showToast?.('Failed to save content gaps', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function remove(id) {
+    if (!id) return
+    try {
+      await db.query('DELETE FROM brand_memory WHERE id=$1', [id])
+      onRefresh?.()
+    } catch (e) {
+      console.error('content gap delete failed', e)
+      showToast?.('Failed to delete', 'error')
+    }
+  }
+
+  return (
+    <div
+      style={{
+        background: 'rgba(194,181,155,0.08)',
+        border: '0.5px solid rgba(194,181,155,0.25)',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 12,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <TrendingUp size={13} color="#C2B59B" />
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#fff' }}>
+            Content Gaps
+          </span>
+          <span style={{ fontSize: 10.5, color: TEXT_MUTED, marginTop: 1 }}>
+            Topics with high demand and low supply — paste from TikTok Creator
+            Insights
+          </span>
+        </div>
+      </div>
+
+      {gaps.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {gaps.map((g) => (
+            <div
+              key={g.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                padding: '6px 10px',
+                borderRadius: 8,
+                background: 'rgba(0,0,0,0.25)',
+                border: '0.5px solid rgba(194,181,155,0.15)',
+              }}
+            >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: 'rgba(255,255,255,0.85)',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {g.content}
+                </div>
+                <div
+                  style={{
+                    fontSize: 9.5,
+                    color: TEXT_FAINT,
+                    marginTop: 2,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Added {relativeTime(g.created_at)}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => remove(g.id)}
+                title="Delete"
+                style={{
+                  flexShrink: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: 4,
+                  borderRadius: 6,
+                  background: 'transparent',
+                  border: '0.5px solid rgba(255,255,255,0.1)',
+                  color: TEXT_MUTED,
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Paste content gap topics here — one per line. Example: NQ morning session mistakes, ICT order blocks explained simply, trading journal setup for beginners"
+        rows={3}
+        style={{
+          width: '100%',
+          fontSize: 12,
+          padding: 10,
+          borderRadius: 8,
+          border: '0.5px solid rgba(194,181,155,0.25)',
+          background: 'rgba(0,0,0,0.3)',
+          color: '#fff',
+          resize: 'vertical',
+          fontFamily: 'inherit',
+          outline: 'none',
+          boxSizing: 'border-box',
+        }}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || !value.trim() || !brand}
+          style={{
+            fontSize: 11,
+            padding: '6px 14px',
+            borderRadius: 8,
+            border: '0.5px solid rgba(194,181,155,0.5)',
+            background: 'rgba(194,181,155,0.15)',
+            color: '#fff',
+            fontWeight: 600,
+            cursor: saving || !value.trim() ? 'not-allowed' : 'pointer',
+            opacity: saving || !value.trim() ? 0.55 : 1,
+          }}
+        >
+          {saving ? 'Saving…' : 'Save Content Gaps'}
+        </button>
+      </div>
+      <div
+        style={{
+          fontSize: 10,
+          color: TEXT_FAINT,
+          lineHeight: 1.5,
+        }}
+      >
+        Go to TikTok → Creator tools → Creator Search Insights → Filter by your
+        niche → Copy topics with high search volume and low video count
+      </div>
+    </div>
+  )
+}
+
 function BrandMemory({ brand, memory, onRefresh, showToast }) {
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -3425,6 +3607,13 @@ function BrandMemory({ brand, memory, onRefresh, showToast }) {
       </div>
 
       <VisualIdentityCard brand={brand} showToast={showToast} onRefresh={onRefresh} />
+
+      <ContentGapsCard
+        brand={brand}
+        memory={memory}
+        onRefresh={onRefresh}
+        showToast={showToast}
+      />
 
       {(memory || []).length === 0 ? (
         <div
