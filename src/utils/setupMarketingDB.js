@@ -150,6 +150,10 @@ export async function setupMarketingDB() {
     )
   `)
 
+  // One-time fresh start: wipe all generated content but keep brands and
+  // brand_memory completely intact. Runs before the seed inserts below.
+  await cleanContentForFreshStart()
+
   await db.query(
     `INSERT INTO brands (name, color, platforms)
      VALUES ('LIMITLESS', '#ffffff', '["instagram","facebook"]')
@@ -235,6 +239,36 @@ export async function setupMarketingDB() {
       [awatecVersionKey],
     )
   }
+}
+
+// Wipes every generated-content table for a clean slate while preserving
+// brands and brand_memory. Gated on an app_meta flag so it only ever runs
+// once per database. Deletes run children-before-parents so the foreign
+// keys (content_pipeline → post_packages, post_packages/schedules/analytics
+// → content) don't reject the delete.
+async function cleanContentForFreshStart() {
+  await db.query(
+    'CREATE TABLE IF NOT EXISTS app_meta (key text PRIMARY KEY, value text)',
+  )
+  const flagKey = 'fresh_start_v1'
+  const existing = await db.query(
+    'SELECT value FROM app_meta WHERE key = $1 LIMIT 1',
+    [flagKey],
+  )
+  if (existing.length > 0) return
+
+  await db.query('DELETE FROM content_pipeline WHERE created_at < now()')
+  await db.query('DELETE FROM schedules WHERE created_at < now()')
+  await db.query('DELETE FROM analytics WHERE created_at < now()')
+  await db.query('DELETE FROM agent_runs WHERE created_at < now()')
+  await db.query('DELETE FROM post_packages WHERE created_at < now()')
+  await db.query('DELETE FROM content WHERE created_at < now()')
+
+  await db.query(
+    `INSERT INTO app_meta (key, value) VALUES ($1, 'done')
+     ON CONFLICT (key) DO NOTHING`,
+    [flagKey],
+  )
 }
 
 async function dedupeBrand(brandName) {
