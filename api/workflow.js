@@ -40,6 +40,9 @@
 //   Body: { action: 'post_instagram', package_id, brand_id }
 //     Publishes a package to Instagram (Graph API). Returns { success, post_id }
 //     or { success:false, error }.
+//   Body: { action: 'analytics_pull', brand_id, post_id, content_id }
+//     Pulls IG insights, scores the post, updates analytics, promotes
+//     score>75 into brand_memory. Returns { success, score }.
 //
 // GET  /api/workflow?action=next_scheduled&brand_id=<uuid>
 //   Next approved package with a visual whose schedule slot is due.
@@ -955,6 +958,94 @@ async function handlePostInstagram(sql, body) {
   return { success: true, post_id: publishData.id }
 }
 
+// Pulls Instagram insights for a published post, scores it, and promotes
+// strong performers into brand_memory.
+async function handleAnalyticsPull(sql, body) {
+  const { brand_id, post_id, content_id } = body
+  if (!brand_id || !post_id || !content_id) {
+    const err = new Error('brand_id, post_id and content_id required')
+    err.status = 400
+    throw err
+  }
+  const token = process.env.INSTAGRAM_ACCESS_TOKEN
+  if (!token) {
+    return { success: false, error: 'Instagram not configured' }
+  }
+
+  const url = `https://graph.instagram.com/v21.0/${post_id}/insights?metric=impressions,reach,likes,comments,shares,saved&access_token=${token}`
+  const igRes = await fetch(url)
+  const igData = await igRes.json()
+  if (!igRes.ok) {
+    return {
+      success: false,
+      error: igData?.error?.message || 'Instagram insights failed',
+    }
+  }
+
+  const metrics = {}
+  for (const item of igData?.data || []) {
+    const v =
+      item?.values?.[0]?.value ?? item?.total_value?.value ?? 0
+    metrics[item.name] = Number(v) || 0
+  }
+  const impressions = metrics.impressions || 0
+  const reach = metrics.reach || 0
+  const likes = metrics.likes || 0
+  const comments = metrics.comments || 0
+  const shares = metrics.shares || 0
+  const saves = metrics.saved || 0
+  const denom = reach || impressions || 0
+  const engagement_rate = denom
+    ? ((likes + comments + shares + saves) / denom) * 100
+    : 0
+  const score = Math.min(
+    engagement_rate * 40 + saves * 0.5 + shares * 0.3,
+    100,
+  )
+
+  await sql.query(
+    'ALTER TABLE analytics ADD COLUMN IF NOT EXISTS saves INTEGER DEFAULT 0',
+  )
+  await sql.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS analytics_content_id_unique
+       ON analytics(content_id)`,
+  )
+  await sql.query(
+    `INSERT INTO analytics (content_id, brand_id)
+     VALUES ($1, $2) ON CONFLICT (content_id) DO NOTHING`,
+    [content_id, brand_id],
+  )
+  await sql.query(
+    `UPDATE analytics
+        SET views=$1, likes=$2, comments=$3, shares=$4, saves=$5,
+            engagement_rate=$6, score=$7
+      WHERE content_id=$8`,
+    [
+      impressions || reach,
+      likes,
+      comments,
+      shares,
+      saves,
+      engagement_rate,
+      score,
+      content_id,
+    ],
+  )
+
+  if (score > 75) {
+    await sql.query(
+      `INSERT INTO brand_memory (brand_id, memory_type, content)
+       VALUES ($1, 'top_performers', $2)`,
+      [
+        brand_id,
+        `High performing post scored ${Math.round(score)}/100`,
+      ],
+    )
+  }
+
+  return { success: true, score }
+}
+
 // Next approved+visual package whose schedule slot is due.
 async function handleNextScheduled(sql, brand_id) {
   if (!brand_id) {
@@ -1048,6 +1139,10 @@ export default async function handler(req, res) {
       }
       if (action === 'post_instagram') {
         const result = await handlePostInstagram(sql, body)
+        return res.status(200).json(result)
+      }
+      if (action === 'analytics_pull') {
+        const result = await handleAnalyticsPull(sql, body)
         return res.status(200).json(result)
       }
       return res

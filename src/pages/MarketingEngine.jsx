@@ -335,17 +335,8 @@ export default function MarketingEngine() {
     }
   }, [])
 
-  useEffect(() => {
-    let i = 0
-    const id = setInterval(() => {
-      const item = LOG_FEED[i % LOG_FEED.length]
-      setLiveLog((log) =>
-        [{ time: nowHHMM(), agent: item.agent, action: item.action }, ...log].slice(0, 20),
-      )
-      i += 1
-    }, 8000)
-    return () => clearInterval(id)
-  }, [])
+  // Live log is sourced from real agent_runs in refreshBrandData. The old
+  // simulated LOG_FEED ticker is intentionally disabled.
 
   const loadBrands = useCallback(async (selectIdAfter) => {
     try {
@@ -393,13 +384,14 @@ export default function MarketingEngine() {
         reviewRows,
         scheduleRows,
         memoryRows,
+        agentRunsRows,
       ] = await Promise.all([
         db.query(
-          "SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND status IN ('ready','needs_visual') AND published=false",
+          "SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND status IN ('ready','needs_visual','rendering') AND published_at IS NULL",
           [selectedBrand.id],
         ),
         db.query(
-          "SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND status='approved' AND published=false",
+          "SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND status='approved' AND published_at IS NULL",
           [selectedBrand.id],
         ),
         db.query(
@@ -407,7 +399,7 @@ export default function MarketingEngine() {
           [selectedBrand.id],
         ),
         db.query(
-          'SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND published=true',
+          'SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND published_at IS NOT NULL',
           [selectedBrand.id],
         ),
         db.query(
@@ -438,6 +430,21 @@ export default function MarketingEngine() {
             ORDER BY memory_type, created_at DESC`,
           [selectedBrand.id],
         ),
+        db.query(
+          `SELECT agent_type, status, created_at,
+            CASE agent_type
+              WHEN 'strategy' THEN 'Strategy Agent completed trend scan and content brief'
+              WHEN 'writer' THEN 'Writer Agent generated content packages'
+              WHEN 'video_director' THEN 'Video Director created video brief'
+              WHEN 'video_editor' THEN 'Editor Agent assembled final video'
+              WHEN 'analytics' THEN 'Analytics Agent scored content and updated memory'
+              WHEN 'repurpose' THEN 'Repurpose Agent created platform variants'
+              ELSE 'Agent completed task'
+            END AS message
+           FROM agent_runs WHERE brand_id=$1
+           ORDER BY created_at DESC LIMIT 20`,
+          [selectedBrand.id],
+        ),
       ])
       setStats({
         contentReady: Number(cReadyRows?.[0]?.count ?? 0),
@@ -449,6 +456,26 @@ export default function MarketingEngine() {
       setReviewItems(reviewRows || [])
       setSchedule(scheduleRows || [])
       setMemory(memoryRows || [])
+      const AGENT_LABEL = {
+        strategy: 'Strategy',
+        writer: 'Writer',
+        video_director: 'Video Director',
+        video_editor: 'Editor',
+        analytics: 'Analytics',
+        repurpose: 'Repurpose',
+        video_render: 'Video Director',
+      }
+      const realLog = (agentRunsRows || []).map((r) => ({
+        time: r.created_at
+          ? new Date(r.created_at).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '',
+        agent: AGENT_LABEL[r.agent_type] || 'Agent',
+        action: r.message || 'Agent completed task',
+      }))
+      if (realLog.length > 0) setLiveLog(realLog)
     } catch (e) {
       console.error('fetch brand data failed', e)
     } finally {
@@ -2668,19 +2695,20 @@ function ScheduleStrip({ brand, version }) {
     let cancelled = false
     async function load() {
       try {
-        const res = await fetch(
-          `/api/schedule?brand_id=${encodeURIComponent(brand.id)}`,
+        const rows = await db.query(
+          `SELECT pp.id, pp.hook_text, pp.caption_text, pp.visual_url,
+                  pp.visual_type, pp.status,
+                  s.scheduled_at, s.platform, s.published
+             FROM post_packages pp
+             JOIN schedules s
+               ON s.content_id = pp.hook_id OR s.content_id = pp.caption_id
+            WHERE pp.brand_id=$1 AND s.scheduled_at::date = CURRENT_DATE
+            ORDER BY s.scheduled_at ASC`,
+          [brand.id],
         )
-        if (!res.ok) return
-        const data = await res.json()
         if (cancelled) return
-        if (Array.isArray(data)) {
-          setSchedules(data)
-          setIsEmpty(data.length === 0)
-        } else {
-          setSchedules(data.schedules || [])
-          setIsEmpty(!!data.is_empty)
-        }
+        setSchedules(rows || [])
+        setIsEmpty((rows || []).length === 0)
       } catch (e) {
         console.error('schedule fetch failed', e)
       }
@@ -2822,11 +2850,10 @@ function ScheduleStrip({ brand, version }) {
             const preview =
               (() => {
                 const txt =
-                  extractText(s.hook) ||
-                  extractText(s.caption) ||
-                  extractText(s.script) ||
+                  extractText(s.hook_text) ||
+                  extractText(s.caption_text) ||
                   ''
-                return txt.slice(0, 35) + (txt.length > 35 ? '…' : '')
+                return txt.slice(0, 30) + (txt.length > 30 ? '…' : '')
               })()
             const platform = s.platform || 'post'
             const pColor = platformColor(platform)
@@ -2925,20 +2952,55 @@ function ScheduleStrip({ brand, version }) {
                     </span>
                   )}
                 </div>
-                <span
+                <div
                   style={{
-                    fontSize: 11.5,
-                    color: 'rgba(255,255,255,0.85)',
-                    fontWeight: 500,
-                    textDecoration: isPublished ? 'line-through' : 'none',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: 220,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    minWidth: 0,
                   }}
                 >
-                  {preview || '(empty)'}
-                </span>
+                  {s.visual_url &&
+                    (s.visual_type === 'video' ? (
+                      <video
+                        src={s.visual_url}
+                        muted
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 5,
+                          objectFit: 'cover',
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={s.visual_url}
+                        alt=""
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 5,
+                          objectFit: 'cover',
+                          flexShrink: 0,
+                        }}
+                      />
+                    ))}
+                  <span
+                    style={{
+                      fontSize: 11.5,
+                      color: 'rgba(255,255,255,0.85)',
+                      fontWeight: 500,
+                      textDecoration: isPublished ? 'line-through' : 'none',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 190,
+                    }}
+                  >
+                    {preview || '(empty)'}
+                  </span>
+                </div>
                 <span
                   style={{
                     display: 'inline-flex',
@@ -4720,6 +4782,7 @@ function ContentHub({
   const [packagesVersion, setPackagesVersion] = useState(0)
   const [renderProgress, setRenderProgress] = useState({})
   const [renderDoneFlash, setRenderDoneFlash] = useState({})
+  const [postAll, setPostAll] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [activeQueue, setActiveQueue] = useState('scripts')
   const [search, setSearch] = useState('')
@@ -4972,6 +5035,52 @@ function ContentHub({
     }
   }
 
+  async function postAllApproved() {
+    if (!brand?.id || postAll) return
+    const queue = (Array.isArray(packages) ? packages : []).filter(
+      (p) => p.status === 'approved' && p.visual_url,
+    )
+    if (queue.length === 0) {
+      showToast?.('No approved packages with a visual to post', 'info')
+      return
+    }
+    for (let i = 0; i < queue.length; i++) {
+      const pkg = queue[i]
+      setPostAll({ current: i + 1, total: queue.length })
+      showToast?.(`Posting ${i + 1} of ${queue.length}…`)
+      try {
+        const res = await fetch('/api/workflow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'post_instagram',
+            package_id: pkg.id,
+            brand_id: brand.id,
+          }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          setPackages((prev) => prev.filter((p) => p.id !== pkg.id))
+        } else {
+          showToast?.(
+            `Package ${i + 1} failed: ${data.error || 'post failed'}`,
+            'error',
+          )
+        }
+      } catch (e) {
+        console.error('post all — item failed', e)
+        showToast?.(`Package ${i + 1} failed`, 'error')
+      }
+      // 30s spacing between posts (skip the wait after the last one).
+      if (i < queue.length - 1) {
+        await new Promise((r) => setTimeout(r, 30000))
+      }
+    }
+    setPostAll(null)
+    showToast?.('Finished posting approved packages')
+    onRefresh?.()
+  }
+
   async function generateVisual(pkg, kind) {
     if (!brand?.id || !pkg?.id) return
     try {
@@ -5211,15 +5320,39 @@ function ContentHub({
                 </span>
               )}
             </div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                background: 'rgba(255,255,255,0.04)',
-                border: '0.5px solid rgba(255,255,255,0.08)',
-                borderRadius: 8,
-                padding: '5px 10px',
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                type="button"
+                onClick={postAllApproved}
+                disabled={!brand || !!postAll}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  background: postAll
+                    ? 'rgba(194,181,155,0.15)'
+                    : 'rgba(194,181,155,0.12)',
+                  border: '0.5px solid rgba(194,181,155,0.5)',
+                  color: '#C2B59B',
+                  cursor: !brand || postAll ? 'default' : 'pointer',
+                  whiteSpace: 'nowrap',
+                  opacity: !brand ? 0.5 : 1,
+                }}
+              >
+                {postAll
+                  ? `Posting ${postAll.current} of ${postAll.total}…`
+                  : 'Post All Approved'}
+              </button>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '0.5px solid rgba(255,255,255,0.08)',
+                  borderRadius: 8,
+                  padding: '5px 10px',
                 width: 220,
                 maxWidth: '100%',
               }}
@@ -5240,6 +5373,7 @@ function ContentHub({
                   fontFamily: 'inherit',
                 }}
               />
+              </div>
             </div>
           </div>
           <QueueTabs
