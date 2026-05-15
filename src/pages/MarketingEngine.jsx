@@ -4530,6 +4530,7 @@ function ContentHub({
   const [packages, setPackages] = useState([])
   const [packagesVersion, setPackagesVersion] = useState(0)
   const [renderProgress, setRenderProgress] = useState({})
+  const [renderDoneFlash, setRenderDoneFlash] = useState({})
   const [generating, setGenerating] = useState(false)
   const [activeQueue, setActiveQueue] = useState('scripts')
   const [search, setSearch] = useState('')
@@ -4635,33 +4636,59 @@ function ContentHub({
     }
   }, [brand?.id, packagesVersion])
 
-  // Poll Remotion render status every 10s for any package still rendering
-  // (needs_visual + has a render_id). When a render finishes, render_status
-  // backfills visual_url server-side, so we just refetch the list.
+  // Poll Remotion render status every 8s for any package whose status is
+  // 'rendering'. On completion we patch the package in state directly
+  // (visual_url + status='ready') and flash a green border for 1s.
   useEffect(() => {
-    const pending = (Array.isArray(packages) ? packages : []).filter(
-      (p) => p.status === 'needs_visual' && p.render_id && !p.visual_url,
+    const rendering = (Array.isArray(packages) ? packages : []).filter(
+      (p) => p.status === 'rendering' && p.render_id,
     )
-    if (pending.length === 0) return
+    if (rendering.length === 0) return
     let cancelled = false
 
     async function pollOnce() {
-      let anyDone = false
-      for (const p of pending) {
+      for (const p of rendering) {
         try {
           const params = new URLSearchParams({
             action: 'render_status',
             render_id: p.render_id,
             bucket: p.render_bucket || '',
+            package_id: p.id,
+            brand_id: brand?.id || '',
           })
           const res = await fetch(`/api/workflow?${params.toString()}`)
           if (!res.ok) continue
           const data = await res.json()
           if (cancelled) return
           if (data.done) {
-            anyDone = true
+            setPackages((prev) =>
+              prev.map((x) =>
+                x.id === p.id
+                  ? {
+                      ...x,
+                      visual_url: data.url,
+                      visual_type: 'video',
+                      status: 'ready',
+                      render_id: null,
+                    }
+                  : x,
+              ),
+            )
             setRenderProgress((prev) => ({ ...prev, [p.id]: 1 }))
-          } else if (data.failed) {
+            setRenderDoneFlash((prev) => ({ ...prev, [p.id]: true }))
+            setTimeout(() => {
+              setRenderDoneFlash((prev) => {
+                const next = { ...prev }
+                delete next[p.id]
+                return next
+              })
+            }, 1000)
+          } else if (data.error) {
+            setPackages((prev) =>
+              prev.map((x) =>
+                x.id === p.id ? { ...x, status: 'needs_visual' } : x,
+              ),
+            )
             setRenderProgress((prev) => ({ ...prev, [p.id]: -1 }))
           } else if (typeof data.progress === 'number') {
             setRenderProgress((prev) => ({ ...prev, [p.id]: data.progress }))
@@ -4670,16 +4697,15 @@ function ContentHub({
           /* transient — try again next tick */
         }
       }
-      if (anyDone && !cancelled) setPackagesVersion((v) => v + 1)
     }
 
     pollOnce()
-    const id = setInterval(pollOnce, 10000)
+    const id = setInterval(pollOnce, 8000)
     return () => {
       cancelled = true
       clearInterval(id)
     }
-  }, [packages])
+  }, [packages, brand?.id])
 
   async function approvePackage(pkg, textOnly = false) {
     if (!brand?.id || !pkg?.id) return
@@ -5027,6 +5053,7 @@ function ContentHub({
                 onGenerateVisual={generateVisual}
                 layout={activeQueue}
                 renderProgress={renderProgress}
+                renderDoneFlash={renderDoneFlash}
               />
             )}
           </div>
@@ -5439,7 +5466,7 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
   )
 }
 
-function PackagesList({ packages, brand, onApprove, onReject, onGenerateVisual, layout, renderProgress }) {
+function PackagesList({ packages, brand, onApprove, onReject, onGenerateVisual, layout, renderProgress, renderDoneFlash }) {
   if (!packages || packages.length === 0) {
     const message =
       layout === 'videos'
@@ -5487,6 +5514,7 @@ function PackagesList({ packages, brand, onApprove, onReject, onGenerateVisual, 
             onGenerateVisual={onGenerateVisual}
             compact={isGrid}
             progress={renderProgress?.[p.id]}
+            doneFlash={!!renderDoneFlash?.[p.id]}
           />
         ))}
       </AnimatePresence>
@@ -5503,46 +5531,53 @@ function RenderProgressBar({ pct }) {
         left: 0,
         right: 0,
         bottom: 0,
-        height: 4,
-        background: 'rgba(0,0,0,0.5)',
+        height: 2,
+        background: 'rgba(194,181,155,0.1)',
         overflow: 'hidden',
       }}
     >
       {determinate ? (
         <motion.div
-          animate={{ width: `${Math.max(4, pct)}%` }}
+          animate={{ width: `${Math.max(2, pct)}%` }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
-          style={{ height: '100%', background: '#fbbf24' }}
+          style={{ height: '100%', background: 'rgba(194,181,155,0.8)' }}
         />
       ) : (
         <motion.div
           animate={{ x: ['-40%', '140%'] }}
           transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ width: '40%', height: '100%', background: '#fbbf24' }}
+          style={{
+            width: '40%',
+            height: '100%',
+            background: 'rgba(194,181,155,0.8)',
+          }}
         />
       )}
     </div>
   )
 }
 
-function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compact, progress }) {
+function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compact, progress, doneFlash }) {
   const [expanded, setExpanded] = useState(false)
   const hasVisual = !!pkg.visual_url
   const createdMs = pkg.created_at
     ? new Date(pkg.created_at).getTime()
     : Date.now()
-  const needsVisual = !hasVisual && pkg.status === 'needs_visual'
-  // An async Lambda render is in flight when the package has a render_id and
-  // the latest poll hasn't reported failure (-1). progress is 0..1.
   const renderFailed = progress === -1
-  const isRendering = needsVisual && !!pkg.render_id && !renderFailed
+  // 'rendering' status is the canonical signal that a Lambda render is in
+  // flight. (Legacy: needs_visual + render_id also counts.)
+  const isRendering =
+    !hasVisual &&
+    !renderFailed &&
+    (pkg.status === 'rendering' ||
+      (pkg.status === 'needs_visual' && !!pkg.render_id))
+  const needsVisual = !hasVisual && pkg.status === 'needs_visual' && !isRendering
   const renderPct =
     typeof progress === 'number' && progress >= 0
       ? Math.round(progress * 100)
       : null
   // Only fall back to the static "Visual pending" badge once we're past the
-  // 3-minute window AND there's no live render to wait on — otherwise the
-  // infinite spinner is replaced by a real progress bar.
+  // 3-minute window AND there's no live render to wait on.
   const visualStale =
     Date.now() - createdMs > 3 * 60 * 1000 && !isRendering
   const statusBadge = hasVisual
@@ -5556,7 +5591,8 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
       }
     : isRendering
     ? {
-        label: renderPct != null ? `Rendering… ${renderPct}%` : 'Rendering…',
+        label:
+          renderPct != null ? `Rendering ${renderPct}%` : 'Rendering…',
         color: '#fbbf24',
         bg: 'rgba(251,191,36,0.12)',
       }
@@ -5570,7 +5606,10 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
         }
       : { label: 'Generating visual…', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' }
     : { label: 'Draft', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.05)' }
-  const showTextOnly = needsVisual || !pkg.visual_url
+  const showTextOnly = needsVisual || (!pkg.visual_url && !isRendering)
+  const cardBorder = doneFlash
+    ? '1px solid rgba(74,222,128,0.8)'
+    : '0.5px solid rgba(255,255,255,0.07)'
   const platformAccent = platformColor(pkg.platform)
   const caption = pkg.caption_text || ''
 
@@ -5585,7 +5624,8 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
         style={{
           position: 'relative',
           background: 'rgba(255,255,255,0.03)',
-          border: '0.5px solid rgba(255,255,255,0.07)',
+          border: cardBorder,
+          transition: 'border-color 0.3s ease',
           borderRadius: 12,
           overflow: 'hidden',
           display: 'flex',
@@ -5747,7 +5787,8 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
       transition={{ duration: 0.22 }}
       style={{
         background: 'rgba(255,255,255,0.03)',
-        border: '0.5px solid rgba(255,255,255,0.07)',
+        border: cardBorder,
+        transition: 'border-color 0.3s ease',
         borderRadius: 12,
         padding: 12,
         display: 'grid',
@@ -5877,7 +5918,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, compac
               gap: 5,
             }}
           >
-            {needsVisual && !statusBadge.stale && (
+            {(needsVisual || isRendering) && !statusBadge.stale && (
               <motion.span
                 animate={{ opacity: [1, 0.4, 1] }}
                 transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}

@@ -11,10 +11,10 @@
 // GET  /api/workflow?action=pipeline_list&brand_id=<uuid>
 //   Returns recent pipelines for the brand (for the UI).
 //
-// GET  /api/workflow?action=render_status&render_id=<id>&bucket=<bucket>
+// GET  /api/workflow?action=render_status&render_id=<id>&bucket=<bucket>&package_id=<id>
 //   Polls a Remotion Lambda render. When done, backfills visual_url onto the
-//   post_package with that render_id and flips status to 'ready'.
-//   Response: { success, done, progress, url?, failed?, error? }
+//   post_package (matched by package_id) and flips status to 'ready'.
+//   Response: { success, done, progress, url?, error?, message? }
 //
 // POST /api/workflow
 //   Body: { action: 'approve', content_id, brand_id }
@@ -791,13 +791,11 @@ async function handlePipelineAdvance(sql, body) {
   throw err
 }
 
-// Polls a Remotion Lambda render by id. When the render is done it backfills
-// the post_package tied to that render (matched by render_id, which is
-// precise — far safer than blanket-updating every visual_url IS NULL row for
-// the brand) and flips its status to 'ready'.
-async function handleRenderStatus(sql, render_id, bucket) {
-  if (!render_id || !bucket) {
-    const err = new Error('render_id and bucket required')
+// Polls a Remotion Lambda render and backfills the specific package
+// (matched by package_id) when it finishes or fails.
+async function handleRenderStatus(sql, { render_id, bucket, package_id }) {
+  if (!render_id || !bucket || !package_id) {
+    const err = new Error('render_id, bucket and package_id required')
     err.status = 400
     throw err
   }
@@ -809,22 +807,12 @@ async function handleRenderStatus(sql, render_id, bucket) {
     region: process.env.REMOTION_AWS_REGION || 'us-east-1',
   })
 
-  if (progress.fatalErrorEncountered) {
-    return {
-      done: false,
-      failed: true,
-      progress: progress.overallProgress || 0,
-      error: progress.errors?.[0]?.message || 'render failed',
-    }
-  }
-
-  if (progress.done) {
-    const url = progress.outputFile
+  if (progress.done && progress.outputFile) {
     await sql.query(
       `UPDATE post_packages
-          SET visual_url=$1, visual_type='video', status='ready'
-        WHERE render_id=$2 AND visual_url IS NULL`,
-      [url, render_id],
+          SET visual_url=$1, visual_type='video', status='ready', render_id=null
+        WHERE id=$2`,
+      [progress.outputFile, package_id],
     )
     await sql.query(
       "UPDATE agent_runs SET status='complete', output=$1 WHERE output::text LIKE $2",
@@ -832,12 +820,20 @@ async function handleRenderStatus(sql, render_id, bucket) {
         JSON.stringify({
           renderId: render_id,
           bucketName: bucket,
-          outputUrl: url,
+          outputUrl: progress.outputFile,
         }),
         `%${render_id}%`,
       ],
     )
-    return { done: true, progress: 1, url }
+    return { done: true, url: progress.outputFile, progress: 1 }
+  }
+
+  if (progress.fatalErrorEncountered) {
+    await sql.query(
+      "UPDATE post_packages SET status='needs_visual' WHERE id=$1",
+      [package_id],
+    )
+    return { done: false, error: true, message: 'Render failed' }
   }
 
   return { done: false, progress: progress.overallProgress || 0 }
@@ -864,8 +860,12 @@ export default async function handler(req, res) {
         return res.status(200).json(list)
       }
       if (action === 'render_status') {
-        const { render_id, bucket } = req.query || {}
-        const result = await handleRenderStatus(sql, render_id, bucket)
+        const { render_id, bucket, package_id } = req.query || {}
+        const result = await handleRenderStatus(sql, {
+          render_id,
+          bucket,
+          package_id,
+        })
         return res.status(200).json({ success: true, ...result })
       }
       return res.status(400).json({

@@ -502,17 +502,17 @@ Output ONLY valid JSON:
               brand_id: brand.id,
             }),
           })
-          const renderData = await renderResponse.json()
-          // Async render: store the renderId + bucket so the UI can poll
-          // /api/workflow?action=render_status and backfill visual_url when
-          // the Lambda render finishes. Package stays 'needs_visual' for now.
-          if (renderData.success && renderData.renderId) {
+          const renderResult = await renderResponse.json()
+          // Async render: store renderId + bucket and flip the package to
+          // 'rendering' so the UI polls /api/workflow?action=render_status
+          // and backfills visual_url when the Lambda render finishes.
+          if (renderResult.renderId) {
             await sql.query(
-              'UPDATE post_packages SET render_id=$1, render_bucket=$2, visual_type=$3 WHERE id=$4',
+              'UPDATE post_packages SET render_id=$1, render_bucket=$2, status=$3 WHERE id=$4',
               [
-                renderData.renderId,
-                renderData.bucketName || null,
-                'video',
+                renderResult.renderId,
+                renderResult.bucketName || null,
+                'rendering',
                 packageId,
               ],
             )
