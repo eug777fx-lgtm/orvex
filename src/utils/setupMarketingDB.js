@@ -113,6 +113,16 @@ export async function setupMarketingDB() {
     )
   `)
 
+  // Async Remotion render tracking: render_id + render_bucket are stored when
+  // the writer fires a render so the UI can poll render_status and the
+  // backfill can target the exact package.
+  await db.query(
+    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS render_id TEXT`,
+  )
+  await db.query(
+    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS render_bucket TEXT`,
+  )
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS content_pipeline (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

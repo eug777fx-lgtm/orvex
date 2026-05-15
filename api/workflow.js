@@ -11,6 +11,11 @@
 // GET  /api/workflow?action=pipeline_list&brand_id=<uuid>
 //   Returns recent pipelines for the brand (for the UI).
 //
+// GET  /api/workflow?action=render_status&render_id=<id>&bucket=<bucket>
+//   Polls a Remotion Lambda render. When done, backfills visual_url onto the
+//   post_package with that render_id and flips status to 'ready'.
+//   Response: { success, done, progress, url?, failed?, error? }
+//
 // POST /api/workflow
 //   Body: { action: 'approve', content_id, brand_id }
 //     Marks content approved, schedules it at the next available slot (4h cadence,
@@ -786,6 +791,58 @@ async function handlePipelineAdvance(sql, body) {
   throw err
 }
 
+// Polls a Remotion Lambda render by id. When the render is done it backfills
+// the post_package tied to that render (matched by render_id, which is
+// precise — far safer than blanket-updating every visual_url IS NULL row for
+// the brand) and flips its status to 'ready'.
+async function handleRenderStatus(sql, render_id, bucket) {
+  if (!render_id || !bucket) {
+    const err = new Error('render_id and bucket required')
+    err.status = 400
+    throw err
+  }
+  const { getRenderProgress } = await import('@remotion/lambda-client')
+  const progress = await getRenderProgress({
+    renderId: render_id,
+    bucketName: bucket,
+    functionName: process.env.REMOTION_FUNCTION_NAME,
+    region: process.env.REMOTION_AWS_REGION || 'us-east-1',
+  })
+
+  if (progress.fatalErrorEncountered) {
+    return {
+      done: false,
+      failed: true,
+      progress: progress.overallProgress || 0,
+      error: progress.errors?.[0]?.message || 'render failed',
+    }
+  }
+
+  if (progress.done) {
+    const url = progress.outputFile
+    await sql.query(
+      `UPDATE post_packages
+          SET visual_url=$1, visual_type='video', status='ready'
+        WHERE render_id=$2 AND visual_url IS NULL`,
+      [url, render_id],
+    )
+    await sql.query(
+      "UPDATE agent_runs SET status='complete', output=$1 WHERE output::text LIKE $2",
+      [
+        JSON.stringify({
+          renderId: render_id,
+          bucketName: bucket,
+          outputUrl: url,
+        }),
+        `%${render_id}%`,
+      ],
+    )
+    return { done: true, progress: 1, url }
+  }
+
+  return { done: false, progress: progress.overallProgress || 0 }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -806,9 +863,15 @@ export default async function handler(req, res) {
         const list = await handlePipelineList(sql, brand_id)
         return res.status(200).json(list)
       }
-      return res
-        .status(400)
-        .json({ error: 'GET requires action=next|pipeline_list&brand_id=...' })
+      if (action === 'render_status') {
+        const { render_id, bucket } = req.query || {}
+        const result = await handleRenderStatus(sql, render_id, bucket)
+        return res.status(200).json({ success: true, ...result })
+      }
+      return res.status(400).json({
+        error:
+          'GET requires action=next|pipeline_list|render_status',
+      })
     }
 
     if (req.method === 'POST') {

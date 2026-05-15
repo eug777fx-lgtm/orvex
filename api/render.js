@@ -1,4 +1,4 @@
-import { renderMediaOnLambda, getRenderProgress } from '@remotion/lambda-client'
+import { renderMediaOnLambda } from '@remotion/lambda-client'
 
 // Fire-and-forget render kickoff used by agents (e.g. video_director) that
 // can't afford to block on the full Lambda render time. Returns the renderId
@@ -98,7 +98,10 @@ export default async function handler(req, res) {
       outName: `${brand_id || 'brand'}-${composition_id}-${Date.now()}.mp4`,
     })
 
-    // Log to agent_runs
+    // Fire-and-forget: log the render and return immediately. The Lambda
+    // render keeps running on AWS (up to 300s). Completion is backfilled by
+    // polling GET /api/workflow?action=render_status which reads
+    // getRenderProgress and writes visual_url onto the package.
     await sql.query(
       'INSERT INTO agent_runs (brand_id, agent_type, input, output, status) VALUES ($1, $2, $3, $4, $5)',
       [
@@ -110,64 +113,12 @@ export default async function handler(req, res) {
       ],
     )
 
-    // Poll for completion (up to 110 seconds — may exceed Vercel function
-    // timeout; the 202 branch below is the fallback when we time out).
-    const startTime = Date.now()
-    let outputUrl = null
-
-    while (Date.now() - startTime < 110000) {
-      await new Promise((resolve) => setTimeout(resolve, 5000))
-
-      const progress = await getRenderProgress({
-        renderId,
-        bucketName,
-        functionName: process.env.REMOTION_FUNCTION_NAME,
-        region: process.env.REMOTION_AWS_REGION || 'us-east-1',
-      })
-
-      if (progress.done) {
-        outputUrl = progress.outputFile
-        break
-      }
-
-      if (progress.fatalErrorEncountered) {
-        throw new Error(progress.errors?.[0]?.message || 'Render failed')
-      }
-    }
-
-    if (!outputUrl) {
-      return res.status(202).json({
-        success: true,
-        status: 'rendering',
-        renderId,
-        message: 'Video is still rendering — check back in 2 minutes',
-      })
-    }
-
-    // Save to content table
-    const contentResult = await sql.query(
-      'INSERT INTO content (brand_id, type, script, status) VALUES ($1, $2, $3, $4) RETURNING id',
-      [brand_id || null, 'video', outputUrl, 'pending'],
-    )
-
-    // Update agent_runs status
-    await sql.query(
-      'UPDATE agent_runs SET status=$1, output=$2 WHERE output::text LIKE $3',
-      [
-        'complete',
-        JSON.stringify({ renderId, bucketName, outputUrl }),
-        `%${renderId}%`,
-      ],
-    )
-
-    const contentRows = contentResult?.rows ?? contentResult
     return res.status(200).json({
       success: true,
-      status: 'complete',
-      url: outputUrl,
-      content_id: contentRows?.[0]?.id,
-      composition: composition_id,
-      brand: brandData.brandName,
+      status: 'rendering',
+      renderId,
+      bucketName,
+      message: 'Render started',
     })
   } catch (error) {
     console.error('Render error:', error)

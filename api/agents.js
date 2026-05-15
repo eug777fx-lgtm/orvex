@@ -503,10 +503,18 @@ Output ONLY valid JSON:
             }),
           })
           const renderData = await renderResponse.json()
-          if (renderData.success && renderData.url) {
+          // Async render: store the renderId + bucket so the UI can poll
+          // /api/workflow?action=render_status and backfill visual_url when
+          // the Lambda render finishes. Package stays 'needs_visual' for now.
+          if (renderData.success && renderData.renderId) {
             await sql.query(
-              "UPDATE post_packages SET visual_url=$1, visual_type='video', status='ready' WHERE id=$2",
-              [renderData.url, packageId],
+              'UPDATE post_packages SET render_id=$1, render_bucket=$2, visual_type=$3 WHERE id=$4',
+              [
+                renderData.renderId,
+                renderData.bucketName || null,
+                'video',
+                packageId,
+              ],
             )
           }
         } catch (renderErr) {
