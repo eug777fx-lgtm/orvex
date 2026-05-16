@@ -127,6 +127,16 @@ export async function setupMarketingDB() {
   await db.query(
     `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS script TEXT`,
   )
+  // video_producer outputs: per-scene asset map + final duration / scene count.
+  await db.query(
+    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS scenes_data JSONB`,
+  )
+  await db.query(
+    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS video_duration INTEGER`,
+  )
+  await db.query(
+    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS scenes_count INTEGER`,
+  )
 
   // Reset packages stuck in 'rendering' with no render_id (the kickoff
   // failed before persisting an id). Narrow + idempotent — safe every boot.

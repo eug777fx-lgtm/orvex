@@ -112,7 +112,7 @@ const AGENTS = [
     name: 'Producer',
     color: '#f59e0b',
     icon: Camera,
-    role: 'Full video assembly · Multi-scene · Complete stories',
+    role: 'Multi-scene assembly · Complete stories · Final cut',
     pos: { left: '52%', top: '58%' },
     bobDelay: 0.8,
     producer: true,
@@ -2370,17 +2370,26 @@ function ProducerModal({ brand, onClose, showToast, onRefresh }) {
       })
       const data = await res.json()
       clearInterval(timer)
-      const ok = data?.output?.success || data?.video?.url
-      if (ok) {
+      // Production runs in the background (status 'producing') — the API
+      // returns immediately. The Videos queue polls for completion.
+      const started =
+        data?.success &&
+        (data.status === 'producing' ||
+          data?.output?.success ||
+          data?.video?.url)
+      if (started) {
         setStageIdx(STAGES.length)
-        setProgressMsg('Done')
+        setProgressMsg(
+          data.message ||
+            'Production started — assembling in the background. Check the Videos queue in 3-5 minutes.',
+        )
         setResult('success')
-        showToast?.('Full video produced — check Videos queue')
+        showToast?.('Full video producing — check Videos queue')
         onRefresh?.()
       } else {
         setResult('failed')
-        setProgressMsg(data?.output?.error || 'Production failed')
-        showToast?.('Production failed — see Videos queue', 'error')
+        setProgressMsg(data?.error || data?.output?.error || 'Production failed')
+        showToast?.('Production failed to start', 'error')
       }
     } catch (e) {
       clearInterval(timer)
@@ -2487,12 +2496,25 @@ function ProducerModal({ brand, onClose, showToast, onRefresh }) {
               }}
             >
               {packages.length === 0 && <option value="">No packages</option>}
-              {packages.map((p) => (
+              {packages.map((p) => {
+                let sc = 0
+                let dur = 0
+                try {
+                  const v = p.script ? JSON.parse(p.script) : null
+                  sc = Array.isArray(v?.scenes) ? v.scenes.length : 0
+                  dur = Number(v?.duration) || 0
+                } catch {
+                  /* not a structured script */
+                }
+                const meta = p.script
+                  ? `${sc} scene${sc === 1 ? '' : 's'}${dur ? ` · ${dur}s` : ''}`
+                  : 'no script'
+                return (
                 <option key={p.id} value={p.id}>
-                  {(p.hook_text || '(no hook)').slice(0, 50)} ·{' '}
-                  {p.script ? 'video script ✓' : 'no script'}
+                  {(p.hook_text || '(no hook)').slice(0, 50)} · {meta}
                 </option>
-              ))}
+                )
+              })}
             </select>
             <button
               type="button"
@@ -5327,6 +5349,32 @@ function ContentHub({
     }
   }, [packages, brand?.id])
 
+  // Poll every 15s while any package is in background 'producing'. The
+  // video_producer agent flips it to 'ready' (or 'needs_visual') when the
+  // Higgsfield + Creatomate flow finishes; we just refetch to pick it up.
+  useEffect(() => {
+    const producing = (Array.isArray(packages) ? packages : []).filter(
+      (p) => p.status === 'producing',
+    )
+    if (producing.length === 0) return
+    let cancelled = false
+    let attempts = 0
+    const maxAttempts = 40 // 40 × 15s = 10 min ceiling
+    const id = setInterval(() => {
+      attempts += 1
+      if (cancelled) return
+      if (attempts >= maxAttempts) {
+        clearInterval(id)
+        return
+      }
+      setPackagesVersion((v) => v + 1)
+    }, 15000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [packages])
+
   async function approvePackage(pkg, textOnly = false) {
     if (!brand?.id || !pkg?.id) return
     try {
@@ -6342,7 +6390,15 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
   // 3-minute window AND there's no live render to wait on.
   const visualStale =
     Date.now() - createdMs > 3 * 60 * 1000 && !isRendering
-  const statusBadge = hasVisual
+  const isProducing = pkg.status === 'producing'
+  const statusBadge = isProducing
+    ? {
+        label: 'Producing full video…',
+        color: '#f59e0b',
+        bg: 'rgba(245,158,11,0.14)',
+        producing: true,
+      }
+    : hasVisual
     ? { label: 'Ready to post', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' }
     : renderFailed
     ? {
@@ -6723,7 +6779,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
               gap: 5,
             }}
           >
-            {(needsVisual || isRendering) && !statusBadge.stale && (
+            {(needsVisual || isRendering || isProducing) && !statusBadge.stale && (
               <motion.span
                 animate={{ opacity: [1, 0.4, 1] }}
                 transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}

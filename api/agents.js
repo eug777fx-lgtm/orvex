@@ -87,6 +87,45 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'agent_type required' })
     }
 
+    // Multi-scene production takes 2-5 minutes which exceeds serverless
+    // limits — flip the package to 'producing', respond immediately, and
+    // continue the Higgsfield + ElevenLabs + Creatomate flow in background.
+    if (agent_type === 'video_producer') {
+      if (!package_id) {
+        return res.status(400).json({ error: 'package_id is required' })
+      }
+      const pkgRows = await sql.query(
+        'SELECT * FROM post_packages WHERE id=$1 AND brand_id=$2',
+        [package_id, brand_id],
+      )
+      const pkg = (pkgRows?.rows ?? pkgRows)?.[0]
+      if (!pkg) {
+        return res.status(404).json({ error: 'package not found' })
+      }
+      const brandRows = await sql.query(
+        'SELECT id, name, primary_color, secondary_color, logo_url FROM brands WHERE id = $1',
+        [brand_id],
+      )
+      const brand = (brandRows?.rows ?? brandRows)?.[0]
+      await sql.query(
+        "UPDATE post_packages SET status='producing' WHERE id=$1",
+        [package_id],
+      )
+      // Fire-and-forget background production. On Vercel the container may
+      // freeze after the response; the package stays 'producing' until a
+      // later boot's cleanup or a successful background completion.
+      setImmediate(() => {
+        produceVideo({ sql, brand, pkg, package_id, brand_id }).catch((e) =>
+          console.error('produceVideo background error:', e?.message || e),
+        )
+      })
+      return res.status(200).json({
+        success: true,
+        status: 'producing',
+        message: 'Video production started — check queue in 3-5 minutes',
+      })
+    }
+
     const result = await runAgent({
       sql,
       brand_id,
@@ -107,6 +146,339 @@ export default async function handler(req, res) {
     const status = error.status || 500
     return res.status(status).json({ error: error.message })
   }
+}
+
+// Background multi-scene production: Higgsfield clip + ElevenLabs voiceover
+// per scene, then a Creatomate timeline assembly. Runs detached from the
+// request so it can take minutes.
+async function produceVideo({ sql, brand, pkg, package_id, brand_id }) {
+  const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'
+  let videoScript
+  try {
+    videoScript = JSON.parse(pkg.script)
+  } catch {
+    videoScript = null
+  }
+  const scenes = Array.isArray(videoScript?.scenes) ? videoScript.scenes : []
+  if (scenes.length === 0) {
+    await sql.query(
+      "UPDATE post_packages SET status='needs_visual' WHERE id=$1",
+      [package_id],
+    )
+    return
+  }
+  const brandColor = brand?.primary_color || '#0B0B0D'
+  const scenes_data = []
+
+  for (const scene of scenes) {
+    // Step A — Higgsfield text-to-video.
+    try {
+      const higsRes = await fetch(
+        'https://api.higgsfield.ai/v1/generation/text-to-video',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.HIGGSFIELD_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt:
+              scene.visual_prompt +
+              ` Brand colors: ${brandColor}. Cinematic quality. Vertical 9:16 format.`,
+            duration: Math.min(scene.duration || 5, 8),
+            aspect_ratio: '9:16',
+          }),
+        },
+      )
+      const higsData = await higsRes.json()
+      const generationId = higsData.id || higsData.generation_id
+      if (generationId) {
+        let higsVideoUrl = null
+        for (let i = 0; i < 12; i++) {
+          await new Promise((r) => setTimeout(r, 5000))
+          const statusRes = await fetch(
+            `https://api.higgsfield.ai/v1/generation/${generationId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.HIGGSFIELD_API_KEY}`,
+              },
+            },
+          )
+          const statusData = await statusRes.json()
+          if (
+            statusData.status === 'completed' ||
+            statusData.status === 'succeeded'
+          ) {
+            higsVideoUrl =
+              statusData.video_url ||
+              statusData.output_url ||
+              statusData.url
+            break
+          }
+          if (statusData.status === 'failed') break
+        }
+        scenes_data.push({ ...scene, higgsfield_url: higsVideoUrl })
+      } else {
+        scenes_data.push({ ...scene, higgsfield_url: null })
+      }
+    } catch (err) {
+      console.log('Higgsfield failed for scene', scene.scene_number, err.message)
+      scenes_data.push({ ...scene, higgsfield_url: null })
+    }
+
+    // Step B — ElevenLabs voiceover.
+    if (scene.voiceover && process.env.ELEVENLABS_API_KEY) {
+      try {
+        const voiceRes = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
+          {
+            method: 'POST',
+            headers: {
+              'xi-api-key': process.env.ELEVENLABS_API_KEY,
+              'Content-Type': 'application/json',
+              Accept: 'audio/mpeg',
+            },
+            body: JSON.stringify({
+              text: scene.voiceover,
+              model_id: 'eleven_monolingual_v1',
+              voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+            }),
+          },
+        )
+        if (voiceRes.ok) {
+          const audioBuffer = await voiceRes.arrayBuffer()
+          const base64Audio = Buffer.from(audioBuffer).toString('base64')
+          scenes_data[scenes_data.length - 1].audio_url =
+            `data:audio/mpeg;base64,${base64Audio}`
+        }
+      } catch (err) {
+        console.log('ElevenLabs failed for scene', scene.scene_number, err.message)
+      }
+    }
+  }
+
+  // Step 6 — build the Creatomate timeline.
+  const creatomateElements = []
+  let timeOffset = 0
+  for (const scene of scenes_data) {
+    const sceneDuration = scene.duration || 5
+    if (scene.higgsfield_url) {
+      creatomateElements.push({
+        type: 'video',
+        source: scene.higgsfield_url,
+        time: timeOffset,
+        duration: sceneDuration,
+        fit: 'cover',
+        volume: '0%',
+      })
+    } else {
+      creatomateElements.push({
+        type: 'rectangle',
+        width: '100%',
+        height: '100%',
+        fill_color: brandColor,
+        time: timeOffset,
+        duration: sceneDuration,
+      })
+    }
+    creatomateElements.push({
+      type: 'rectangle',
+      width: '100%',
+      height: '100%',
+      fill_color: 'rgba(0,0,0,0.45)',
+      time: timeOffset,
+      duration: sceneDuration,
+    })
+    if (scene.text_overlay) {
+      creatomateElements.push({
+        type: 'text',
+        text: scene.text_overlay,
+        time: timeOffset + 0.3,
+        duration: sceneDuration - 0.5,
+        width: '85%',
+        height: 'auto',
+        x_alignment: '50%',
+        y_alignment: '50%',
+        font_family: 'Montserrat',
+        font_weight: '800',
+        font_size: '8.5 vmin',
+        fill_color: '#FFFFFF',
+        letter_spacing: '-0.5px',
+        animations: [
+          {
+            type: 'text-slide',
+            duration: 0.4,
+            direction: 'up',
+            scope: 'split-clip',
+          },
+        ],
+      })
+    }
+    if (scene.audio_url) {
+      creatomateElements.push({
+        type: 'audio',
+        source: scene.audio_url,
+        time: timeOffset,
+        duration: sceneDuration,
+      })
+    }
+    if (
+      scene.transition_out === 'fade' &&
+      timeOffset + sceneDuration < (videoScript.duration || Infinity)
+    ) {
+      creatomateElements.push({
+        type: 'rectangle',
+        width: '100%',
+        height: '100%',
+        fill_color: '#000000',
+        time: timeOffset + sceneDuration - 0.3,
+        duration: 0.3,
+        opacity: '0%',
+        animations: [{ type: 'fade', duration: 0.3, reversed: false }],
+      })
+    }
+    timeOffset += sceneDuration
+  }
+  creatomateElements.push({
+    type: 'text',
+    text: brand?.name || '',
+    time: 0,
+    duration: timeOffset,
+    x_alignment: '95%',
+    y_alignment: '94%',
+    font_family: 'Montserrat',
+    font_weight: '300',
+    font_size: '3 vmin',
+    fill_color: 'rgba(255,255,255,0.5)',
+    letter_spacing: '2px',
+  })
+  creatomateElements.push({
+    type: 'audio',
+    source: 'https://cdn.pixabay.com/audio/2024/01/15/audio_8b2a4f6c7d.mp3',
+    time: 0,
+    duration: timeOffset,
+    volume: '15%',
+    audio_fade_in: 1,
+    audio_fade_out: 1,
+  })
+
+  // Step 7 — submit to Creatomate.
+  let creatomateRenderId = null
+  try {
+    const creatomateRes = await fetch(
+      'https://api.creatomate.com/v1/renders',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.CREATOMATE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          output_format: 'mp4',
+          width: 1080,
+          height: 1920,
+          frame_rate: 30,
+          duration: timeOffset,
+          elements: creatomateElements,
+        }),
+      },
+    )
+    const creatomateData = await creatomateRes.json()
+    creatomateRenderId = Array.isArray(creatomateData)
+      ? creatomateData[0]?.id
+      : creatomateData?.id
+  } catch (err) {
+    console.log('Creatomate submit failed:', err.message)
+  }
+
+  // Step 8 — poll Creatomate.
+  let finalVideoUrl = null
+  if (creatomateRenderId) {
+    for (let i = 0; i < 24; i++) {
+      await new Promise((r) => setTimeout(r, 5000))
+      try {
+        const pollRes = await fetch(
+          `https://api.creatomate.com/v1/renders/${creatomateRenderId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.CREATOMATE_API_KEY}`,
+            },
+          },
+        )
+        const pollData = await pollRes.json()
+        if (pollData.status === 'succeeded') {
+          finalVideoUrl = pollData.url
+          break
+        }
+        if (pollData.status === 'failed') {
+          console.log('Creatomate failed:', pollData.error)
+          break
+        }
+      } catch (err) {
+        console.log('Creatomate poll error:', err.message)
+      }
+    }
+  }
+
+  // Step 9 — finalise.
+  const scenesCount = scenes_data.length
+  if (finalVideoUrl) {
+    await sql.query(
+      `UPDATE post_packages
+          SET visual_url=$1, visual_type='video', status='ready',
+              scenes_data=$2::jsonb, video_duration=$3, scenes_count=$4
+        WHERE id=$5`,
+      [
+        finalVideoUrl,
+        JSON.stringify(scenes_data),
+        Math.round(timeOffset),
+        scenesCount,
+        package_id,
+      ],
+    )
+    await sql.query(
+      `INSERT INTO agent_runs (brand_id, agent_type, status, output)
+       VALUES ($1, 'video_producer', 'complete', $2)`,
+      [
+        brand_id,
+        JSON.stringify({
+          video_url: finalVideoUrl,
+          scenes: scenesCount,
+          duration: timeOffset,
+        }),
+      ],
+    )
+    return
+  }
+
+  // Fallback — best individual scene that has a Higgsfield clip.
+  const fallbackUrl =
+    scenes_data.find((s) => s.higgsfield_url)?.higgsfield_url || null
+  await sql.query(
+    `UPDATE post_packages
+        SET visual_url=$1, status='ready',
+            scenes_data=$2::jsonb, video_duration=$3, scenes_count=$4
+      WHERE id=$5`,
+    [
+      fallbackUrl,
+      JSON.stringify(scenes_data),
+      Math.round(timeOffset),
+      scenesCount,
+      package_id,
+    ],
+  )
+  await sql.query(
+    `INSERT INTO agent_runs (brand_id, agent_type, status, output)
+     VALUES ($1, 'video_producer', 'fallback', $2)`,
+    [
+      brand_id,
+      JSON.stringify({
+        fallback: true,
+        video_url: fallbackUrl,
+        message: 'Used best available scene as fallback',
+      }),
+    ],
+  )
 }
 
 async function runAgent({
@@ -171,325 +543,6 @@ async function runAgent({
   const visualContext = brand.logo_url
     ? ` VISUAL IDENTITY: Primary color: ${brand.primary_color}. Secondary color: ${brand.secondary_color}. Visual style: ${brand.visual_style}. Aesthetic: ${brand.aesthetic_description}. Reference these when suggesting visuals, colors, or video concepts.`
     : ''
-
-  // video_producer turns a structured multi-scene script (post_packages.script)
-  // into a single finished short-form video: Higgsfield clip per scene →
-  // ElevenLabs voiceover per scene → Creatomate timeline assembly.
-  if (agent_type === 'video_producer') {
-    const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'
-    if (!package_id) {
-      return {
-        parsed: { error: 'package_id is required for video_producer' },
-        tokensUsed: 0,
-        itemsGenerated: 0,
-        video: null,
-      }
-    }
-    const pkgRows = await sql.query(
-      'SELECT * FROM post_packages WHERE id=$1 AND brand_id=$2',
-      [package_id, brand_id],
-    )
-    const pkg = (pkgRows?.rows ?? pkgRows)?.[0]
-    if (!pkg) {
-      return {
-        parsed: { error: 'package not found' },
-        tokensUsed: 0,
-        itemsGenerated: 0,
-        video: null,
-      }
-    }
-    let video = null
-    try {
-      video = pkg.script ? JSON.parse(pkg.script) : null
-    } catch {
-      video = null
-    }
-    const scenes = Array.isArray(video?.scenes) ? video.scenes : []
-    if (scenes.length === 0) {
-      return {
-        parsed: {
-          error: 'No structured video script on this package. Re-run Writer.',
-        },
-        tokensUsed: 0,
-        itemsGenerated: 0,
-        video: null,
-      }
-    }
-
-    await sql.query("UPDATE post_packages SET status='rendering' WHERE id=$1", [
-      package_id,
-    ])
-
-    // 1 + 2: per-scene Higgsfield clip + ElevenLabs voiceover.
-    const scenesData = []
-    for (const scene of scenes) {
-      const duration = Number(scene.duration) || 5
-      const startTime = Number(scene.start_time) || 0
-      let clipUrl = null
-      try {
-        const gen = await generateVideo({
-          brand_id,
-          type: 'text_to_video',
-          prompt: scene.visual_prompt || scene.text_overlay || 'cinematic b-roll',
-          sql,
-        })
-        if (gen?.success && gen.url) clipUrl = gen.url
-      } catch (e) {
-        console.error('higgsfield scene failed', scene.scene_number, e.message)
-      }
-      // Higgsfield unavailable → kick a Remotion render for this scene as a
-      // fallback (async; clip stays null for this assembly pass, the scene
-      // shows the brand-colour base layer instead of empty).
-      if (!clipUrl && scene.remotion_composition) {
-        try {
-          await startRemotionRender({
-            compositionId: scene.remotion_composition,
-            props: scene.remotion_props || {
-              headline: scene.text_overlay || '',
-              subtext: scene.voiceover || '',
-              brandName: brand.name,
-              primaryColor: brand.primary_color || '#c084fc',
-            },
-            brandId: brand.id,
-            sql,
-          })
-        } catch (e) {
-          console.error('remotion fallback failed', e.message)
-        }
-      }
-
-      let audioUrl = null
-      if (scene.voiceover && process.env.ELEVENLABS_API_KEY) {
-        try {
-          const r = await fetch(
-            `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
-            {
-              method: 'POST',
-              headers: {
-                'xi-api-key': process.env.ELEVENLABS_API_KEY,
-                'Content-Type': 'application/json',
-                Accept: 'audio/mpeg',
-              },
-              body: JSON.stringify({
-                text: scene.voiceover,
-                model_id: 'eleven_monolingual_v1',
-                voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-              }),
-            },
-          )
-          if (r.ok) {
-            const buf = await r.arrayBuffer()
-            audioUrl = `data:audio/mpeg;base64,${Buffer.from(buf).toString('base64')}`
-          }
-        } catch (e) {
-          console.error('elevenlabs scene failed', scene.scene_number, e.message)
-        }
-      }
-
-      scenesData.push({
-        scene_number: scene.scene_number,
-        start_time: startTime,
-        duration,
-        clip_url: clipUrl,
-        audio_url: audioUrl,
-        text_overlay: scene.text_overlay || '',
-        transition_out: scene.transition_out || 'fade',
-      })
-    }
-
-    const totalDuration =
-      Number(video.duration) ||
-      scenesData.reduce((s, x) => s + x.duration, 0)
-
-    // 4: build the Creatomate timeline.
-    const elements = []
-    for (const s of scenesData) {
-      if (s.clip_url) {
-        elements.push({
-          type: 'video',
-          source: s.clip_url,
-          track: 1,
-          time: s.start_time,
-          duration: s.duration,
-          fit: 'cover',
-          animations:
-            s.transition_out === 'slide'
-              ? [{ type: 'slide', duration: 0.4, direction: 'left' }]
-              : [{ type: 'fade', duration: 0.4 }],
-        })
-      } else {
-        elements.push({
-          type: 'shape',
-          width: '100%',
-          height: '100%',
-          fill_color: brand.primary_color || '#0B0B0D',
-          track: 1,
-          time: s.start_time,
-          duration: s.duration,
-        })
-      }
-      if (s.text_overlay) {
-        elements.push({
-          type: 'text',
-          text: s.text_overlay,
-          track: 2,
-          time: s.start_time + 0.3,
-          duration: Math.max(0.5, s.duration - 0.5),
-          x_alignment: '50%',
-          y_alignment: '50%',
-          width: '82%',
-          font_family: 'Montserrat',
-          font_weight: '700',
-          font_size: '7.5 vmin',
-          fill_color: '#FFFFFF',
-          animations: [
-            { type: 'text-slide', duration: 0.4, direction: 'up', scope: 'split-clip' },
-          ],
-        })
-      }
-      if (s.audio_url) {
-        elements.push({
-          type: 'audio',
-          source: s.audio_url,
-          track: 3,
-          time: s.start_time,
-          duration: s.duration,
-        })
-      }
-    }
-    // background music + brand watermark spanning full duration.
-    elements.push({
-      type: 'audio',
-      source: 'https://cdn.creatomate.com/demo/ambient-cinematic.mp3',
-      track: 4,
-      time: 0,
-      duration: totalDuration,
-      volume: '20%',
-      audio_fade_in: 1,
-      audio_fade_out: 1,
-    })
-    elements.push({
-      type: 'text',
-      text: brand.name,
-      track: 5,
-      time: 0,
-      duration: totalDuration,
-      x_alignment: '95%',
-      y_alignment: '95%',
-      font_family: 'Montserrat',
-      font_weight: '300',
-      font_size: '3 vmin',
-      fill_color: 'rgba(255,255,255,0.55)',
-    })
-
-    let finalUrl = null
-    let creatomateError = null
-    if (process.env.CREATOMATE_API_KEY) {
-      try {
-        const cRes = await fetch('https://api.creatomate.com/v1/renders', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.CREATOMATE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            output_format: 'mp4',
-            width: 1080,
-            height: 1920,
-            frame_rate: 30,
-            elements,
-          }),
-        })
-        const cData = await cRes.json()
-        const render = Array.isArray(cData) ? cData[0] : cData
-        let renderId = render?.id
-        finalUrl = render?.url || null
-        let status = render?.status
-        // 6: poll up to 120s.
-        const start = Date.now()
-        while (
-          renderId &&
-          status !== 'succeeded' &&
-          status !== 'failed' &&
-          Date.now() - start < 120000
-        ) {
-          await new Promise((r) => setTimeout(r, 5000))
-          const pRes = await fetch(
-            `https://api.creatomate.com/v1/renders/${renderId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${process.env.CREATOMATE_API_KEY}`,
-              },
-            },
-          )
-          const pData = await pRes.json()
-          status = pData?.status
-          if (pData?.url) finalUrl = pData.url
-        }
-        if (status !== 'succeeded') {
-          creatomateError = `creatomate status: ${status || 'timeout'}`
-        }
-      } catch (e) {
-        creatomateError = e.message
-      }
-    } else {
-      creatomateError = 'CREATOMATE_API_KEY not configured'
-    }
-
-    if (finalUrl && !creatomateError) {
-      await sql.query(
-        "UPDATE post_packages SET visual_url=$1, visual_type='video', status='ready' WHERE id=$2",
-        [finalUrl, package_id],
-      )
-      await sql.query(
-        `INSERT INTO agent_runs (brand_id, agent_type, input, output, status)
-         VALUES ($1, 'video_producer', $2, $3, 'complete')`,
-        [
-          brand_id,
-          JSON.stringify({ package_id }),
-          JSON.stringify({ video_url: finalUrl, scenes_count: scenesData.length }),
-        ],
-      )
-      return {
-        parsed: {
-          success: true,
-          video_url: finalUrl,
-          duration: totalDuration,
-          scenes_count: scenesData.length,
-        },
-        tokensUsed: 0,
-        itemsGenerated: 1,
-        video: { url: finalUrl, content_id: package_id },
-      }
-    }
-
-    // Creatomate failed — fall back to best individual scene clip.
-    const bestClip = scenesData.find((s) => s.clip_url)?.clip_url || null
-    await sql.query(
-      "UPDATE post_packages SET visual_url=$1, status='needs_visual' WHERE id=$2",
-      [bestClip, package_id],
-    )
-    await sql.query(
-      `INSERT INTO agent_runs (brand_id, agent_type, input, output, status)
-       VALUES ($1, 'video_producer', $2, $3, 'failed')`,
-      [
-        brand_id,
-        JSON.stringify({ package_id }),
-        JSON.stringify({ error: creatomateError, fallback_clip: bestClip }),
-      ],
-    )
-    return {
-      parsed: {
-        success: false,
-        error: creatomateError,
-        fallback_clip: bestClip,
-        scenes_count: scenesData.length,
-      },
-      tokensUsed: 0,
-      itemsGenerated: bestClip ? 1 : 0,
-      video: bestClip ? { url: bestClip } : null,
-    }
-  }
 
   // video_editor is an orchestrator agent — it inspects a ready pipeline,
   // asks Claude to plan an editing timeline, then drives Creatomate via
@@ -692,9 +745,9 @@ Produce 3 complete post packages — mix of instagram and facebook, at least 1 m
       "visual_type": "image" | "video" | "carousel",
       "remotion_composition": "HookOpener" | "QuoteCard" | "TradeInsight" | "BrandPromo" | "ServiceAd" | null,
       "video": {
-        "title": "descriptive title",
+        "title": "descriptive title of the video",
         "duration": 30,
-        "format": "9:16",
+        "platform": "instagram",
         "hook": "the opening line that stops the scroll",
         "scenes": [
           {
@@ -703,18 +756,18 @@ Produce 3 complete post packages — mix of instagram and facebook, at least 1 m
             "end_time": 5,
             "duration": 5,
             "purpose": "hook",
-            "visual_prompt": "detailed cinematic description for Higgsfield — lighting, mood, subject, movement, camera angle",
+            "visual_prompt": "Cinematic close-up. Dramatic lighting. Dark moody atmosphere. Camera slowly zooms in. Professional grade footage.",
             "text_overlay": "bold text that appears on screen",
             "voiceover": "exact words spoken in this scene",
-            "sound_direction": "ambient sound + music mood",
+            "sound_direction": "Tense ambient electronic music. Low frequency bass.",
             "remotion_composition": "HookOpener",
             "remotion_props": { "headline": "text for motion graphic", "subtext": "subtitle text", "primaryColor": "#c084fc" },
-            "transition_out": "fade" | "cut" | "slide"
+            "transition_out": "fade"
           }
         ],
-        "music_direction": "overall music mood and energy",
-        "color_grade": "cinematic dark or bright energetic",
-        "caption": "full instagram caption",
+        "music_direction": "Dark cinematic electronic. Builds through problem, resolves at solution.",
+        "color_grade": "dark cinematic",
+        "caption": "full instagram caption text here",
         "cta": "call to action",
         "hashtags": "#tag1 #tag2"
       }
@@ -722,7 +775,7 @@ Produce 3 complete post packages — mix of instagram and facebook, at least 1 m
   ]
 }
 
-RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it or set null otherwise). Each video has 3 to 6 scenes. Each scene is 3-10 seconds. Total video duration 15-60 seconds. scene start_time/end_time must be sequential and continuous.`
+RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it or set null otherwise). transition_out is one of "fade" | "cut" | "slide". Each video has 3 to 5 scenes. Each scene is 3-10 seconds. Total video duration 15-60 seconds. scene start_time/end_time must be sequential and continuous (scene N end_time == scene N+1 start_time).`
   } else if (agent_type === 'analytics') {
     systemPrompt = `You are an analytics agent for ${brand.name}. BRAND VOICE: ${voiceRules} TOP PERFORMERS: ${topPerformers}${visualContext} Output ONLY valid JSON: { top_performer: string, key_insight: string, recommendation: string, memory_update: string, avoid: string }`
   } else if (agent_type === 'video_director') {
