@@ -295,6 +295,423 @@ function reviewItemType(item) {
   return item.type || (item.hook ? 'hook' : item.caption ? 'caption' : item.script ? 'script' : 'item')
 }
 
+// ===== n8n-style Pipeline View (replaces the animated AgentOffice) =====
+const SECTION_BG_PV = '#0e0e10'
+const PIPE_STAGES = [
+  {
+    key: 'strategy',
+    label: 'Strategy',
+    api: 'strategy',
+    icon: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z M12 12l8-4.5 M12 12v9 M12 12L4 7.5',
+  },
+  { key: 'writer', label: 'Writer', api: 'writer', icon: 'M4 20h4L18 10l-4-4L4 16z M14 6l4 4' },
+  {
+    key: 'video_director',
+    label: 'Video Director',
+    api: 'video_director',
+    icon: 'M4 6h12v12H4z M16 9l4-3v12l-4-3',
+  },
+  { key: 'video_editor', label: 'Editor', api: 'video_editor', icon: 'M6 3v18 M18 3v18 M3 8h18 M3 16h18' },
+  {
+    key: 'distribution',
+    label: 'Distribution',
+    api: null,
+    icon: 'M3 11l18-8-8 18-2-7-8-3z',
+  },
+]
+const PIPE_AGENT_COLOR = {
+  strategy: '#a78bfa',
+  writer: '#22d3ee',
+  video_director: '#fbbf24',
+  video_editor: '#C2B59B',
+  video_producer: '#f59e0b',
+  distribution: '#4ade80',
+  analytics: '#f87171',
+  repurpose: '#60a5fa',
+}
+
+function PipeNode({ stage, state, lastRun, onClick }) {
+  const colors = {
+    idle: { bg: 'rgba(255,255,255,0.04)', bd: 'rgba(255,255,255,0.1)', fg: 'rgba(255,255,255,0.4)' },
+    running: { bg: 'rgba(251,191,36,0.1)', bd: 'rgba(251,191,36,0.4)', fg: '#fbbf24' },
+    complete: { bg: 'rgba(74,222,128,0.1)', bd: 'rgba(74,222,128,0.4)', fg: '#4ade80' },
+    error: { bg: 'rgba(248,113,113,0.1)', bd: 'rgba(248,113,113,0.4)', fg: '#f87171' },
+  }
+  const c = colors[state] || colors.idle
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        width: 100,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 6,
+        cursor: onClick ? 'pointer' : 'default',
+      }}
+    >
+      <motion.div
+        animate={
+          state === 'running'
+            ? { scale: [1, 1.08, 1], opacity: [1, 0.7, 1] }
+            : { scale: 1, opacity: 1 }
+        }
+        transition={
+          state === 'running'
+            ? { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }
+            : { duration: 0.2 }
+        }
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: '50%',
+          background: c.bg,
+          border: `0.5px solid ${c.bd}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d={stage.icon} stroke={c.fg} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </motion.div>
+      <div style={{ fontSize: 12, fontWeight: 500, color: '#fff', textAlign: 'center' }}>
+        {stage.label}
+      </div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+        {lastRun ? relTime(lastRun) : 'idle'}
+      </div>
+    </div>
+  )
+}
+
+function relTime(d) {
+  if (!d) return ''
+  const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000)
+  if (s < 60) return 'just now'
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
+  return `${Math.floor(s / 86400)}d ago`
+}
+
+function PipelineView({ brand, stats, showToast, onRefresh }) {
+  const [runs, setRuns] = useState([])
+  const [running, setRunning] = useState(null)
+  const safeStats = stats || {}
+  const hasPackages =
+    Number(safeStats.contentReady || 0) +
+      Number(safeStats.scheduled || 0) +
+      Number(safeStats.published || 0) >
+    0
+
+  const loadRuns = useCallback(async () => {
+    if (!brand?.id) return
+    try {
+      const res = await fetch(
+        `/api/db?action=logs&brand_id=${encodeURIComponent(brand.id)}&limit=10`,
+      )
+      if (!res.ok) return
+      const data = await res.json()
+      if (Array.isArray(data)) setRuns(data)
+    } catch {
+      /* transient */
+    }
+  }, [brand?.id])
+
+  useEffect(() => {
+    loadRuns()
+    const id = setInterval(loadRuns, 5000)
+    return () => clearInterval(id)
+  }, [loadRuns])
+
+  const latestByAgent = {}
+  for (const r of runs || []) {
+    if (r && r.agent_type && !latestByAgent[r.agent_type]) latestByAgent[r.agent_type] = r
+  }
+  function stageState(stage) {
+    if (running === stage.api) return 'running'
+    const r = latestByAgent[stage.key] || latestByAgent[stage.api]
+    if (!r) return 'idle'
+    if (r.status === 'failed') return 'error'
+    if (['pending', 'rendering', 'producing'].includes(r.status)) return 'running'
+    if (r.status === 'complete' || r.status === 'fallback') return 'complete'
+    return 'idle'
+  }
+
+  async function run(apiType, label) {
+    if (!brand?.id || running) return
+    if (!apiType) {
+      showToast?.('Distribution runs automatically from the schedule')
+      return
+    }
+    if (apiType === 'video_producer') {
+      showToast?.('Pick a package in Content Hub, then Generate Video')
+      return
+    }
+    setRunning(apiType)
+    showToast?.(`${label} Agent running…`)
+    try {
+      const data = await callAgent(brand.id, apiType)
+      const n = countItemsAdded(data) || data?.items_generated || 0
+      showToast?.(n > 0 ? `${label} finished — ${n} items` : `${label} finished`)
+      onRefresh?.()
+      loadRuns()
+    } catch (e) {
+      showToast?.(`${label} failed — ${e.message}`, 'error')
+    } finally {
+      setRunning(null)
+    }
+  }
+
+  async function runAll() {
+    if (!brand?.id || running) return
+    setRunning('all')
+    try {
+      showToast?.('Strategy Agent running…')
+      await callAgent(brand.id, 'strategy')
+      showToast?.('Writer Agent running…')
+      await callAgent(brand.id, 'writer')
+      showToast?.('Run All complete')
+      onRefresh?.()
+      loadRuns()
+    } catch (e) {
+      showToast?.(`Run All failed — ${e.message}`, 'error')
+    } finally {
+      setRunning(null)
+    }
+  }
+
+  const statusLine =
+    running === 'all'
+      ? 'Running all agents…'
+      : running
+      ? `${running.replace(/_/g, ' ')} agent running…`
+      : (runs || [])[0]
+      ? (runs[0].message || `${runs[0].agent_type} ${runs[0].status}`)
+      : 'Idle — run an agent to start the pipeline'
+
+  const runBtns = [
+    ['Strategy', 'strategy'],
+    ['Writer', 'writer'],
+    ['Video Director', 'video_director'],
+    ['Editor', 'video_editor'],
+    ['Producer', 'video_producer'],
+  ]
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {!hasPackages && (
+        <div
+          style={{
+            background: 'rgba(194,181,155,0.04)',
+            border: '0.5px solid rgba(194,181,155,0.1)',
+            borderRadius: 12,
+            padding: '16px 20px',
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 12 }}>
+            How to get started
+          </div>
+          {[
+            ['Click Strategy Agent', 'It researches trending content'],
+            ['Click Writer Agent', 'It generates hooks, captions and scripts'],
+            ['Go to Content Hub', 'Review and approve packages'],
+            ['Click Generate Video', 'Remotion renders a motion graphic'],
+            ['Approve the package', 'It gets scheduled to your calendar'],
+          ].map(([t, d], i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' }}>
+              <div
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: '50%',
+                  background: 'rgba(194,181,155,0.15)',
+                  border: '0.5px solid rgba(194,181,155,0.4)',
+                  color: '#C2B59B',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {i + 1}
+              </div>
+              <div style={{ fontSize: 13, color: '#fff' }}>
+                {t}
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}> — {d}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* SECTION 1 — pipeline status bar */}
+      <div
+        style={{
+          background: 'rgba(194,181,155,0.03)',
+          border: '0.5px solid rgba(194,181,155,0.08)',
+          borderRadius: 16,
+          padding: '20px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          overflowX: 'auto',
+        }}
+      >
+        {PIPE_STAGES.map((stage, i) => {
+          const r = latestByAgent[stage.key] || latestByAgent[stage.api]
+          return (
+            <div key={stage.key} style={{ display: 'flex', alignItems: 'center' }}>
+              <PipeNode
+                stage={stage}
+                state={stageState(stage)}
+                lastRun={r?.created_at}
+                onClick={() => run(stage.api, stage.label)}
+              />
+              {i < PIPE_STAGES.length - 1 && (
+                <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 20, padding: '0 8px' }}>→</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* SECTION 2 — run controls */}
+      <div
+        style={{
+          background: SECTION_BG_PV,
+          border: '0.5px solid rgba(255,255,255,0.06)',
+          borderRadius: 16,
+          padding: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <button
+            type="button"
+            onClick={runAll}
+            disabled={!brand || !!running}
+            style={{
+              background: '#C2B59B',
+              color: '#0B0B0D',
+              fontWeight: 600,
+              border: 'none',
+              borderRadius: 10,
+              padding: '12px 24px',
+              fontSize: 13,
+              cursor: !brand || running ? 'default' : 'pointer',
+              opacity: !brand ? 0.5 : 1,
+            }}
+          >
+            {running === 'all' ? 'Running…' : 'Run All Agents'}
+          </button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {runBtns.map(([label, api]) => (
+              <button
+                key={api}
+                type="button"
+                onClick={() => run(api, label)}
+                disabled={!brand || !!running}
+                style={{
+                  border: '0.5px solid rgba(255,255,255,0.15)',
+                  color: running === api ? '#fbbf24' : 'rgba(255,255,255,0.7)',
+                  background: 'transparent',
+                  borderRadius: 8,
+                  padding: '7px 12px',
+                  fontSize: 12,
+                  cursor: !brand || running ? 'default' : 'pointer',
+                }}
+              >
+                {running === api ? `${label}…` : label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{statusLine}</div>
+      </div>
+
+      {/* SECTION 3 — live activity feed */}
+      <div
+        style={{
+          background: SECTION_BG_PV,
+          border: '0.5px solid rgba(255,255,255,0.06)',
+          borderRadius: 16,
+          padding: 20,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <motion.span
+            animate={{ opacity: [1, 0.3, 1] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80' }}
+          />
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>Live Activity</span>
+        </div>
+        {(runs || []).length === 0 && (
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+            No activity yet — run an agent above
+          </div>
+        )}
+        <AnimatePresence initial={false}>
+          {(runs || []).map((r) => (
+            <motion.div
+              key={r.id}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '6px 0' }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                  color: 'rgba(255,255,255,0.3)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {r.created_at
+                  ? new Date(r.created_at).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })
+                  : '--:--'}
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: PIPE_AGENT_COLOR[r.agent_type] || '#fff',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {String(r.agent_type || 'agent').replace(/_/g, ' ')}
+              </span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+                {r.message || `${r.status}`}
+              </span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
 // ===== Page =====
 export default function MarketingEngine() {
   const [brands, setBrands] = useState([])
@@ -682,18 +1099,11 @@ export default function MarketingEngine() {
                 paddingBottom: 40,
               }}
             >
-              <AgentOffice
-                screenIndex={screenIndex}
-                meetingAgents={meetingAgents}
+              <PipelineView
                 brand={selectedBrand}
-                onRefresh={refreshBrandData}
+                stats={stats}
                 showToast={showToast}
-                now={now}
-                hasMemory={memory.length > 0}
-                onSetUpMemory={() => {
-                  const el = document.getElementById('brand-memory-section')
-                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }}
+                onRefresh={refreshBrandData}
               />
               <ScheduleStrip brand={selectedBrand} version={scheduleVersion} />
               <BrandMemory
