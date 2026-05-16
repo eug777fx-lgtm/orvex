@@ -170,6 +170,150 @@ export async function setupMarketingDB() {
     )
   `)
 
+  // ===== Sales Rep System =====
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS sales_reps (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'rep',
+      phone TEXT,
+      whatsapp TEXT,
+      is_active BOOLEAN DEFAULT true,
+      commission_rate FLOAT DEFAULT 10.0,
+      target_monthly FLOAT DEFAULT 0,
+      target_weekly FLOAT DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS sales_leads (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      rep_id UUID REFERENCES sales_reps(id),
+      assigned_by UUID REFERENCES sales_reps(id),
+      company_name TEXT NOT NULL,
+      contact_name TEXT,
+      contact_email TEXT,
+      contact_phone TEXT,
+      contact_whatsapp TEXT,
+      industry TEXT,
+      location TEXT,
+      source TEXT DEFAULT 'cold_outreach',
+      status TEXT DEFAULT 'new',
+      service_interest TEXT[],
+      estimated_value FLOAT,
+      notes TEXT,
+      next_followup TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      updated_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS lead_activities (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      lead_id UUID REFERENCES sales_leads(id),
+      rep_id UUID REFERENCES sales_reps(id),
+      activity_type TEXT NOT NULL,
+      description TEXT,
+      outcome TEXT,
+      attachment_url TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS deals (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      lead_id UUID REFERENCES sales_leads(id),
+      rep_id UUID REFERENCES sales_reps(id),
+      service_name TEXT NOT NULL,
+      deal_value FLOAT NOT NULL,
+      commission_rate FLOAT NOT NULL,
+      commission_amount FLOAT GENERATED ALWAYS AS (deal_value * commission_rate / 100) STORED,
+      status TEXT DEFAULT 'pending_approval',
+      payment_confirmed BOOLEAN DEFAULT false,
+      payment_proof_url TEXT,
+      admin_notes TEXT,
+      approved_by UUID REFERENCES sales_reps(id),
+      approved_at TIMESTAMPTZ,
+      commission_paid_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS services_catalog (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL,
+      description TEXT,
+      category TEXT,
+      price_min FLOAT,
+      price_max FLOAT,
+      price_fixed FLOAT,
+      commission_rate FLOAT DEFAULT 10.0,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS rep_kpis (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      rep_id UUID REFERENCES sales_reps(id),
+      date DATE DEFAULT CURRENT_DATE,
+      calls_made INTEGER DEFAULT 0,
+      emails_sent INTEGER DEFAULT 0,
+      leads_added INTEGER DEFAULT 0,
+      demos_booked INTEGER DEFAULT 0,
+      proposals_sent INTEGER DEFAULT 0,
+      deals_closed INTEGER DEFAULT 0,
+      revenue_generated FLOAT DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(rep_id, date)
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS sales_notifications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      recipient_id UUID REFERENCES sales_reps(id),
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT,
+      read BOOLEAN DEFAULT false,
+      link TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  // services_catalog has no natural unique key in the spec; add one so the
+  // seed below is idempotent across the every-startup setup run.
+  await db.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS services_catalog_name_unique ON services_catalog(name)`,
+  )
+
+  await db.query(`
+    INSERT INTO services_catalog (name, description, category, price_min, price_max, commission_rate) VALUES
+    ('CRM Setup', 'Full CRM setup with pipeline, lead tracking and automations', 'CRM', 500, 2000, 15),
+    ('AI Marketing System', 'Complete AI content generation and brand automation system', 'AI', 1500, 5000, 15),
+    ('Website Development', 'Custom website with modern design and CMS', 'Web', 800, 3000, 10),
+    ('Lead Generation System', 'Automated lead capture, nurturing and qualification', 'Growth', 500, 2000, 15),
+    ('Full Business Operating System', 'CRM + AI Marketing + Website + Automations package', 'Package', 3000, 10000, 20),
+    ('Brand Identity', 'Logo, visual system, brand strategy and style guide', 'Brand', 300, 1500, 10),
+    ('Monthly Retainer - Starter', 'Basic monthly maintenance and content management', 'Retainer', 500, 500, 10),
+    ('Monthly Retainer - Growth', 'Full AI marketing + CRM management monthly', 'Retainer', 1500, 1500, 15)
+    ON CONFLICT DO NOTHING
+  `)
+
+  await db.query(`
+    INSERT INTO sales_reps (name, email, password_hash, role, commission_rate) VALUES
+    ('Eugene', 'admin@lithoslabs.com', 'admin123', 'admin', 0)
+    ON CONFLICT DO NOTHING
+  `)
+
   // One-time fresh start: wipe all generated content but keep brands and
   // brand_memory completely intact. Runs before the seed inserts below.
   await cleanContentForFreshStart()

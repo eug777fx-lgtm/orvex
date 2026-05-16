@@ -35,6 +35,7 @@ import Workflow from './pages/Workflow'
 import PublicDemo from './pages/PublicDemo'
 import Login from './pages/Login'
 import MarketingEngine from './pages/MarketingEngine'
+import SalesRep from './pages/SalesRep'
 import useIsMobile from './utils/useIsMobile'
 
 const navItems = [
@@ -335,6 +336,14 @@ export default function App() {
     return (
       <Routes>
         <Route path="/demo/:slug" element={<PublicDemo />} />
+      </Routes>
+    )
+  }
+
+  if (location.pathname.startsWith('/sales')) {
+    return (
+      <Routes>
+        <Route path="/sales/*" element={<SalesRep />} />
       </Routes>
     )
   }

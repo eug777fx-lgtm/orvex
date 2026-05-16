@@ -1310,6 +1310,8 @@ export default function Dashboard() {
         )}
       </div>
 
+      <SalesPortalCard />
+
       <AddLeadModal
         open={addLeadOpen}
         onClose={() => setAddLeadOpen(false)}
@@ -1327,5 +1329,92 @@ export default function Dashboard() {
         }}
       />
     </PageShell>
+  )
+}
+
+function SalesPortalCard() {
+  const [copied, setCopied] = useState(false)
+  const url =
+    (typeof window !== 'undefined' ? window.location.origin : '') + '/sales'
+  function copy() {
+    navigator.clipboard?.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <div
+      style={{
+        background: 'rgba(194,181,155,0.04)',
+        border: '0.5px solid rgba(194,181,155,0.1)',
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 16,
+      }}
+    >
+      <div style={{ fontWeight: 500, color: '#fff', fontSize: 14 }}>
+        Sales Portal
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: 'rgba(255,255,255,0.5)',
+          marginTop: 2,
+        }}
+      >
+        Share this link with your sales team
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginTop: 10,
+        }}
+      >
+        <code
+          style={{
+            flex: 1,
+            minWidth: 0,
+            background: 'rgba(0,0,0,0.35)',
+            border: '0.5px solid rgba(194,181,155,0.15)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            fontSize: 12.5,
+            color: '#C2B59B',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {url}
+        </code>
+        <button
+          type="button"
+          onClick={copy}
+          style={{
+            background: '#C2B59B',
+            color: '#0B0B0D',
+            fontWeight: 600,
+            border: 'none',
+            borderRadius: 8,
+            padding: '8px 14px',
+            fontSize: 12.5,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {copied ? 'Copied' : 'Copy link'}
+        </button>
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          color: 'rgba(255,255,255,0.4)',
+          marginTop: 8,
+        }}
+      >
+        Opens a separate dashboard for sales reps
+      </div>
+    </div>
   )
 }

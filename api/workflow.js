@@ -1,5 +1,8 @@
+// Required env vars: INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_USER_ID, CREATOMATE_API_KEY, SALES_REP_INVITE_CODE, WEBHOOK_SECRET
+//
 // Required env vars (set in Vercel project settings):
 //   VITE_DATABASE_URL    — Neon Postgres connection string
+//   SALES_REP_INVITE_CODE — invite code required for sales rep self-registration
 //   ANTHROPIC_API_KEY    — Claude API key (for pipeline script stage)
 //   ELEVENLABS_API_KEY   — ElevenLabs TTS (optional; falls back if missing)
 //   CREATOMATE_API_KEY   — Creatomate video render API (optional; falls back if missing)
@@ -1077,6 +1080,420 @@ async function handleNextScheduled(sql, brand_id) {
   return { has_content: true, package: row }
 }
 
+// ===== Sales Rep System =====
+// Bumps a single rep_kpis counter for today, creating the row if absent.
+async function bumpKpi(sql, repId, column, amount = 1) {
+  const allowed = new Set([
+    'calls_made',
+    'emails_sent',
+    'leads_added',
+    'demos_booked',
+    'proposals_sent',
+    'deals_closed',
+    'revenue_generated',
+  ])
+  if (!allowed.has(column)) return
+  await sql.query(
+    `INSERT INTO rep_kpis (rep_id, date, ${column})
+     VALUES ($1, CURRENT_DATE, $2)
+     ON CONFLICT (rep_id, date)
+     DO UPDATE SET ${column} = rep_kpis.${column} + $2`,
+    [repId, amount],
+  )
+}
+
+const rowsOf = (r) => r?.rows ?? r ?? []
+const firstOf = (r) => rowsOf(r)?.[0]
+
+async function handleSales(sql, { method, action, query, body }) {
+  // ---- GET actions ----
+  if (method === 'GET') {
+    if (action === 'rep_profile') {
+      const r = await sql.query(
+        `SELECT sr.*,
+                COUNT(DISTINCT sl.id) AS total_leads,
+                COUNT(DISTINCT d.id) FILTER (WHERE d.status IN ('approved','commission_paid')) AS deals_closed,
+                COALESCE(SUM(d.commission_amount) FILTER (WHERE d.status IN ('approved','commission_paid')), 0) AS total_earnings
+           FROM sales_reps sr
+           LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
+           LEFT JOIN deals d ON d.rep_id = sr.id
+          WHERE sr.id = $1
+          GROUP BY sr.id`,
+        [query.rep_id],
+      )
+      return { handled: true, payload: { success: true, profile: firstOf(r) || null } }
+    }
+    if (action === 'rep_leads') {
+      const r = await sql.query(
+        `SELECT sl.*,
+                COUNT(la.id) AS activity_count,
+                MAX(la.created_at) AS last_activity
+           FROM sales_leads sl
+           LEFT JOIN lead_activities la ON la.lead_id = sl.id
+          WHERE sl.rep_id = $1 AND ($2::text IS NULL OR sl.status = $2)
+          GROUP BY sl.id
+          ORDER BY sl.updated_at DESC`,
+        [query.rep_id, query.status || null],
+      )
+      return { handled: true, payload: { success: true, leads: rowsOf(r) } }
+    }
+    if (action === 'rep_deals') {
+      const r = await sql.query(
+        `SELECT d.*, sl.company_name, sl.contact_name
+           FROM deals d
+           JOIN sales_leads sl ON d.lead_id = sl.id
+          WHERE d.rep_id = $1
+          ORDER BY d.created_at DESC`,
+        [query.rep_id],
+      )
+      return { handled: true, payload: { success: true, deals: rowsOf(r) } }
+    }
+    if (action === 'leaderboard') {
+      const r = await sql.query(
+        `SELECT sr.name, sr.id,
+                COUNT(DISTINCT sl.id) AS total_leads,
+                COUNT(DISTINCT d.id) FILTER (WHERE d.status IN ('approved','commission_paid')) AS deals_closed,
+                COALESCE(SUM(d.deal_value) FILTER (WHERE d.status IN ('approved','commission_paid')), 0) AS revenue,
+                COALESCE(SUM(d.commission_amount) FILTER (WHERE d.status IN ('approved','commission_paid')), 0) AS earnings
+           FROM sales_reps sr
+           LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
+           LEFT JOIN deals d ON d.rep_id = sr.id
+          WHERE sr.role = 'rep' AND sr.is_active = true
+          GROUP BY sr.id, sr.name
+          ORDER BY revenue DESC`,
+      )
+      return { handled: true, payload: { success: true, leaderboard: rowsOf(r) } }
+    }
+    if (action === 'services_catalog') {
+      const r = await sql.query(
+        `SELECT * FROM services_catalog WHERE is_active = true ORDER BY category, name`,
+      )
+      return { handled: true, payload: { success: true, services: rowsOf(r) } }
+    }
+    if (action === 'admin_deals') {
+      const r = await sql.query(
+        `SELECT d.*, sr.name AS rep_name, sl.company_name, sl.contact_name
+           FROM deals d
+           JOIN sales_reps sr ON d.rep_id = sr.id
+           JOIN sales_leads sl ON d.lead_id = sl.id
+          WHERE ($1::text IS NULL OR d.status = $1)
+          ORDER BY d.created_at DESC`,
+        [query.status || null],
+      )
+      return { handled: true, payload: { success: true, deals: rowsOf(r) } }
+    }
+    if (action === 'sales_notifications') {
+      const r = await sql.query(
+        `SELECT * FROM sales_notifications
+          WHERE recipient_id = $1
+          ORDER BY created_at DESC LIMIT 20`,
+        [query.rep_id],
+      )
+      return { handled: true, payload: { success: true, notifications: rowsOf(r) } }
+    }
+    if (action === 'overdue_followups') {
+      const r = await sql.query(
+        `SELECT company_name, contact_name, next_followup, status
+           FROM sales_leads
+          WHERE rep_id = $1 AND next_followup <= now()
+            AND status NOT IN ('closed_won','closed_lost','not_interested')
+          ORDER BY next_followup ASC`,
+        [query.rep_id],
+      )
+      return { handled: true, payload: { success: true, overdue: rowsOf(r) } }
+    }
+    if (action === 'admin_all_reps') {
+      const r = await sql.query(
+        `SELECT sr.*,
+                COUNT(DISTINCT sl.id) AS total_leads,
+                COUNT(DISTINCT d.id) FILTER (WHERE d.status IN ('approved','commission_paid')) AS deals_closed,
+                COALESCE(SUM(d.commission_amount) FILTER (WHERE d.status = 'commission_paid'), 0) AS paid_commission,
+                COALESCE(SUM(d.commission_amount) FILTER (WHERE d.status = 'approved'), 0) AS pending_commission
+           FROM sales_reps sr
+           LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
+           LEFT JOIN deals d ON d.rep_id = sr.id
+          WHERE sr.role = 'rep'
+          GROUP BY sr.id
+          ORDER BY sr.created_at ASC`,
+      )
+      return { handled: true, payload: { success: true, reps: rowsOf(r) } }
+    }
+    return { handled: false }
+  }
+
+  // ---- POST actions ----
+  if (method === 'POST') {
+    if (action === 'rep_login') {
+      const { email, password } = body
+      const r = await sql.query(
+        'SELECT * FROM sales_reps WHERE email=$1 AND is_active=true',
+        [email],
+      )
+      const rep = firstOf(r)
+      if (!rep || rep.password_hash !== password) {
+        return { handled: true, payload: { success: false, error: 'Invalid credentials' } }
+      }
+      return {
+        handled: true,
+        payload: {
+          success: true,
+          rep: {
+            id: rep.id,
+            name: rep.name,
+            email: rep.email,
+            role: rep.role,
+            commission_rate: rep.commission_rate,
+          },
+        },
+      }
+    }
+    if (action === 'rep_register') {
+      const { name, email, password, invite_code } = body
+      if (invite_code !== process.env.SALES_REP_INVITE_CODE) {
+        return { handled: true, payload: { success: false, error: 'Invalid invite code' } }
+      }
+      try {
+        const r = await sql.query(
+          `INSERT INTO sales_reps (name, email, password_hash, role)
+           VALUES ($1, $2, $3, 'rep') RETURNING id, name, email, role`,
+          [name, email, password],
+        )
+        return { handled: true, payload: { success: true, rep: firstOf(r) } }
+      } catch (e) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'Email already registered' },
+        }
+      }
+    }
+    if (action === 'add_lead') {
+      const {
+        rep_id,
+        company_name,
+        contact_name,
+        contact_email,
+        contact_phone,
+        contact_whatsapp,
+        industry,
+        location,
+        source,
+        service_interest,
+        estimated_value,
+        notes,
+      } = body
+      const r = await sql.query(
+        `INSERT INTO sales_leads
+           (rep_id, company_name, contact_name, contact_email, contact_phone,
+            contact_whatsapp, industry, location, source, service_interest,
+            estimated_value, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::text[],$11,$12)
+         RETURNING id`,
+        [
+          rep_id,
+          company_name,
+          contact_name || null,
+          contact_email || null,
+          contact_phone || null,
+          contact_whatsapp || null,
+          industry || null,
+          location || null,
+          source || 'cold_outreach',
+          Array.isArray(service_interest) ? service_interest : null,
+          estimated_value || null,
+          notes || null,
+        ],
+      )
+      const leadId = firstOf(r)?.id
+      await sql.query(
+        `INSERT INTO lead_activities (lead_id, rep_id, activity_type, description)
+         VALUES ($1, $2, 'note', 'Lead added')`,
+        [leadId, rep_id],
+      )
+      await bumpKpi(sql, rep_id, 'leads_added', 1)
+      return { handled: true, payload: { success: true, lead_id: leadId } }
+    }
+    if (action === 'update_lead_status') {
+      const { lead_id, rep_id, status, notes, next_followup } = body
+      await sql.query(
+        `UPDATE sales_leads
+            SET status=$1, next_followup=$2, notes=COALESCE($5, notes), updated_at=now()
+          WHERE id=$3 AND rep_id=$4`,
+        [status, next_followup || null, lead_id, rep_id, notes || null],
+      )
+      await sql.query(
+        `INSERT INTO lead_activities (lead_id, rep_id, activity_type, description)
+         VALUES ($1, $2, 'status_change', $3)`,
+        [lead_id, rep_id, 'Status changed to ' + status],
+      )
+      if (status === 'demo_booked') await bumpKpi(sql, rep_id, 'demos_booked', 1)
+      if (status === 'proposal_sent')
+        await bumpKpi(sql, rep_id, 'proposals_sent', 1)
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'add_activity') {
+      const { lead_id, rep_id, activity_type, description, outcome } = body
+      await sql.query(
+        `INSERT INTO lead_activities
+           (lead_id, rep_id, activity_type, description, outcome)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [lead_id, rep_id, activity_type, description || null, outcome || null],
+      )
+      if (activity_type === 'call') await bumpKpi(sql, rep_id, 'calls_made', 1)
+      if (activity_type === 'email') await bumpKpi(sql, rep_id, 'emails_sent', 1)
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'submit_deal') {
+      const {
+        rep_id,
+        lead_id,
+        service_name,
+        deal_value,
+        commission_rate,
+        payment_proof_url,
+      } = body
+      const r = await sql.query(
+        `INSERT INTO deals
+           (rep_id, lead_id, service_name, deal_value, commission_rate, status, payment_proof_url)
+         VALUES ($1,$2,$3,$4,$5,'pending_approval',$6)
+         RETURNING id`,
+        [
+          rep_id,
+          lead_id,
+          service_name,
+          deal_value,
+          commission_rate,
+          payment_proof_url || null,
+        ],
+      )
+      const dealId = firstOf(r)?.id
+      await sql.query(
+        `UPDATE sales_leads SET status='closed_won', updated_at=now() WHERE id=$1`,
+        [lead_id],
+      )
+      await bumpKpi(sql, rep_id, 'deals_closed', 1)
+      await bumpKpi(sql, rep_id, 'revenue_generated', Number(deal_value) || 0)
+      const repRow = firstOf(
+        await sql.query('SELECT name FROM sales_reps WHERE id=$1', [rep_id]),
+      )
+      const admins = rowsOf(
+        await sql.query("SELECT id FROM sales_reps WHERE role='admin'"),
+      )
+      for (const a of admins) {
+        await sql.query(
+          `INSERT INTO sales_notifications (recipient_id, type, title, message, link)
+           VALUES ($1,'deal_approval','New deal needs approval',$2,'/sales')`,
+          [a.id, `${repRow?.name || 'A rep'} submitted a deal for ${service_name}`],
+        )
+      }
+      return {
+        handled: true,
+        payload: {
+          success: true,
+          deal_id: dealId,
+          commission_amount:
+            (Number(deal_value) || 0) * (Number(commission_rate) || 0) / 100,
+        },
+      }
+    }
+    if (action === 'approve_deal') {
+      const { deal_id, admin_id, approved, admin_notes } = body
+      const deal = firstOf(
+        await sql.query('SELECT rep_id, service_name FROM deals WHERE id=$1', [
+          deal_id,
+        ]),
+      )
+      if (approved) {
+        await sql.query(
+          `UPDATE deals SET status='approved', approved_by=$1, approved_at=now() WHERE id=$2`,
+          [admin_id, deal_id],
+        )
+      } else {
+        await sql.query(
+          `UPDATE deals SET status='rejected', admin_notes=$1 WHERE id=$2`,
+          [admin_notes || null, deal_id],
+        )
+      }
+      if (deal?.rep_id) {
+        await sql.query(
+          `INSERT INTO sales_notifications (recipient_id, type, title, message, link)
+           VALUES ($1,'deal_status',$2,$3,'/sales')`,
+          [
+            deal.rep_id,
+            approved ? 'Deal approved' : 'Deal rejected',
+            approved
+              ? `Your deal for ${deal.service_name} was approved`
+              : `Your deal for ${deal.service_name} was rejected${
+                  admin_notes ? ': ' + admin_notes : ''
+                }`,
+          ],
+        )
+      }
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'mark_commission_paid') {
+      const { deal_id } = body
+      await sql.query(
+        `UPDATE deals SET status='commission_paid', commission_paid_at=now() WHERE id=$1`,
+        [deal_id],
+      )
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'mark_notifications_read') {
+      const { rep_id } = body
+      await sql.query(
+        `UPDATE sales_notifications SET read=true WHERE recipient_id=$1 AND read=false`,
+        [rep_id],
+      )
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'objection_help') {
+      // Server-side Anthropic proxy so the API key never reaches the browser.
+      const { objection } = body
+      if (!objection) {
+        return { handled: true, payload: { success: false, error: 'objection required' } }
+      }
+      if (!process.env.ANTHROPIC_API_KEY) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'AI not configured' },
+        }
+      }
+      const aRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 200,
+          system:
+            'You are an expert sales assistant for Lithos Labs, a premium CRM and AI marketing agency in Aruba. Help sales reps handle objections professionally and persuasively. Keep response under 3 sentences. Be confident and value-focused.',
+          messages: [
+            {
+              role: 'user',
+              content:
+                "The prospect said: '" +
+                objection +
+                "'. Give me a professional response.",
+            },
+          ],
+        }),
+      })
+      const aData = await aRes.json()
+      const text = aData?.content?.[0]?.text || ''
+      return {
+        handled: true,
+        payload: { success: !!text, response: text },
+      }
+    }
+    return { handled: false }
+  }
+
+  return { handled: false }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -1110,9 +1527,16 @@ export default async function handler(req, res) {
         const result = await handleNextScheduled(sql, brand_id)
         return res.status(200).json({ success: true, ...result })
       }
+      const salesGet = await handleSales(sql, {
+        method: 'GET',
+        action,
+        query: req.query || {},
+        body: {},
+      })
+      if (salesGet.handled) return res.status(200).json(salesGet.payload)
       return res.status(400).json({
         error:
-          'GET requires action=next|pipeline_list|render_status|next_scheduled',
+          'GET requires action=next|pipeline_list|render_status|next_scheduled|<sales actions>',
       })
     }
 
@@ -1151,11 +1575,18 @@ export default async function handler(req, res) {
         const result = await handleAnalyticsPull(sql, body)
         return res.status(200).json(result)
       }
+      const salesPost = await handleSales(sql, {
+        method: 'POST',
+        action,
+        query: {},
+        body,
+      })
+      if (salesPost.handled) return res.status(200).json(salesPost.payload)
       return res
         .status(400)
         .json({
           error:
-            "body.action must be 'approve', 'reject', 'published', 'pipeline_start', 'pipeline_advance', 'edit_video', or 'post_instagram'",
+            "body.action must be 'approve', 'reject', 'published', 'pipeline_start', 'pipeline_advance', 'edit_video', 'post_instagram', or a sales action",
         })
     }
 
