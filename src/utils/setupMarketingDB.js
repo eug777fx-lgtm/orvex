@@ -166,15 +166,26 @@ export async function setupMarketingDB() {
   }
 
   // Reset packages stuck in 'rendering' with no render_id (the kickoff
-  // failed before persisting an id). Narrow + idempotent — safe every boot.
+  // failed before persisting an id). Only run AFTER confirming the
+  // created_at column actually exists — legacy post_packages tables may
+  // predate it, and a missing column would otherwise abort setup.
   try {
-    await db.query(
-      `UPDATE post_packages
-          SET status='needs_visual'
-        WHERE status='rendering'
-          AND render_id IS NULL
-          AND created_at < now() - interval '10 minutes'`,
+    const cols = await db.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_name='post_packages' AND column_name='created_at'`,
     )
+    const hasCreatedAt =
+      (Array.isArray(cols) && cols.length > 0) ||
+      (cols && cols.rows && cols.rows.length > 0)
+    if (hasCreatedAt) {
+      await db.query(
+        `UPDATE post_packages
+            SET status='needs_visual'
+          WHERE status='rendering'
+            AND render_id IS NULL
+            AND created_at < now() - interval '10 minutes'`,
+      )
+    }
   } catch (e) {
     console.log('Migration skip:', e.message)
   }
@@ -196,12 +207,16 @@ export async function setupMarketingDB() {
       updated_at TIMESTAMPTZ DEFAULT now()
     )
   `)
-  await db.query(
-    `CREATE INDEX IF NOT EXISTS idx_pipeline_brand ON content_pipeline(brand_id)`,
-  )
-  await db.query(
-    `CREATE INDEX IF NOT EXISTS idx_pipeline_stage ON content_pipeline(stage)`,
-  )
+  try {
+    await db.query(
+      `CREATE INDEX IF NOT EXISTS idx_pipeline_brand ON content_pipeline(brand_id)`,
+    )
+    await db.query(
+      `CREATE INDEX IF NOT EXISTS idx_pipeline_stage ON content_pipeline(stage)`,
+    )
+  } catch (e) {
+    console.log('Migration skip:', e.message)
+  }
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS agent_runs (
@@ -351,29 +366,37 @@ export async function setupMarketingDB() {
   `)
 
   // services_catalog has no natural unique key in the spec; add one so the
-  // seed below is idempotent across the every-startup setup run.
-  await db.query(
-    `CREATE UNIQUE INDEX IF NOT EXISTS services_catalog_name_unique ON services_catalog(name)`,
-  )
+  // seed below is idempotent across the every-startup setup run. Wrapped so
+  // a legacy/duplicated catalog can't abort setup.
+  try {
+    await db.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS services_catalog_name_unique ON services_catalog(name)`,
+    )
+    await db.query(`
+      INSERT INTO services_catalog (name, description, category, price_min, price_max, commission_rate) VALUES
+      ('CRM Setup', 'Full CRM setup with pipeline, lead tracking and automations', 'CRM', 500, 2000, 15),
+      ('AI Marketing System', 'Complete AI content generation and brand automation system', 'AI', 1500, 5000, 15),
+      ('Website Development', 'Custom website with modern design and CMS', 'Web', 800, 3000, 10),
+      ('Lead Generation System', 'Automated lead capture, nurturing and qualification', 'Growth', 500, 2000, 15),
+      ('Full Business Operating System', 'CRM + AI Marketing + Website + Automations package', 'Package', 3000, 10000, 20),
+      ('Brand Identity', 'Logo, visual system, brand strategy and style guide', 'Brand', 300, 1500, 10),
+      ('Monthly Retainer - Starter', 'Basic monthly maintenance and content management', 'Retainer', 500, 500, 10),
+      ('Monthly Retainer - Growth', 'Full AI marketing + CRM management monthly', 'Retainer', 1500, 1500, 15)
+      ON CONFLICT DO NOTHING
+    `)
+  } catch (e) {
+    console.log('Migration skip:', e.message)
+  }
 
-  await db.query(`
-    INSERT INTO services_catalog (name, description, category, price_min, price_max, commission_rate) VALUES
-    ('CRM Setup', 'Full CRM setup with pipeline, lead tracking and automations', 'CRM', 500, 2000, 15),
-    ('AI Marketing System', 'Complete AI content generation and brand automation system', 'AI', 1500, 5000, 15),
-    ('Website Development', 'Custom website with modern design and CMS', 'Web', 800, 3000, 10),
-    ('Lead Generation System', 'Automated lead capture, nurturing and qualification', 'Growth', 500, 2000, 15),
-    ('Full Business Operating System', 'CRM + AI Marketing + Website + Automations package', 'Package', 3000, 10000, 20),
-    ('Brand Identity', 'Logo, visual system, brand strategy and style guide', 'Brand', 300, 1500, 10),
-    ('Monthly Retainer - Starter', 'Basic monthly maintenance and content management', 'Retainer', 500, 500, 10),
-    ('Monthly Retainer - Growth', 'Full AI marketing + CRM management monthly', 'Retainer', 1500, 1500, 15)
-    ON CONFLICT DO NOTHING
-  `)
-
-  await db.query(`
-    INSERT INTO sales_reps (name, email, password_hash, role, commission_rate) VALUES
-    ('Eugene', 'admin@lithoslabs.com', 'admin123', 'admin', 0)
-    ON CONFLICT (email) DO UPDATE SET password_hash='admin123', role='admin'
-  `)
+  try {
+    await db.query(`
+      INSERT INTO sales_reps (name, email, password_hash, role, commission_rate) VALUES
+      ('Eugene', 'admin@lithoslabs.com', 'admin123', 'admin', 0)
+      ON CONFLICT (email) DO UPDATE SET password_hash='admin123', role='admin'
+    `)
+  } catch (e) {
+    console.log('Migration skip:', e.message)
+  }
 
   // One-time fresh start: wipe all generated content but keep brands and
   // brand_memory completely intact. Runs before the seed inserts below.

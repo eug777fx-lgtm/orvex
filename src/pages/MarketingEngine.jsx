@@ -1893,17 +1893,21 @@ function AgentCharacter({ agent, position, mode, screenIndex }) {
     : status || ''
   const bobDelay = typeof agent.bobDelay === 'number' ? agent.bobDelay : 0
 
+  // Position is driven by plain CSS left/top + a CSS transition instead of
+  // framer's `animate` — framer-animating layout props from an object is the
+  // source of the "[object Object]" animation error when position is ever
+  // malformed/undefined. CSS transitions are robust to that.
+  const posLeft = position?.left ?? '50%'
+  const posTop = position?.top ?? '50%'
   return (
     <motion.div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      animate={{
-        left: position.left,
-        top: position.top,
-      }}
-      transition={{ duration: 1.8, ease: 'easeInOut' }}
       style={{
         position: 'absolute',
+        left: posLeft,
+        top: posTop,
+        transition: 'left 1.8s ease-in-out, top 1.8s ease-in-out',
         zIndex: 10,
         display: 'flex',
         flexDirection: 'column',
