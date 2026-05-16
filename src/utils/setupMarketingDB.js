@@ -311,7 +311,7 @@ export async function setupMarketingDB() {
   await db.query(`
     INSERT INTO sales_reps (name, email, password_hash, role, commission_rate) VALUES
     ('Eugene', 'admin@lithoslabs.com', 'admin123', 'admin', 0)
-    ON CONFLICT DO NOTHING
+    ON CONFLICT (email) DO UPDATE SET password_hash='admin123', role='admin'
   `)
 
   // One-time fresh start: wipe all generated content but keep brands and

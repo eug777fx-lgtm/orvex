@@ -531,12 +531,24 @@ Output ONLY valid JSON:
           logoUrl: brand.logo_url || null,
         }
 
-        const renderResult = await startRemotionRender({
-          compositionId: renderComposition,
-          props: remotionProps,
-          brandId: brand.id,
-          sql,
-        })
+        // Only video packages render via Remotion. Image / carousel /
+        // static_ad packages stay 'needs_visual' so the user can trigger
+        // Higgsfield image generation from the UI instead.
+        let renderResult = null
+        if (visualType === 'video') {
+          renderResult = await startRemotionRender({
+            compositionId: renderComposition,
+            props: remotionProps,
+            brandId: brand.id,
+            sql,
+          })
+        } else {
+          console.log(
+            'Package type',
+            visualType,
+            '- skipping Remotion render, needs image generation',
+          )
+        }
 
         if (renderResult?.renderId) {
           await sql.query(

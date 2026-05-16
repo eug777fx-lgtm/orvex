@@ -5936,10 +5936,15 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
   const createdMs = pkg.created_at
     ? new Date(pkg.created_at).getTime()
     : Date.now()
-  const renderFailed = progress === -1
+  // Only video packages render via Remotion — image/carousel/static_ad
+  // never enter the render flow, so "Render failed" / "Rendering" must
+  // never show for them.
+  const isVideoPkg = pkg.visual_type === 'video'
+  const renderFailed = isVideoPkg && progress === -1
   // 'rendering' status is the canonical signal that a Lambda render is in
   // flight. (Legacy: needs_visual + render_id also counts.)
   const isRendering =
+    isVideoPkg &&
     !hasVisual &&
     !renderFailed &&
     (pkg.status === 'rendering' ||
@@ -5970,14 +5975,21 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
         bg: 'rgba(251,191,36,0.12)',
       }
     : pkg.status === 'needs_visual'
-    ? visualStale
-      ? {
-          label: 'Visual pending',
-          color: '#fbbf24',
-          bg: 'rgba(251,191,36,0.12)',
+    ? isVideoPkg
+      ? visualStale
+        ? {
+            label: 'Visual pending',
+            color: '#fbbf24',
+            bg: 'rgba(251,191,36,0.12)',
+            stale: true,
+          }
+        : { label: 'Generating visual…', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' }
+      : {
+          label: 'Needs image',
+          color: 'rgba(125,211,252,0.8)',
+          bg: 'rgba(125,211,252,0.12)',
           stale: true,
         }
-      : { label: 'Generating visual…', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' }
     : { label: 'Draft', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.05)' }
   const showTextOnly = needsVisual || (!pkg.visual_url && !isRendering)
   const cardBorder = doneFlash
