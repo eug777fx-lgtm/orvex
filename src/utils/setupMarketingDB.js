@@ -1,6 +1,34 @@
 import db from '@/lib/db'
 
 export async function setupMarketingDB() {
+  // ===== PERMANENT created_at FIX =====
+  // Before ANY query runs, guarantee a created_at column exists on every
+  // table that is ever filtered/ordered by it. Legacy databases may have
+  // these tables WITHOUT created_at (CREATE TABLE IF NOT EXISTS is a no-op
+  // on a pre-existing table), which is what throws
+  // `column "created_at" does not exist` and aborts the whole setup.
+  // Each ALTER is isolated in its own try/catch so a missing table
+  // (fresh DB — table not created yet) or any other error can never abort.
+  const ensureCreatedAt = [
+    'analytics',
+    'content_pipeline',
+    'schedules',
+    'agent_runs',
+    'post_packages',
+    'content',
+    'brands',
+    'brand_memory',
+  ]
+  for (const t of ensureCreatedAt) {
+    try {
+      await db.query(
+        `ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`,
+      )
+    } catch (e) {
+      console.log('skip:', e.message)
+    }
+  }
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS brands (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
