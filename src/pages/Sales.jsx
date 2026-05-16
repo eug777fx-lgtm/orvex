@@ -295,7 +295,7 @@ function SlidePanel({ open, onClose, children, isMobile }) {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 49 }} />
           <motion.div
             initial={{ x: isMobile ? 0 : 460, y: isMobile ? '100%' : 0 }}
-            animate={{ x: 0, y: 0 }}
+            animate={{ x: 0, y: isMobile ? '0%' : 0 }}
             exit={{ x: isMobile ? 0 : 460, y: isMobile ? '100%' : 0 }}
             transition={{ type: 'tween', duration: 0.25 }}
             style={{ position: 'fixed', top: isMobile ? 0 : 56, right: 0, bottom: 0, width: isMobile ? '100%' : 440, background: SECTION_BG, borderLeft: BORDER, overflowY: 'auto', padding: 24, zIndex: 50 }}
