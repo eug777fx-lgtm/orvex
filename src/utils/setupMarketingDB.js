@@ -122,6 +122,11 @@ export async function setupMarketingDB() {
   await db.query(
     `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS render_bucket TEXT`,
   )
+  // Full structured video script (multi-scene) produced by the Writer agent
+  // and consumed by the video_producer agent.
+  await db.query(
+    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS script TEXT`,
+  )
 
   // Reset packages stuck in 'rendering' with no render_id (the kickoff
   // failed before persisting an id). Narrow + idempotent — safe every boot.

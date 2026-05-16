@@ -108,6 +108,25 @@ const AGENTS = [
     ],
   },
   {
+    key: 'video_producer',
+    name: 'Producer',
+    color: '#f59e0b',
+    icon: Camera,
+    role: 'Full video assembly · Multi-scene · Complete stories',
+    pos: { left: '52%', top: '58%' },
+    bobDelay: 0.8,
+    producer: true,
+    statuses: [
+      'Generating scene visuals...',
+      'Recording voiceovers...',
+      'Assembling timeline...',
+      'Adding transitions...',
+      'Mixing audio...',
+      'Exporting final video...',
+      'Production complete ✓',
+    ],
+  },
+  {
     key: 'distribution',
     name: 'Distribution',
     color: '#ffffff',
@@ -1621,6 +1640,11 @@ const HUD_COLORS = {
     accent: '#C2B59B',
     soft: 'rgba(194,181,155,0.55)',
   },
+  video_producer: {
+    glow: 'rgba(245,158,11,0.1)',
+    accent: '#f59e0b',
+    soft: 'rgba(245,158,11,0.55)',
+  },
   distribution: { glow: 'rgba(74,222,128,0.08)', accent: '#4ade80', soft: 'rgba(74,222,128,0.5)' },
   analytics: { glow: 'rgba(248,113,113,0.08)', accent: '#f87171', soft: 'rgba(248,113,113,0.5)' },
 }
@@ -1630,6 +1654,7 @@ const DESK_POSITIONS = {
   writer: { left: '38%', top: '12%' },
   video: { left: '68%', top: '12%' },
   video_editor: { left: '40%', top: '54%' },
+  video_producer: { left: '54%', top: '54%' },
   distribution: { left: '18%', top: '62%' },
   analytics: { left: '62%', top: '62%' },
 }
@@ -1639,6 +1664,7 @@ const HOME_POSITIONS = {
   writer: { left: '36%', top: '18%' },
   video: { left: '66%', top: '18%' },
   video_editor: { left: '38%', top: '58%' },
+  video_producer: { left: '52%', top: '58%' },
   distribution: { left: '16%', top: '68%' },
   analytics: { left: '60%', top: '68%' },
 }
@@ -1648,6 +1674,7 @@ const MEETING_POSITIONS = {
   writer: { left: '54%', top: '40%' },
   video: { left: '36%', top: '50%' },
   video_editor: { left: '47%', top: '47%' },
+  video_producer: { left: '53%', top: '57%' },
   distribution: { left: '57%', top: '50%' },
   analytics: { left: '47%', top: '60%' },
 }
@@ -1969,7 +1996,7 @@ function AgentCharacter({ agent, position, mode, screenIndex }) {
   )
 }
 
-function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMemory }) {
+function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMemory, onProduce }) {
   const colors = HUD_COLORS[agent.key] || { accent: '#ffffff' }
   const status = agent.statuses[screenIndex % agent.statuses.length]
   const statusLine = Array.isArray(status) ? status[0] || '' : status || ''
@@ -2019,6 +2046,10 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
 
   async function handleRun() {
     if (!brand || runStatus === 'running') return
+    if (agent.producer) {
+      onProduce?.()
+      return
+    }
     if (agent.requiresPipeline && !pipelineReady) return
     setRunStatus('running')
     try {
@@ -2176,7 +2207,13 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
           transition: 'all 0.15s ease',
         }}
       >
-        {isRunning ? '...' : agent.key === 'video_editor' ? 'Edit' : 'Run'}
+        {isRunning
+          ? '...'
+          : agent.key === 'video_editor'
+          ? 'Edit'
+          : agent.producer
+          ? 'Produce'
+          : 'Run'}
       </button>
     </div>
   )
@@ -2245,6 +2282,303 @@ function NoMemoryOverlay({ onSetUpMemory }) {
   )
 }
 
+function ProducerModal({ brand, onClose, showToast, onRefresh }) {
+  const [packages, setPackages] = useState([])
+  const [selected, setSelected] = useState('')
+  const [running, setRunning] = useState(false)
+  const [stageIdx, setStageIdx] = useState(0)
+  const [progressMsg, setProgressMsg] = useState('')
+  const [result, setResult] = useState(null)
+
+  useEffect(() => {
+    if (!brand?.id) return
+    let cancelled = false
+    async function load() {
+      try {
+        const rows = await db.query(
+          `SELECT id, hook_text, visual_type, status, script
+             FROM post_packages
+            WHERE brand_id=$1 AND status IN ('needs_visual','rendering')
+            ORDER BY created_at DESC LIMIT 30`,
+          [brand.id],
+        )
+        if (cancelled) return
+        const list = rows || []
+        setPackages(list)
+        const firstProducible = list.find((p) => p.script)
+        setSelected(firstProducible?.id || list[0]?.id || '')
+      } catch (e) {
+        console.error('producer packages load failed', e)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [brand?.id])
+
+  const selectedPkg = packages.find((p) => p.id === selected)
+  let sceneCount = 0
+  try {
+    const v = selectedPkg?.script ? JSON.parse(selectedPkg.script) : null
+    sceneCount = Array.isArray(v?.scenes) ? v.scenes.length : 0
+  } catch {
+    sceneCount = 0
+  }
+
+  const STAGES = [
+    'Script',
+    `Higgsfield${sceneCount ? ` (${sceneCount} scenes)` : ''}`,
+    'Remotion overlays',
+    'ElevenLabs voiceover',
+    'Creatomate assembly',
+    'Final video',
+  ]
+
+  async function produce() {
+    if (!selected || running) return
+    setRunning(true)
+    setResult(null)
+    setStageIdx(1)
+    setProgressMsg('Generating scene 1 visual...')
+
+    // Simulated staged progress while the single long request is in flight.
+    let scene = 1
+    const timer = setInterval(() => {
+      setStageIdx((i) => {
+        const next = Math.min(i + 1, STAGES.length - 1)
+        if (next === 1) {
+          scene = scene < (sceneCount || 1) ? scene + 1 : scene
+          setProgressMsg(`Generating scene ${scene} visual...`)
+        } else if (next === 2) setProgressMsg('Rendering motion overlays...')
+        else if (next === 3) setProgressMsg('Recording voiceover...')
+        else if (next === 4) setProgressMsg('Assembling in Creatomate...')
+        else setProgressMsg('Finalising...')
+        return next
+      })
+    }, 5000)
+
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_type: 'video_producer',
+          brand_id: brand.id,
+          package_id: selected,
+        }),
+      })
+      const data = await res.json()
+      clearInterval(timer)
+      const ok = data?.output?.success || data?.video?.url
+      if (ok) {
+        setStageIdx(STAGES.length)
+        setProgressMsg('Done')
+        setResult('success')
+        showToast?.('Full video produced — check Videos queue')
+        onRefresh?.()
+      } else {
+        setResult('failed')
+        setProgressMsg(data?.output?.error || 'Production failed')
+        showToast?.('Production failed — see Videos queue', 'error')
+      }
+    } catch (e) {
+      clearInterval(timer)
+      console.error('produce failed', e)
+      setResult('failed')
+      setProgressMsg('Network error')
+      showToast?.('Production failed', 'error')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  function stageState(i) {
+    if (result === 'failed' && i === stageIdx) return 'failed'
+    if (i < stageIdx) return 'complete'
+    if (i === stageIdx && running) return 'active'
+    if (result === 'success') return 'complete'
+    return 'pending'
+  }
+  const mark = { pending: '○', active: '●', complete: '✓', failed: '✗' }
+  const markColor = {
+    pending: 'rgba(255,255,255,0.3)',
+    active: '#f59e0b',
+    complete: '#4ade80',
+    failed: '#f87171',
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.7)',
+        zIndex: 250,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+      }}
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#0a0a0c',
+          border: '0.5px solid rgba(245,158,11,0.25)',
+          borderRadius: 16,
+          padding: 22,
+          width: 460,
+          maxWidth: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
+            Video Producer
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: TEXT_MUTED,
+              fontSize: 20,
+              cursor: 'pointer',
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {!running && result !== 'success' && (
+          <>
+            <div style={{ fontSize: 12, color: TEXT_MUTED }}>
+              Pick a package to produce into a full multi-scene video.
+            </div>
+            <select
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+              style={{
+                width: '100%',
+                background: 'rgba(0,0,0,0.4)',
+                border: '0.5px solid rgba(245,158,11,0.25)',
+                borderRadius: 8,
+                color: '#fff',
+                fontSize: 13,
+                padding: '10px 12px',
+                outline: 'none',
+              }}
+            >
+              {packages.length === 0 && <option value="">No packages</option>}
+              {packages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {(p.hook_text || '(no hook)').slice(0, 50)} ·{' '}
+                  {p.script ? 'video script ✓' : 'no script'}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={produce}
+              disabled={!selected}
+              style={{
+                background: '#f59e0b',
+                color: '#0B0B0D',
+                fontWeight: 700,
+                border: 'none',
+                borderRadius: 10,
+                padding: '11px 16px',
+                fontSize: 13,
+                cursor: selected ? 'pointer' : 'not-allowed',
+                opacity: selected ? 1 : 0.5,
+              }}
+            >
+              Produce Full Video
+            </button>
+          </>
+        )}
+
+        {(running || result) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {STAGES.map((s, i) => {
+              const st = stageState(i)
+              return (
+                <div
+                  key={s}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    fontSize: 13,
+                    color: st === 'pending' ? 'rgba(255,255,255,0.4)' : '#fff',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 16,
+                      textAlign: 'center',
+                      color: markColor[st],
+                      fontWeight: 700,
+                    }}
+                  >
+                    {mark[st]}
+                  </span>
+                  {s}
+                </div>
+              )
+            })}
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: 12,
+                color: result === 'failed' ? '#f87171' : '#f59e0b',
+              }}
+            >
+              {progressMsg}
+            </div>
+            {result === 'success' && (
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  marginTop: 8,
+                  background: 'rgba(74,222,128,0.15)',
+                  border: '0.5px solid rgba(74,222,128,0.4)',
+                  color: '#4ade80',
+                  borderRadius: 10,
+                  padding: '10px 16px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Done — view in Videos queue
+              </button>
+            )}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  )
+}
+
 function AgentOffice({
   screenIndex,
   meetingAgents,
@@ -2256,6 +2590,7 @@ function AgentOffice({
   onSetUpMemory,
 }) {
   const [agentPositions, setAgentPositions] = useState(() => ({ ...HOME_POSITIONS }))
+  const [producerOpen, setProducerOpen] = useState(false)
   const [agentModes, setAgentModes] = useState(() =>
     Object.fromEntries(AGENTS.map((a) => [a.key, 'wandering'])),
   )
@@ -2593,6 +2928,7 @@ function AgentOffice({
             onRefresh={onRefresh}
             showToast={showToast}
             hasMemory={hasMemory}
+            onProduce={() => setProducerOpen(true)}
           />
         ))}
       </div>
@@ -2600,6 +2936,17 @@ function AgentOffice({
       {brand && hasMemory === false && (
         <NoMemoryOverlay onSetUpMemory={onSetUpMemory} />
       )}
+
+      <AnimatePresence>
+        {producerOpen && (
+          <ProducerModal
+            brand={brand}
+            onClose={() => setProducerOpen(false)}
+            showToast={showToast}
+            onRefresh={onRefresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -5930,9 +6277,46 @@ function RenderProgressBar({ pct }) {
   )
 }
 
+function VideoVisual({ src, full }) {
+  const ref = useRef(null)
+  return (
+    <video
+      ref={ref}
+      src={src}
+      controls={full}
+      muted
+      playsInline
+      loop
+      onMouseEnter={() => ref.current?.play?.().catch(() => {})}
+      onMouseLeave={() => {
+        if (ref.current) {
+          ref.current.pause()
+          ref.current.currentTime = 0
+        }
+      }}
+      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+    />
+  )
+}
+
 function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPostNow, compact, progress, doneFlash }) {
   const [expanded, setExpanded] = useState(false)
   const hasVisual = !!pkg.visual_url
+  // A Creatomate-assembled video is a "Full Production" (multi-scene).
+  const isFullProduction =
+    typeof pkg.visual_url === 'string' &&
+    pkg.visual_url.includes('creatomate')
+  let prodScenes = 0
+  let prodDuration = 0
+  if (pkg.script) {
+    try {
+      const v = JSON.parse(pkg.script)
+      prodScenes = Array.isArray(v?.scenes) ? v.scenes.length : 0
+      prodDuration = Number(v?.duration) || 0
+    } catch {
+      /* not structured */
+    }
+  }
   const createdMs = pkg.created_at
     ? new Date(pkg.created_at).getTime()
     : Date.now()
@@ -6031,11 +6415,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
         >
           {pkg.visual_url ? (
             pkg.visual_type === 'video' ? (
-              <video
-                src={pkg.visual_url}
-                controls
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              <VideoVisual src={pkg.visual_url} full={false} />
             ) : (
               <img
                 src={pkg.visual_url}
@@ -6073,9 +6453,34 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
           >
             {statusBadge.label}
           </span>
+          {isFullProduction && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                fontSize: 9,
+                padding: '2px 7px',
+                borderRadius: 999,
+                background: 'rgba(194,181,155,0.18)',
+                border: '0.5px solid rgba(194,181,155,0.5)',
+                color: '#C2B59B',
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+              }}
+            >
+              Full Production
+            </span>
+          )}
           {isRendering && <RenderProgressBar pct={renderPct} />}
         </div>
         <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {isFullProduction && (prodScenes > 0 || prodDuration > 0) && (
+            <div style={{ fontSize: 10, color: '#C2B59B' }}>
+              {prodScenes} scene{prodScenes === 1 ? '' : 's'}
+              {prodDuration ? ` · ${prodDuration} seconds` : ''}
+            </div>
+          )}
           <div
             style={{
               fontSize: 12,
@@ -6216,11 +6621,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
         >
           {pkg.visual_url ? (
             pkg.visual_type === 'video' ? (
-              <video
-                src={pkg.visual_url}
-                controls
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              <VideoVisual src={pkg.visual_url} full />
             ) : (
               <img
                 src={pkg.visual_url}
@@ -6336,6 +6737,28 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
             )}
             {statusBadge.label}
           </span>
+          {isFullProduction && (
+            <span
+              style={{
+                fontSize: 9.5,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: 'rgba(194,181,155,0.18)',
+                border: '0.5px solid rgba(194,181,155,0.5)',
+                color: '#C2B59B',
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+              }}
+            >
+              Full Production
+            </span>
+          )}
+          {isFullProduction && (prodScenes > 0 || prodDuration > 0) && (
+            <span style={{ fontSize: 10, color: '#C2B59B' }}>
+              {prodScenes} scene{prodScenes === 1 ? '' : 's'}
+              {prodDuration ? ` · ${prodDuration} seconds` : ''}
+            </span>
+          )}
         </div>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', lineHeight: 1.3 }}>
           {pkg.hook_text || '(no hook)'}
