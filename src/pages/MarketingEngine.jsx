@@ -5549,25 +5549,40 @@ function ContentHub({
   async function generateVisual(pkg, kind) {
     if (!brand?.id || !pkg?.id) return
     try {
-      if (kind === 'video' && pkg.remotion_composition) {
+      if (kind === 'video') {
+        // Kick off a manual Remotion render. /api/render returns immediately
+        // with renderId/bucketName; we flip the package to 'rendering' and
+        // the 10s render_status poll backfills visual_url when done.
+        const composition = pkg.remotion_composition || 'HookOpener'
         const r = await fetch('/api/render', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            composition_id: pkg.remotion_composition,
-            props: { headline: pkg.hook_text, brandName: brand.name },
+            composition_id: composition,
+            props: {
+              headline: pkg.hook_text || '',
+              subtext: pkg.cta_text || '',
+              brandName: brand.name,
+              primaryColor: brand.primary_color || '#c084fc',
+              secondaryColor: brand.secondary_color || '#ffffff',
+              logoUrl: brand.logo_url || null,
+            },
             brand_id: brand.id,
           }),
         })
         const data = await r.json()
-        if (data.url) {
+        if (data.renderId) {
           await db.query(
-            `UPDATE post_packages SET visual_url=$1, visual_type='video', status='ready' WHERE id=$2`,
-            [data.url, pkg.id],
+            `UPDATE post_packages SET render_id=$1, render_bucket=$2, visual_type='video', status='rendering' WHERE id=$3`,
+            [data.renderId, data.bucketName || null, pkg.id],
           )
-          showToast?.('Video ready')
+          showToast?.('Rendering video — ready in ~25s')
+          setPackagesVersion((v) => v + 1)
         } else {
-          showToast?.('Video queued', 'info')
+          showToast?.(
+            data.error || data.message || 'Render could not start',
+            'error',
+          )
         }
       } else {
         // Image via Higgsfield
@@ -6420,67 +6435,33 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
   // Only video packages render via Remotion — image/carousel/static_ad
   // never enter the render flow, so "Render failed" / "Rendering" must
   // never show for them.
-  const isVideoPkg = pkg.visual_type === 'video'
-  const renderFailed = isVideoPkg && progress === -1
-  // 'rendering' status is the canonical signal that a Lambda render is in
-  // flight. (Legacy: needs_visual + render_id also counts.)
-  const isRendering =
-    isVideoPkg &&
-    !hasVisual &&
-    !renderFailed &&
-    (pkg.status === 'rendering' ||
-      (pkg.status === 'needs_visual' && !!pkg.render_id))
-  const needsVisual = !hasVisual && pkg.status === 'needs_visual' && !isRendering
+  // Three states only: no visual / rendering / ready. Render failures bounce
+  // the package back to needs_visual server-side (render_status), so there's
+  // no separate "failed" UI to reason about.
+  const isProducing = pkg.status === 'producing'
+  const isRendering = pkg.status === 'rendering' || isProducing
+  const needsVisual = !hasVisual && !isRendering
   const renderPct =
     typeof progress === 'number' && progress >= 0
       ? Math.round(progress * 100)
       : null
-  // Only fall back to the static "Visual pending" badge once we're past the
-  // 3-minute window AND there's no live render to wait on.
-  const visualStale =
-    Date.now() - createdMs > 3 * 60 * 1000 && !isRendering
-  const isProducing = pkg.status === 'producing'
-  const statusBadge = isProducing
-    ? {
-        label: 'Producing full video…',
-        color: '#f59e0b',
-        bg: 'rgba(245,158,11,0.14)',
-        producing: true,
-      }
-    : hasVisual
-    ? { label: 'Ready to post', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' }
-    : renderFailed
-    ? {
-        label: 'Render failed',
-        color: '#f87171',
-        bg: 'rgba(248,113,113,0.12)',
-        stale: true,
-      }
+  const statusBadge = hasVisual
+    ? { label: 'Ready', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' }
     : isRendering
     ? {
-        label:
-          renderPct != null ? `Rendering ${renderPct}%` : 'Rendering…',
+        label: renderPct != null ? `Rendering ${renderPct}%` : 'Rendering…',
         color: '#fbbf24',
         bg: 'rgba(251,191,36,0.12)',
       }
-    : pkg.status === 'needs_visual'
-    ? isVideoPkg
-      ? visualStale
-        ? {
-            label: 'Visual pending',
-            color: '#fbbf24',
-            bg: 'rgba(251,191,36,0.12)',
-            stale: true,
-          }
-        : { label: 'Generating visual…', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' }
-      : {
-          label: 'Needs image',
-          color: 'rgba(125,211,252,0.8)',
-          bg: 'rgba(125,211,252,0.12)',
-          stale: true,
-        }
-    : { label: 'Draft', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.05)' }
-  const showTextOnly = needsVisual || (!pkg.visual_url && !isRendering)
+    : {
+        label: 'Needs visual',
+        color: 'rgba(255,255,255,0.55)',
+        bg: 'rgba(255,255,255,0.05)',
+        stale: true,
+      }
+  // "Post without visual" is always available while the package has no
+  // visual and isn't actively rendering.
+  const showTextOnly = needsVisual
   const cardBorder = doneFlash
     ? '1px solid rgba(74,222,128,0.8)'
     : '0.5px solid rgba(255,255,255,0.07)'
@@ -6755,44 +6736,24 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
           )}
           {isRendering && <RenderProgressBar pct={renderPct} />}
         </div>
-        {!hasVisual && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              type="button"
-              onClick={() => onGenerateVisual(pkg, 'video')}
-              disabled={!pkg.remotion_composition}
-              style={{
-                flex: 1,
-                fontSize: 10.5,
-                padding: '5px 9px',
-                borderRadius: 6,
-                background: 'rgba(255,255,255,0.04)',
-                border: '0.5px solid rgba(255,255,255,0.12)',
-                color: pkg.remotion_composition ? 'rgba(255,255,255,0.75)' : TEXT_FAINT,
-                fontWeight: 500,
-                cursor: pkg.remotion_composition ? 'pointer' : 'not-allowed',
-              }}
-            >
-              Generate Video
-            </button>
-            <button
-              type="button"
-              onClick={() => onGenerateVisual(pkg, 'image')}
-              style={{
-                flex: 1,
-                fontSize: 10.5,
-                padding: '5px 9px',
-                borderRadius: 6,
-                background: 'rgba(255,255,255,0.04)',
-                border: '0.5px solid rgba(255,255,255,0.12)',
-                color: 'rgba(255,255,255,0.75)',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              Generate Image
-            </button>
-          </div>
+        {needsVisual && (
+          <button
+            type="button"
+            onClick={() => onGenerateVisual(pkg, 'video')}
+            style={{
+              width: '100%',
+              fontSize: 13,
+              padding: '10px 14px',
+              borderRadius: 8,
+              background: 'rgba(194,181,155,0.14)',
+              border: '0.5px solid rgba(194,181,155,0.5)',
+              color: '#C2B59B',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Generate Video
+          </button>
         )}
       </div>
 
