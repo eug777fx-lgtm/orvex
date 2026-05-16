@@ -608,67 +608,11 @@ RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it 
           videoScript,
         ],
       )
-      const packageId = (pkgInsert?.rows ?? pkgInsert)?.[0]?.id
+      // No auto-render. Packages are created with status='needs_visual';
+      // the user triggers a render manually via the Generate Video button
+      // (POST /api/render) — reliable and avoids writer-run timeouts.
+      void (pkgInsert?.rows ?? pkgInsert)?.[0]?.id
       itemsGenerated += 1
-
-      // Auto-render a Remotion video for this package by invoking Lambda
-      // directly (no fragile intra-deployment HTTP round-trip). If Remotion
-      // isn't configured or the kickoff fails the package stays
-      // 'needs_visual' and the UI offers manual generate / post-without-visual.
-      if (packageId) {
-        const renderComposition = composition || 'HookOpener'
-        const remotionProps = {
-          headline: hookText?.slice(0, 60) || 'Discipline is built quietly.',
-          subtext: ctaText?.slice(0, 80) || 'Start journaling your trades.',
-          brandName: brand.name,
-          primaryColor: brand.primary_color || '#c084fc',
-          secondaryColor: brand.secondary_color || '#ffffff',
-          logoUrl: brand.logo_url || null,
-        }
-
-        // Only video packages render via Remotion. Image / carousel /
-        // static_ad packages stay 'needs_visual' so the user can trigger
-        // Higgsfield image generation from the UI instead.
-        let renderResult = null
-        if (visualType === 'video') {
-          renderResult = await startRemotionRender({
-            compositionId: renderComposition,
-            props: remotionProps,
-            brandId: brand.id,
-            sql,
-          })
-        } else {
-          console.log(
-            'Package type',
-            visualType,
-            '- skipping Remotion render, needs image generation',
-          )
-        }
-
-        if (renderResult?.renderId) {
-          await sql.query(
-            'UPDATE post_packages SET render_id=$1, render_bucket=$2, status=$3 WHERE id=$4',
-            [
-              renderResult.renderId,
-              renderResult.bucketName,
-              'rendering',
-              packageId,
-            ],
-          )
-          console.log(
-            'Package',
-            packageId,
-            'render started:',
-            renderResult.renderId,
-          )
-        } else {
-          console.log(
-            'Package',
-            packageId,
-            'render skipped — staying needs_visual',
-          )
-        }
-      }
     }
   }
 

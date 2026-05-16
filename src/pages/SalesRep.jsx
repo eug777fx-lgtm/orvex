@@ -169,6 +169,7 @@ const P = {
   dollar: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
   clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
+  menu: 'M3 6h18M3 12h18M3 18h18',
   building:
     'M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01',
   'log-out': 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
@@ -889,7 +890,6 @@ const NAV = [
   { key: 'demos', label: 'Demos', icon: 'monitor' },
   { key: 'admin', label: 'Admin', icon: 'shield', adminOnly: true },
 ]
-const MOBILE_TABS = ['dashboard', 'leads', 'pipeline', 'tasks']
 
 function NavPill({ label, active, onClick }) {
   const [h, setH] = useState(false)
@@ -1077,7 +1077,7 @@ function Notifications({ rep }) {
   )
 }
 
-function TopNav({ rep, active, setActive, onLogout, nav, isMobile }) {
+function TopNav({ rep, active, setActive, onLogout, onMenu, nav, isMobile }) {
   return (
     <header
       style={{
@@ -1097,11 +1097,28 @@ function TopNav({ rep, active, setActive, onLogout, nav, isMobile }) {
         gap: 16,
       }}
     >
+      {isMobile && (
+        <button
+          onClick={onMenu}
+          aria-label="Menu"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: C.text,
+            cursor: 'pointer',
+            padding: 6,
+            display: 'flex',
+            flexShrink: 0,
+          }}
+        >
+          <Ico name="menu" size={20} />
+        </button>
+      )}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
+          gap: 9,
           flexShrink: 0,
         }}
       >
@@ -1120,6 +1137,20 @@ function TopNav({ rep, active, setActive, onLogout, nav, isMobile }) {
             Labs
           </span>
         </div>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: C.beige,
+            border: `0.5px solid ${C.beige}55`,
+            borderRadius: 999,
+            padding: '2px 7px',
+          }}
+        >
+          Sales
+        </span>
       </div>
 
       {!isMobile && (
@@ -1189,69 +1220,198 @@ function TopNav({ rep, active, setActive, onLogout, nav, isMobile }) {
   )
 }
 
-function MobileNav({ active, setActive, openMore }) {
-  const items = MOBILE_TABS.map((k) => NAV.find((n) => n.key === k))
+function MobileDrawer({ open, onClose, rep, active, setActive, nav, onLogout }) {
   return (
-    <nav
-      style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 60,
-        background: C.nav,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderTop: C.border,
-        display: 'flex',
-        zIndex: 100,
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
-    >
-      {items.map((it) => (
-        <button
-          key={it.key}
-          onClick={() => setActive(it.key)}
-          style={{
-            flex: 1,
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 4,
-            color: active === it.key ? C.text : C.t40,
-            fontSize: 10,
-            fontFamily: FONT,
-            justifyContent: 'center',
-          }}
-        >
-          <Ico name={it.icon} size={19} />
-          {it.label}
-        </button>
-      ))}
-      <button
-        onClick={openMore}
-        style={{
-          flex: 1,
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 4,
-          color: C.t40,
-          fontSize: 10,
-          fontFamily: FONT,
-          justifyContent: 'center',
-        }}
-      >
-        <Ico name="more" size={19} />
-        More
-      </button>
-    </nav>
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 480,
+              background: 'rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(3px)',
+            }}
+          />
+          <motion.div
+            initial={{ x: '-100%' }}
+            animate={{ x: '0%' }}
+            exit={{ x: '-100%' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              zIndex: 490,
+              width: 248,
+              maxWidth: '82%',
+              background: C.sectionCard,
+              borderRight: C.borderStrong,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                height: 56,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 9,
+                padding: '0 18px',
+                borderBottom: C.border,
+                flexShrink: 0,
+              }}
+            >
+              <img
+                src="/lithos-logo.png"
+                alt="Lithos"
+                width={22}
+                height={22}
+                style={{ objectFit: 'contain' }}
+              />
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+                <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>
+                  Lithos
+                </span>
+                <span style={{ fontWeight: 300, fontSize: 15, color: C.t40 }}>
+                  Labs
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: C.beige,
+                  border: `0.5px solid ${C.beige}55`,
+                  borderRadius: 999,
+                  padding: '2px 7px',
+                }}
+              >
+                Sales
+              </span>
+            </div>
+            <nav
+              style={{
+                flex: 1,
+                padding: '14px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 3,
+                overflowY: 'auto',
+              }}
+            >
+              {nav.map((n) => {
+                const on = active === n.key
+                return (
+                  <button
+                    key={n.key}
+                    onClick={() => setActive(n.key)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      fontWeight: on ? 500 : 400,
+                      width: '100%',
+                      textAlign: 'left',
+                      border: 'none',
+                      background: on ? C.active : 'transparent',
+                      color: on ? C.text : C.t50,
+                      fontFamily: FONT,
+                    }}
+                  >
+                    <Ico name={n.icon} size={16} />
+                    {n.label}
+                  </button>
+                )
+              })}
+            </nav>
+            <div style={{ padding: 14, borderTop: C.border, flexShrink: 0 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '0.5px solid rgba(255,255,255,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: C.text,
+                  }}
+                >
+                  {initials(rep.name)}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: C.text,
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {rep.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      color: C.t40,
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {rep.role}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={onLogout}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  width: '100%',
+                  background: 'transparent',
+                  border: C.border,
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  color: C.t40,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontFamily: FONT,
+                }}
+              >
+                <Ico name="log-out" size={14} />
+                Log out
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   )
 }
 
@@ -4048,7 +4208,7 @@ export default function SalesRep() {
   const [kpis, setKpis] = useState({ week: {}, today: {} })
   const [loading, setLoading] = useState(true)
   const [toastMsg, setToastMsg] = useState('')
-  const [moreOpen, setMoreOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [discoverPrefill, setDiscoverPrefill] = useState(null)
 
   const toast = useCallback((m) => {
@@ -4095,7 +4255,7 @@ export default function SalesRep() {
   }
   function go(key) {
     setActive(key)
-    setMoreOpen(false)
+    setDrawerOpen(false)
   }
 
   if (!ready) {
@@ -4241,13 +4401,14 @@ export default function SalesRep() {
         active={active}
         setActive={go}
         onLogout={logout}
+        onMenu={() => setDrawerOpen(true)}
         nav={nav}
         isMobile={isMobile}
       />
 
       <main
         style={{
-          padding: isMobile ? '20px 16px 84px' : '32px 32px',
+          padding: isMobile ? '20px 16px' : '32px 32px',
           maxWidth: 1400,
           margin: '56px auto 0',
           width: '100%',
@@ -4265,43 +4426,16 @@ export default function SalesRep() {
       </main>
 
       {isMobile && (
-        <MobileNav
+        <MobileDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          rep={rep}
           active={active}
           setActive={go}
-          openMore={() => setMoreOpen(true)}
+          nav={nav}
+          onLogout={logout}
         />
       )}
-
-      <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title="Menu">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {nav
-            .filter((n) => !MOBILE_TABS.includes(n.key))
-            .map((n) => (
-              <button
-                key={n.key}
-                onClick={() => go(n.key)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '11px 14px',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  width: '100%',
-                  textAlign: 'left',
-                  border: 'none',
-                  background: active === n.key ? C.active : 'transparent',
-                  color: active === n.key ? C.text : C.t50,
-                  fontFamily: FONT,
-                }}
-              >
-                <Ico name={n.icon} size={16} />
-                {n.label}
-              </button>
-            ))}
-        </div>
-      </Modal>
 
       <Toast msg={toastMsg} />
     </div>
