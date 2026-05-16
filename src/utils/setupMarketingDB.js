@@ -12,6 +12,18 @@ export async function setupMarketingDB() {
     )
   `)
 
+  // Guarantee created_at exists on legacy `brands` tables BEFORE anything
+  // orders/filters by it (dedupeBrand below does ORDER BY created_at).
+  // CREATE TABLE IF NOT EXISTS is a no-op on an existing pre-created_at table,
+  // so without this an old DB throws: column "created_at" does not exist.
+  try {
+    await db.query(
+      `ALTER TABLE brands ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`,
+    )
+  } catch (e) {
+    console.log('Migration skip:', e.message)
+  }
+
   // Clean up any duplicate brand rows (oldest wins) before the unique index
   // is created — CREATE UNIQUE INDEX would error if duplicates still exist.
   await dedupeBrand('AWATEC')
@@ -21,22 +33,28 @@ export async function setupMarketingDB() {
     CREATE UNIQUE INDEX IF NOT EXISTS brands_name_unique ON brands(name)
   `)
 
-  await db.query(
-    `ALTER TABLE brands ADD COLUMN IF NOT EXISTS client_id TEXT`,
-  )
-  await db.query(
-    `ALTER TABLE brands ADD COLUMN IF NOT EXISTS brand_type TEXT DEFAULT 'own'`,
-  )
-  await db.query(
-    `UPDATE brands SET brand_type = 'own' WHERE brand_type IS NULL`,
-  )
-  await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS logo_url TEXT`)
-  await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS primary_color TEXT`)
-  await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS secondary_color TEXT`)
-  await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS visual_style TEXT`)
-  await db.query(
-    `ALTER TABLE brands ADD COLUMN IF NOT EXISTS aesthetic_description TEXT`,
-  )
+  // Every ALTER TABLE is wrapped so one failing migration (e.g. a column
+  // that depends on another not yet present) cannot abort the whole setup.
+  try {
+    await db.query(
+      `ALTER TABLE brands ADD COLUMN IF NOT EXISTS client_id TEXT`,
+    )
+    await db.query(
+      `ALTER TABLE brands ADD COLUMN IF NOT EXISTS brand_type TEXT DEFAULT 'own'`,
+    )
+    await db.query(
+      `UPDATE brands SET brand_type = 'own' WHERE brand_type IS NULL`,
+    )
+    await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS logo_url TEXT`)
+    await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS primary_color TEXT`)
+    await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS secondary_color TEXT`)
+    await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS visual_style TEXT`)
+    await db.query(
+      `ALTER TABLE brands ADD COLUMN IF NOT EXISTS aesthetic_description TEXT`,
+    )
+  } catch (e) {
+    console.log('Migration skip:', e.message)
+  }
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS content (
@@ -115,38 +133,51 @@ export async function setupMarketingDB() {
 
   // Async Remotion render tracking: render_id + render_bucket are stored when
   // the writer fires a render so the UI can poll render_status and the
-  // backfill can target the exact package.
-  await db.query(
-    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS render_id TEXT`,
-  )
-  await db.query(
-    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS render_bucket TEXT`,
-  )
-  // Full structured video script (multi-scene) produced by the Writer agent
-  // and consumed by the video_producer agent.
-  await db.query(
-    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS script TEXT`,
-  )
-  // video_producer outputs: per-scene asset map + final duration / scene count.
-  await db.query(
-    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS scenes_data JSONB`,
-  )
-  await db.query(
-    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS video_duration INTEGER`,
-  )
-  await db.query(
-    `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS scenes_count INTEGER`,
-  )
+  // backfill can target the exact package. Wrapped so a failing column add
+  // can't abort the rest of setup. created_at is guaranteed first because the
+  // UPDATE below filters on it (legacy tables may predate the column).
+  try {
+    await db.query(
+      `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`,
+    )
+    await db.query(
+      `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS render_id TEXT`,
+    )
+    await db.query(
+      `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS render_bucket TEXT`,
+    )
+    // Full structured video script (multi-scene) produced by the Writer agent
+    // and consumed by the video_producer agent.
+    await db.query(
+      `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS script TEXT`,
+    )
+    // video_producer outputs: per-scene asset map + final duration / scene count.
+    await db.query(
+      `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS scenes_data JSONB`,
+    )
+    await db.query(
+      `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS video_duration INTEGER`,
+    )
+    await db.query(
+      `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS scenes_count INTEGER`,
+    )
+  } catch (e) {
+    console.log('Migration skip:', e.message)
+  }
 
   // Reset packages stuck in 'rendering' with no render_id (the kickoff
   // failed before persisting an id). Narrow + idempotent — safe every boot.
-  await db.query(
-    `UPDATE post_packages
-        SET status='needs_visual'
-      WHERE status='rendering'
-        AND render_id IS NULL
-        AND created_at < now() - interval '10 minutes'`,
-  )
+  try {
+    await db.query(
+      `UPDATE post_packages
+          SET status='needs_visual'
+        WHERE status='rendering'
+          AND render_id IS NULL
+          AND created_at < now() - interval '10 minutes'`,
+    )
+  } catch (e) {
+    console.log('Migration skip:', e.message)
+  }
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS content_pipeline (
@@ -411,9 +442,14 @@ export async function setupMarketingDB() {
     [awatecVersionKey],
   )
   if (awatecVersionRows.length === 0) {
-    const awatecRows = await db.query(
-      "SELECT id FROM brands WHERE name = 'AWATEC' ORDER BY created_at ASC LIMIT 1",
-    )
+    let awatecRows = []
+    try {
+      awatecRows = await db.query(
+        "SELECT id FROM brands WHERE name = 'AWATEC' ORDER BY created_at ASC LIMIT 1",
+      )
+    } catch (e) {
+      console.log('Migration skip:', e.message)
+    }
     const awatecId = awatecRows[0]?.id
     if (awatecId) {
       await db.query('DELETE FROM brand_memory WHERE brand_id = $1', [
@@ -451,12 +487,30 @@ async function cleanContentForFreshStart() {
   )
   if (existing.length > 0) return
 
-  await db.query('DELETE FROM content_pipeline WHERE created_at < now()')
-  await db.query('DELETE FROM schedules WHERE created_at < now()')
-  await db.query('DELETE FROM analytics WHERE created_at < now()')
-  await db.query('DELETE FROM agent_runs WHERE created_at < now()')
-  await db.query('DELETE FROM post_packages WHERE created_at < now()')
-  await db.query('DELETE FROM content WHERE created_at < now()')
+  // The `analytics` table uses `recorded_at`, NOT `created_at`, so the old
+  // `DELETE FROM analytics WHERE created_at < now()` always threw
+  // `column "created_at" does not exist` and aborted the entire setup.
+  // Guarantee a created_at column on every table first (idempotent — no-op
+  // where it already exists), then delete with per-table try/catch so a
+  // single bad table can never break the rest of the migration.
+  const cleanTables = [
+    'content_pipeline',
+    'schedules',
+    'analytics',
+    'agent_runs',
+    'post_packages',
+    'content',
+  ]
+  for (const t of cleanTables) {
+    try {
+      await db.query(
+        `ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`,
+      )
+      await db.query(`DELETE FROM ${t} WHERE created_at < now()`)
+    } catch (e) {
+      console.log('Migration skip:', e.message)
+    }
+  }
 
   await db.query(
     `INSERT INTO app_meta (key, value) VALUES ($1, 'done')
@@ -466,10 +520,19 @@ async function cleanContentForFreshStart() {
 }
 
 async function dedupeBrand(brandName) {
-  const rows = await db.query(
-    'SELECT id FROM brands WHERE name = $1 ORDER BY created_at ASC',
-    [brandName],
-  )
+  // created_at is ensured by the ALTER guard in setupMarketingDB before this
+  // runs, but stay defensive: if the column still isn't there, skip dedupe
+  // rather than aborting the entire setup.
+  let rows
+  try {
+    rows = await db.query(
+      'SELECT id FROM brands WHERE name = $1 ORDER BY created_at ASC',
+      [brandName],
+    )
+  } catch (e) {
+    console.log('Migration skip:', e.message)
+    return
+  }
   if (!rows || rows.length <= 1) return
   const deleteIds = rows.slice(1).map((r) => r.id)
   for (const deleteId of deleteIds) {

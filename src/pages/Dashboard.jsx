@@ -1344,43 +1344,44 @@ function SalesPortalCard() {
   return (
     <div
       style={{
-        background: 'rgba(194,181,155,0.04)',
-        border: '0.5px solid rgba(194,181,155,0.1)',
+        background: '#111113',
+        border: '0.5px solid rgba(255,255,255,0.06)',
         borderRadius: 12,
-        padding: 16,
+        padding: 20,
         marginTop: 16,
       }}
     >
-      <div style={{ fontWeight: 500, color: '#fff', fontSize: 14 }}>
+      <div style={{ fontWeight: 600, color: '#fff', fontSize: 15 }}>
         Sales Portal
       </div>
       <div
         style={{
-          fontSize: 12,
-          color: 'rgba(255,255,255,0.5)',
+          fontSize: 13,
+          color: 'rgba(255,255,255,0.35)',
           marginTop: 2,
         }}
       >
-        Share this link with your sales team
+        Share with your sales team
       </div>
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          marginTop: 10,
+          marginTop: 14,
         }}
       >
         <code
           style={{
             flex: 1,
             minWidth: 0,
-            background: 'rgba(0,0,0,0.35)',
-            border: '0.5px solid rgba(194,181,155,0.15)',
-            borderRadius: 8,
+            background: 'rgba(255,255,255,0.04)',
+            borderRadius: 6,
             padding: '8px 12px',
-            fontSize: 12.5,
-            color: '#C2B59B',
+            fontSize: 12,
+            fontFamily:
+              "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
+            color: 'rgba(255,255,255,0.7)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -1392,28 +1393,35 @@ function SalesPortalCard() {
           type="button"
           onClick={copy}
           style={{
-            background: '#C2B59B',
-            color: '#0B0B0D',
+            background: '#ffffff',
+            color: '#000000',
             fontWeight: 600,
             border: 'none',
             borderRadius: 8,
-            padding: '8px 14px',
-            fontSize: 12.5,
+            padding: '8px 16px',
+            fontSize: 13,
             cursor: 'pointer',
             whiteSpace: 'nowrap',
           }}
         >
-          {copied ? 'Copied' : 'Copy link'}
+          {copied ? 'Copied' : 'Copy Link'}
         </button>
-      </div>
-      <div
-        style={{
-          fontSize: 11,
-          color: 'rgba(255,255,255,0.4)',
-          marginTop: 8,
-        }}
-      >
-        Opens a separate dashboard for sales reps
+        <button
+          type="button"
+          onClick={() => window.open('/sales', '_blank')}
+          style={{
+            background: 'transparent',
+            color: 'rgba(255,255,255,0.7)',
+            border: '0.5px solid rgba(255,255,255,0.15)',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontSize: 13,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Open Portal
+        </button>
       </div>
     </div>
   )

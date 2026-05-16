@@ -35,7 +35,7 @@ import Workflow from './pages/Workflow'
 import PublicDemo from './pages/PublicDemo'
 import Login from './pages/Login'
 import MarketingEngine from './pages/MarketingEngine'
-import SalesRep from './pages/SalesRep'
+import Sales from './pages/Sales'
 import useIsMobile from './utils/useIsMobile'
 
 const navItems = [
@@ -343,7 +343,7 @@ export default function App() {
   if (location.pathname.startsWith('/sales')) {
     return (
       <Routes>
-        <Route path="/sales/*" element={<SalesRep />} />
+        <Route path="/sales/*" element={<Sales />} />
       </Routes>
     )
   }
