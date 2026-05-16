@@ -2165,6 +2165,14 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
           {statusLabel}
         </span>
       </div>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          gap: 3,
+        }}
+      >
       <button
         type="button"
         onClick={handleRun}
@@ -2215,7 +2223,48 @@ function AgentInfoPill({ agent, screenIndex, brand, onRefresh, showToast, hasMem
           ? 'Produce'
           : 'Run'}
       </button>
+      {agent.producer && <ProcessQueueLink />}
+      </div>
     </div>
+  )
+}
+
+function ProcessQueueLink() {
+  const [state, setState] = useState('idle')
+  async function run() {
+    if (state === 'running') return
+    setState('running')
+    try {
+      const res = await fetch('/api/workflow?action=process_productions')
+      const data = await res.json()
+      setState(data?.success ? 'done' : 'error')
+    } catch {
+      setState('error')
+    }
+    setTimeout(() => setState('idle'), 4000)
+  }
+  return (
+    <button
+      type="button"
+      onClick={run}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        fontSize: 11,
+        color: 'rgba(194,181,155,0.5)',
+        cursor: state === 'running' ? 'default' : 'pointer',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {state === 'running'
+        ? 'Processing...'
+        : state === 'done'
+        ? 'Done'
+        : state === 'error'
+        ? 'Failed — retry'
+        : 'Process Queue'}
+    </button>
   )
 }
 

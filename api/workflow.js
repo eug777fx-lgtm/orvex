@@ -50,6 +50,13 @@
 // GET  /api/workflow?action=next_scheduled&brand_id=<uuid>
 //   Next approved package with a visual whose schedule slot is due.
 //   Response: { success, has_content, package? }
+//
+// POST /api/workflow { action: 'process_productions' }
+// GET  /api/workflow?action=process_productions
+//   Cron-driven worker. Drains up to 3 packages stuck in 'producing' and
+//   runs the full Higgsfield + ElevenLabs + Creatomate production for each.
+
+import { produceVideo } from './_render-helper.js'
 
 const MAX_PER_DAY = 3
 const SLOT_GAP_HOURS = 4
@@ -1105,6 +1112,38 @@ async function bumpKpi(sql, repId, column, amount = 1) {
 const rowsOf = (r) => r?.rows ?? r ?? []
 const firstOf = (r) => rowsOf(r)?.[0]
 
+// Cron worker: drain packages stuck in 'producing' and run the full
+// multi-scene production for each. Bounded to 3 per run so a single
+// invocation stays within the serverless time budget.
+async function handleProcessProductions(sql) {
+  const rows = await sql.query(
+    `SELECT id, brand_id FROM post_packages
+      WHERE status='producing'
+        AND updated_at < now() - interval '30 seconds'
+      ORDER BY updated_at ASC
+      LIMIT 3`,
+  )
+  const pkgs = rowsOf(rows)
+  const results = []
+  for (const p of pkgs) {
+    try {
+      const r = await produceVideo({
+        packageId: p.id,
+        brandId: p.brand_id,
+        sql,
+      })
+      results.push({ package_id: p.id, ...r })
+    } catch (e) {
+      await sql.query(
+        "UPDATE post_packages SET status='needs_visual', updated_at=now() WHERE id=$1",
+        [p.id],
+      )
+      results.push({ package_id: p.id, success: false, error: e?.message })
+    }
+  }
+  return { success: true, processed: pkgs.length, results }
+}
+
 async function handleSales(sql, { method, action, query, body }) {
   // ---- GET actions ----
   if (method === 'GET') {
@@ -1692,6 +1731,10 @@ async function handleSales(sql, { method, action, query, body }) {
   return { handled: false }
 }
 
+// process_productions runs the long Higgsfield + Creatomate flow — give the
+// function the maximum serverless runtime.
+export const config = { maxDuration: 300 }
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -1723,6 +1766,10 @@ export default async function handler(req, res) {
       if (action === 'next_scheduled') {
         const result = await handleNextScheduled(sql, brand_id)
         return res.status(200).json({ success: true, ...result })
+      }
+      if (action === 'process_productions') {
+        const result = await handleProcessProductions(sql)
+        return res.status(200).json(result)
       }
       const salesGet = await handleSales(sql, {
         method: 'GET',
@@ -1770,6 +1817,10 @@ export default async function handler(req, res) {
       }
       if (action === 'analytics_pull') {
         const result = await handleAnalyticsPull(sql, body)
+        return res.status(200).json(result)
+      }
+      if (action === 'process_productions') {
+        const result = await handleProcessProductions(sql)
         return res.status(200).json(result)
       }
       const salesPost = await handleSales(sql, {
