@@ -1218,6 +1218,75 @@ async function handleSales(sql, { method, action, query, body }) {
       )
       return { handled: true, payload: { success: true, reps: rowsOf(r) } }
     }
+    if (action === 'rep_kpis') {
+      const week = await sql.query(
+        `SELECT COALESCE(SUM(calls_made),0)::int AS calls_made,
+                COALESCE(SUM(emails_sent),0)::int AS emails_sent,
+                COALESCE(SUM(leads_added),0)::int AS leads_added,
+                COALESCE(SUM(demos_booked),0)::int AS demos_booked,
+                COALESCE(SUM(proposals_sent),0)::int AS proposals_sent,
+                COALESCE(SUM(deals_closed),0)::int AS deals_closed,
+                COALESCE(SUM(revenue_generated),0) AS revenue_generated
+           FROM rep_kpis
+          WHERE rep_id = $1 AND date >= CURRENT_DATE - INTERVAL '6 days'`,
+        [query.rep_id],
+      )
+      const today = await sql.query(
+        `SELECT COALESCE(SUM(leads_added),0)::int AS leads_added,
+                COALESCE(SUM(calls_made),0)::int AS calls_made
+           FROM rep_kpis WHERE rep_id = $1 AND date = CURRENT_DATE`,
+        [query.rep_id],
+      )
+      return {
+        handled: true,
+        payload: {
+          success: true,
+          week: firstOf(week) || {},
+          today: firstOf(today) || {},
+        },
+      }
+    }
+    if (action === 'rep_activities') {
+      const r = await sql.query(
+        `SELECT la.*, sl.company_name
+           FROM lead_activities la
+           JOIN sales_leads sl ON la.lead_id = sl.id
+          WHERE la.rep_id = $1
+          ORDER BY la.created_at DESC LIMIT 10`,
+        [query.rep_id],
+      )
+      return { handled: true, payload: { success: true, activities: rowsOf(r) } }
+    }
+    if (action === 'lead_activities') {
+      const r = await sql.query(
+        `SELECT * FROM lead_activities
+          WHERE lead_id = $1
+          ORDER BY created_at DESC`,
+        [query.lead_id],
+      )
+      return { handled: true, payload: { success: true, activities: rowsOf(r) } }
+    }
+    if (action === 'rep_tasks') {
+      const r = await sql.query(
+        `SELECT t.*, sl.company_name AS lead_company
+           FROM rep_tasks t
+           LEFT JOIN sales_leads sl ON t.lead_id = sl.id
+          WHERE t.rep_id = $1 AND ($2::text IS NULL OR t.status = $2)
+          ORDER BY (t.due_date IS NULL), t.due_date ASC, t.created_at DESC`,
+        [query.rep_id, query.status || null],
+      )
+      return { handled: true, payload: { success: true, tasks: rowsOf(r) } }
+    }
+    if (action === 'admin_all_leads') {
+      const r = await sql.query(
+        `SELECT sl.*, sr.name AS rep_name
+           FROM sales_leads sl
+           LEFT JOIN sales_reps sr ON sl.rep_id = sr.id
+          ORDER BY sl.updated_at DESC
+          LIMIT 300`,
+      )
+      return { handled: true, payload: { success: true, leads: rowsOf(r) } }
+    }
     return { handled: false }
   }
 
@@ -1486,6 +1555,135 @@ async function handleSales(sql, { method, action, query, body }) {
       return {
         handled: true,
         payload: { success: !!text, response: text },
+      }
+    }
+    if (action === 'add_task') {
+      const { rep_id, lead_id, title, description, priority, due_date } = body
+      if (!rep_id || !title) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'rep_id and title required' },
+        }
+      }
+      const r = await sql.query(
+        `INSERT INTO rep_tasks
+           (rep_id, lead_id, title, description, priority, due_date)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         RETURNING id`,
+        [
+          rep_id,
+          lead_id || null,
+          title,
+          description || null,
+          priority || 'medium',
+          due_date || null,
+        ],
+      )
+      return {
+        handled: true,
+        payload: { success: true, task_id: firstOf(r)?.id },
+      }
+    }
+    if (action === 'update_task') {
+      const { task_id, status, completed_at } = body
+      await sql.query(
+        `UPDATE rep_tasks
+            SET status = COALESCE($2, status),
+                completed_at = $3
+          WHERE id = $1`,
+        [task_id, status || null, completed_at || null],
+      )
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'delete_task') {
+      const { task_id } = body
+      await sql.query('DELETE FROM rep_tasks WHERE id=$1', [task_id])
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'reassign_lead') {
+      const { lead_id, rep_id } = body
+      await sql.query(
+        `UPDATE sales_leads SET rep_id=$1, updated_at=now() WHERE id=$2`,
+        [rep_id, lead_id],
+      )
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'notify_admin') {
+      const { title, message, link } = body
+      const admins = rowsOf(
+        await sql.query("SELECT id FROM sales_reps WHERE role='admin'"),
+      )
+      for (const a of admins) {
+        await sql.query(
+          `INSERT INTO sales_notifications (recipient_id, type, title, message, link)
+           VALUES ($1,'request',$2,$3,$4)`,
+          [a.id, title || 'Rep request', message || null, link || '/sales'],
+        )
+      }
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'discover_leads') {
+      const { query: q, industry, location, mode, business } = body
+      if (!process.env.ANTHROPIC_API_KEY) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'AI not configured' },
+        }
+      }
+      const isRecommend = mode === 'recommendation'
+      const system = isRecommend
+        ? 'You are a sales advisor for Lithos Labs, a CRM and AI marketing agency in Aruba. Services: CRM Setup, AI Marketing System, Website Development, Lead Generation System, Full Business Operating System, Brand Identity, Monthly Retainers. Given a prospect business description, recommend the single best-fit service. Return ONLY valid JSON, no prose: {"recommended_service": string, "why": string, "pitch": string}'
+        : 'You are a sales research assistant for Lithos Labs, a CRM and AI marketing agency in Aruba. Generate realistic potential client profiles for the query provided. Return ONLY valid JSON array, no prose: [{"company_name": string, "industry": string, "location": string, "estimated_size": string, "potential_need": string, "contact_title": string, "estimated_value": number, "why_good_fit": string, "outreach_angle": string}]'
+      const userContent = isRecommend
+        ? `Prospect business: ${business || q || ''}`
+        : `Query: ${q || ''}. Industry filter: ${
+            industry || 'any'
+          }. Location: ${location || 'Aruba'}. Generate 5-8 profiles.`
+      const aRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          system,
+          messages: [{ role: 'user', content: userContent }],
+        }),
+      })
+      const aData = await aRes.json()
+      const raw = aData?.content?.[0]?.text || ''
+      let parsed = null
+      try {
+        const start = raw.search(/[[{]/)
+        const end = Math.max(raw.lastIndexOf(']'), raw.lastIndexOf('}'))
+        parsed =
+          start !== -1 && end !== -1
+            ? JSON.parse(raw.slice(start, end + 1))
+            : null
+      } catch {
+        parsed = null
+      }
+      if (!parsed) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'AI returned no usable result' },
+        }
+      }
+      if (isRecommend) {
+        return {
+          handled: true,
+          payload: { success: true, recommendation: parsed },
+        }
+      }
+      return {
+        handled: true,
+        payload: {
+          success: true,
+          results: Array.isArray(parsed) ? parsed : [],
+        },
       }
     }
     return { handled: false }

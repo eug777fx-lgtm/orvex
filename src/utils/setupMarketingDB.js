@@ -294,6 +294,21 @@ export async function setupMarketingDB() {
     )
   `)
 
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS rep_tasks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      rep_id UUID REFERENCES sales_reps(id),
+      lead_id UUID REFERENCES sales_leads(id),
+      title TEXT NOT NULL,
+      description TEXT,
+      priority TEXT DEFAULT 'medium',
+      status TEXT DEFAULT 'todo',
+      due_date DATE,
+      completed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
   // services_catalog has no natural unique key in the spec; add one so the
   // seed below is idempotent across the every-startup setup run.
   await db.query(
