@@ -4888,8 +4888,10 @@ function ContentHub({
     }
   }, [brand?.id, packagesVersion])
 
-  // Poll Remotion render status every 8s for any package whose status is
-  // 'rendering'. On completion we patch the package in state directly
+  // Poll Remotion render status every 10s for any package whose status is
+  // 'rendering'. Keep polling for up to 5 minutes (maxAttempts=30 × 10s);
+  // only stop when every render is done/errored or the ceiling is hit.
+  // On completion we patch the package in state directly
   // (visual_url + status='ready') and flash a green border for 1s.
   useEffect(() => {
     const rendering = (Array.isArray(packages) ? packages : []).filter(
@@ -4897,15 +4899,27 @@ function ContentHub({
     )
     if (rendering.length === 0) return
     let cancelled = false
+    let attempts = 0
+    const maxAttempts = 30 // 30 attempts × 10s = 300s (5 min) max
+    let intervalId = null
+    const settled = new Set()
+
+    function stopPolling() {
+      if (intervalId !== null) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
 
     async function pollOnce() {
+      attempts += 1
       for (const p of rendering) {
+        if (settled.has(p.id)) continue
         try {
           const params = new URLSearchParams({
             action: 'render_status',
             render_id: p.render_id,
             bucket: p.render_bucket || '',
-            package_id: p.id,
             brand_id: brand?.id || '',
           })
           const res = await fetch(`/api/workflow?${params.toString()}`)
@@ -4913,6 +4927,7 @@ function ContentHub({
           const data = await res.json()
           if (cancelled) return
           if (data.done) {
+            settled.add(p.id)
             setPackages((prev) =>
               prev.map((x) =>
                 x.id === p.id
@@ -4936,6 +4951,7 @@ function ContentHub({
               })
             }, 1000)
           } else if (data.error) {
+            settled.add(p.id)
             setPackages((prev) =>
               prev.map((x) =>
                 x.id === p.id ? { ...x, status: 'needs_visual' } : x,
@@ -4949,13 +4965,18 @@ function ContentHub({
           /* transient — try again next tick */
         }
       }
+      // Stop only when every render finished/errored, or the 5-minute
+      // (maxAttempts) ceiling is reached.
+      if (settled.size >= rendering.length || attempts >= maxAttempts) {
+        stopPolling()
+      }
     }
 
     pollOnce()
-    const id = setInterval(pollOnce, 8000)
+    intervalId = setInterval(pollOnce, 10000)
     return () => {
       cancelled = true
-      clearInterval(id)
+      stopPolling()
     }
   }, [packages, brand?.id])
 
