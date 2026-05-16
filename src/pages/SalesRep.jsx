@@ -3670,18 +3670,28 @@ function Notifications({ rep }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
-  const load = useCallback(() => {
-    if (!rep?.id) return
-    api('sales_notifications', { params: { rep_id: rep.id } }).then(
-      (d) => d.success && setList(d.notifications || []),
-    )
-  }, [rep?.id])
+  const repId = rep?.id
+
+  async function fetchNotifs() {
+    if (!repId) return
+    const d = await api('sales_notifications', { params: { rep_id: repId } })
+    if (d.success) setList(d.notifications || [])
+  }
 
   useEffect(() => {
-    load()
-    const id = setInterval(load, 30000)
-    return () => clearInterval(id)
-  }, [load])
+    if (!repId) return
+    let alive = true
+    const tick = () =>
+      api('sales_notifications', { params: { rep_id: repId } }).then(
+        (d) => alive && d.success && setList(d.notifications || []),
+      )
+    tick()
+    const id = setInterval(tick, 30000)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [repId])
 
   useEffect(() => {
     function onDoc(e) {
@@ -3696,9 +3706,9 @@ function Notifications({ rep }) {
   async function markAll() {
     await api('mark_notifications_read', {
       method: 'POST',
-      body: { rep_id: rep.id },
+      body: { rep_id: repId },
     })
-    load()
+    fetchNotifs()
   }
 
   return (
@@ -4196,17 +4206,22 @@ export default function SalesRep() {
     setTimeout(() => setToastMsg(''), 2600)
   }, [])
 
-  const reloadLeads = useCallback(async () => {
+  async function reloadLeads() {
     if (!rep?.id) return
     const d = await api('rep_leads', { params: { rep_id: rep.id } })
     if (d.success) setLeads(d.leads || [])
-  }, [rep?.id])
+  }
 
   useEffect(() => {
-    if (!rep?.id) return
-    reloadLeads()
-    api('services_catalog').then((d) => d.success && setServices(d.services || []))
-  }, [rep?.id, reloadLeads])
+    const rid = rep?.id
+    if (!rid) return
+    api('rep_leads', { params: { rep_id: rid } }).then(
+      (d) => d.success && setLeads(d.leads || []),
+    )
+    api('services_catalog').then(
+      (d) => d.success && setServices(d.services || []),
+    )
+  }, [rep?.id])
 
   function logout() {
     localStorage.removeItem(AUTH_KEY)
