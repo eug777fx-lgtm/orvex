@@ -15,6 +15,58 @@ import { startRemotionRender } from './_render-helper.js'
 // Creatomate poll) — give the function the maximum serverless runtime.
 export const config = { maxDuration: 300 }
 
+// Robust JSON extraction from an LLM response: strips markdown fences, tries
+// a direct parse, then scans for the first balanced {...} object, then the
+// first balanced [...] array. Returns the parsed value or null.
+function extractJSON(text) {
+  // Remove markdown code fences
+  let cleaned = String(text || '')
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim()
+
+  // Try direct parse first
+  try {
+    return JSON.parse(cleaned)
+  } catch (e) {}
+
+  // Try to find JSON object with balanced braces
+  let depth = 0
+  let start = -1
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '{') {
+      if (depth === 0) start = i
+      depth++
+    } else if (cleaned[i] === '}') {
+      depth--
+      if (depth === 0 && start !== -1) {
+        try {
+          return JSON.parse(cleaned.slice(start, i + 1))
+        } catch (e) {}
+      }
+    }
+  }
+
+  // Try to find array
+  start = -1
+  depth = 0
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '[') {
+      if (depth === 0) start = i
+      depth++
+    } else if (cleaned[i] === ']') {
+      depth--
+      if (depth === 0 && start !== -1) {
+        try {
+          return JSON.parse(cleaned.slice(start, i + 1))
+        } catch (e) {}
+      }
+    }
+  }
+
+  return null
+}
+
 function validateBrandContext(brand /*, agentType */) {
   const required = ['id', 'name']
   for (const field of required) {
@@ -132,7 +184,6 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('agents handler error:', error.message)
-    console.log('Writer error:', error.message, error.stack)
     const status = error.status || 500
     return res.status(status).json({ error: error.message })
   }
@@ -387,52 +438,25 @@ Output ONLY valid JSON:
   if (agent_type === 'strategy') {
     systemPrompt = `You are a content strategy agent for ${brand.name}. Today is ${todayStr}. HIGH PRIORITY CONTENT GAPS (topics with proven demand — prioritize these): ${contentGaps || 'No content gaps added yet — add from TikTok Creator Insights'} BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory}${visualContext} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
   } else if (agent_type === 'writer') {
-    systemPrompt = `You are a professional copywriter and short-form video director for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers}${visualContext}
+    systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers}${visualContext}
 
-Produce 3 complete post packages — mix of instagram and facebook, at least 1 must be a full multi-scene video. Output ONLY valid JSON:
+Generate exactly 3 post packages — a mix of instagram and facebook, a mix of image and video. Output ONLY valid JSON. Keep it small and flat — no nested objects:
 {
   "packages": [
     {
-      "platform": "instagram" | "facebook",
-      "hook": "scroll-stopping line",
-      "caption": "full caption that tells the story",
-      "cta": "clear call to action",
-      "hashtags": "5 space-separated hashtags",
-      "visual_brief": "detailed description for Higgsfield or Remotion",
-      "visual_type": "image" | "video" | "carousel",
-      "remotion_composition": "HookOpener" | "QuoteCard" | "TradeInsight" | "BrandPromo" | "ServiceAd" | null,
-      "video": {
-        "title": "descriptive title of the video",
-        "duration": 30,
-        "platform": "instagram",
-        "hook": "the opening line that stops the scroll",
-        "scenes": [
-          {
-            "scene_number": 1,
-            "start_time": 0,
-            "end_time": 5,
-            "duration": 5,
-            "purpose": "hook",
-            "visual_prompt": "Cinematic close-up. Dramatic lighting. Dark moody atmosphere. Camera slowly zooms in. Professional grade footage.",
-            "text_overlay": "bold text that appears on screen",
-            "voiceover": "exact words spoken in this scene",
-            "sound_direction": "Tense ambient electronic music. Low frequency bass.",
-            "remotion_composition": "HookOpener",
-            "remotion_props": { "headline": "text for motion graphic", "subtext": "subtitle text", "primaryColor": "#c084fc" },
-            "transition_out": "fade"
-          }
-        ],
-        "music_direction": "Dark cinematic electronic. Builds through problem, resolves at solution.",
-        "color_grade": "dark cinematic",
-        "caption": "full instagram caption text here",
-        "cta": "call to action",
-        "hashtags": "#tag1 #tag2"
-      }
+      "platform": "instagram",
+      "hook": "short hook text max 100 chars",
+      "caption": "full caption text",
+      "cta": "call to action",
+      "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5",
+      "visual_brief": "one sentence description of what the visual should show",
+      "visual_type": "video",
+      "remotion_composition": "HookOpener"
     }
   ]
 }
 
-RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it or set null otherwise). transition_out is one of "fade" | "cut" | "slide". Each video has 3 to 5 scenes. Each scene is 3-10 seconds. Total video duration 15-60 seconds. scene start_time/end_time must be sequential and continuous (scene N end_time == scene N+1 start_time).`
+RULES: platform is "instagram" or "facebook". visual_type is "image" or "video". remotion_composition is one of "HookOpener" "QuoteCard" "TradeInsight" "BrandPromo" "ServiceAd". Output ONLY the JSON object — no markdown, no prose, no nested scene breakdown. The Video Producer handles scene breakdown separately. Exactly 3 packages.`
   } else if (agent_type === 'analytics') {
     systemPrompt = `You are an analytics agent for ${brand.name}. BRAND VOICE: ${voiceRules} TOP PERFORMERS: ${topPerformers}${visualContext} Output ONLY valid JSON: { top_performer: string, key_insight: string, recommendation: string, memory_update: string, avoid: string }`
   } else if (agent_type === 'video_director') {
@@ -465,7 +489,8 @@ RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it 
   const isStrategy = agent_type === 'strategy'
   const requestBody = {
     model: 'claude-sonnet-4-20250514',
-    max_tokens: isStrategy ? 3000 : 2000,
+    max_tokens:
+      agent_type === 'writer' ? 4000 : isStrategy ? 3000 : 2000,
     system: systemPrompt,
     messages: isStrategy
       ? [
@@ -513,30 +538,44 @@ RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it 
   const tokensUsed =
     (apiData?.usage?.input_tokens || 0) + (apiData?.usage?.output_tokens || 0)
 
-  if (agent_type === 'writer') {
-    console.log('Writer raw output:', String(rawText).substring(0, 500))
-  }
+  let parsed = extractJSON(rawText)
+  if (!parsed) parsed = { raw_output: rawText }
 
-  let parsed
-  try {
-    const match = rawText.match(/\{[\s\S]*\}/)
-    if (!match) {
-      if (agent_type === 'writer')
-        console.log('Writer JSON parse skip: no { } match in output')
-      parsed = { raw_output: rawText }
-    } else {
-      try {
-        parsed = JSON.parse(match[0])
-      } catch (perr) {
-        if (agent_type === 'writer')
-          console.log('Writer JSON parse failed:', perr.message)
-        parsed = { raw_output: rawText }
+  // Fallback recovery: if the writer produced no usable packages array,
+  // pull "hook"/"caption" values straight out of the raw text and build
+  // minimal packages so a run is never silently lost.
+  if (
+    agent_type === 'writer' &&
+    (!parsed ||
+      !Array.isArray(parsed.packages) ||
+      parsed.packages.length === 0)
+  ) {
+    const grab = (key) =>
+      [
+        ...String(rawText).matchAll(
+          new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`, 'g'),
+        ),
+      ].map((m) => m[1].replace(/\\"/g, '"').replace(/\\n/g, ' ').trim())
+    const hooks = grab('hook')
+    const captions = grab('caption')
+    if (hooks.length || captions.length) {
+      const n = Math.max(hooks.length, captions.length)
+      const recovered = []
+      for (let i = 0; i < n; i++) {
+        recovered.push({
+          platform: 'instagram',
+          hook: hooks[i] || '',
+          caption: captions[i] || '',
+          cta: '',
+          hashtags: '',
+          visual_brief: '',
+          visual_type: 'image',
+          remotion_composition: 'HookOpener',
+        })
       }
+      parsed = { packages: recovered }
+      console.log('Writer fallback recovered packages:', recovered.length)
     }
-  } catch (perr) {
-    if (agent_type === 'writer')
-      console.log('Writer JSON match failed:', perr.message)
-    parsed = { raw_output: rawText }
   }
 
   await sql.query(
@@ -554,7 +593,6 @@ RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it 
   let itemsGenerated = 0
   if (agent_type === 'writer' && parsed && typeof parsed === 'object') {
     const packages = Array.isArray(parsed.packages) ? parsed.packages : []
-    console.log('Writer parsed packages:', packages?.length)
     for (const pkg of packages) {
       if (!pkg) continue
       const hookText = String(pkg.hook || '')
@@ -623,8 +661,7 @@ RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it 
       // No auto-render. Packages are created with status='needs_visual';
       // the user triggers a render manually via the Generate Video button
       // (POST /api/render) — reliable and avoids writer-run timeouts.
-      const packageId = (pkgInsert?.rows ?? pkgInsert)?.[0]?.id
-      console.log('Package inserted:', packageId)
+      void (pkgInsert?.rows ?? pkgInsert)?.[0]?.id
       itemsGenerated += 1
     }
   }
