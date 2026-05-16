@@ -170,21 +170,18 @@ export async function setupMarketingDB() {
   // created_at column actually exists — legacy post_packages tables may
   // predate it, and a missing column would otherwise abort setup.
   try {
-    const cols = await db.query(
-      `SELECT column_name FROM information_schema.columns
-        WHERE table_name='post_packages' AND column_name='created_at'`,
+    const colCheck = await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name='post_packages' AND column_name='created_at'",
     )
-    const hasCreatedAt =
-      (Array.isArray(cols) && cols.length > 0) ||
-      (cols && cols.rows && cols.rows.length > 0)
-    if (hasCreatedAt) {
-      await db.query(
-        `UPDATE post_packages
-            SET status='needs_visual'
-          WHERE status='rendering'
-            AND render_id IS NULL
-            AND created_at < now() - interval '10 minutes'`,
-      )
+    const colExists = (colCheck.rows || colCheck).length > 0
+    if (colExists) {
+      try {
+        await db.query(
+          "UPDATE post_packages SET status='needs_visual' WHERE status='rendering' AND render_id IS NULL AND created_at < now() - interval '10 minutes'",
+        )
+      } catch (e) {
+        console.log('Cleanup skip:', e.message)
+      }
     }
   } catch (e) {
     console.log('Migration skip:', e.message)

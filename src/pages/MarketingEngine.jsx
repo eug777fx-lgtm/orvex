@@ -406,7 +406,7 @@ export default function MarketingEngine() {
         agentRunsRows,
       ] = await Promise.all([
         db.query(
-          "SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND status IN ('ready','needs_visual','rendering') AND published_at IS NULL",
+          "SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND status IN ('needs_visual','ready','rendering','producing') AND published_at IS NULL",
           [selectedBrand.id],
         ),
         db.query(
@@ -422,7 +422,7 @@ export default function MarketingEngine() {
           [selectedBrand.id],
         ),
         db.query(
-          "SELECT COUNT(*) AS count FROM content WHERE brand_id=$1 AND created_at::date = CURRENT_DATE",
+          "SELECT COUNT(*) AS count FROM post_packages WHERE brand_id=$1 AND created_at::date = CURRENT_DATE",
           [selectedBrand.id],
         ),
         db.query(
@@ -5290,7 +5290,10 @@ function ContentHub({
                   b.name AS brand_name,
                   b.color AS brand_color,
                   b.primary_color,
-                  b.logo_url
+                  b.logo_url,
+                  CASE WHEN pp.script IS NOT NULL THEN
+                    CASE WHEN pp.script::text LIKE '{%' THEN (pp.script::json->>'visual_brief') ELSE NULL END
+                  END AS visual_brief_parsed
              FROM post_packages pp
              JOIN brands b ON pp.brand_id = b.id
             WHERE pp.brand_id = $1
@@ -5342,6 +5345,7 @@ function ContentHub({
             action: 'render_status',
             render_id: p.render_id,
             bucket: p.render_bucket || '',
+            package_id: p.id,
             brand_id: brand?.id || '',
           })
           const res = await fetch(`/api/workflow?${params.toString()}`)
@@ -5564,8 +5568,9 @@ function ContentHub({
           body: JSON.stringify({
             composition_id: composition,
             props: {
-              headline: pkg.hook_text || '',
-              subtext: pkg.cta_text || '',
+              headline:
+                pkg.hook_text?.slice(0, 60) || 'Discipline is built quietly.',
+              subtext: pkg.cta_text?.slice(0, 80) || '',
               brandName: brand.name,
               primaryColor: brand.primary_color || '#c084fc',
               secondaryColor: brand.secondary_color || '#ffffff',
@@ -5596,7 +5601,7 @@ function ContentHub({
           body: JSON.stringify({
             brand_id: brand.id,
             type: 'text_to_image',
-            prompt: pkg.visual_brief || pkg.hook_text || '',
+            prompt: pkg.visual_brief || pkg.visual_brief_parsed || pkg.hook_text || '',
           }),
         })
         const data = await r.json()
@@ -6523,7 +6528,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                 textAlign: 'center',
               }}
             >
-              {pkg.visual_brief || 'No visual yet'}
+              {pkg.visual_brief || pkg.visual_brief_parsed || 'No visual yet'}
             </div>
           )}
           <span
@@ -6735,7 +6740,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
               ) : (
                 <ImageIcon size={20} style={{ marginBottom: 6 }} />
               )}
-              <div>{pkg.visual_brief || 'No visual yet'}</div>
+              <div>{pkg.visual_brief || pkg.visual_brief_parsed || 'No visual yet'}</div>
             </div>
           )}
           {isRendering && <RenderProgressBar pct={renderPct} />}
