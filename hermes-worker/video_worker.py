@@ -289,7 +289,7 @@ def process_package(package):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "UPDATE post_packages SET visual_url=%s, visual_type='video', status='ready', scenes_count=%s, video_duration=%s, updated_at=now() WHERE id=%s",
+        "UPDATE post_packages SET visual_url=%s, visual_type='video', status='ready', scenes_count=%s, video_duration=%s WHERE id=%s",
         (final_url, len(scenes_data), int(total_duration), package_id)
     )
     conn.commit()
@@ -303,7 +303,7 @@ def update_package_status(package_id, status):
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("UPDATE post_packages SET status=%s, updated_at=now() WHERE id=%s", (status, package_id))
+        cur.execute("UPDATE post_packages SET status=%s WHERE id=%s", (status, package_id))
         conn.commit()
         cur.close()
         conn.close()
@@ -323,7 +323,7 @@ def main():
             conn = get_db()
             cur = conn.cursor()
             cur.execute(
-                "SELECT id, brand_id, script FROM post_packages WHERE status='producing' ORDER BY updated_at ASC LIMIT 1"
+                "SELECT id, brand_id, script FROM post_packages WHERE status='producing' ORDER BY created_at ASC LIMIT 1"
             )
             package = cur.fetchone()
             cur.close()

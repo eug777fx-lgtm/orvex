@@ -438,25 +438,24 @@ Output ONLY valid JSON:
   if (agent_type === 'strategy') {
     systemPrompt = `You are a content strategy agent for ${brand.name}. Today is ${todayStr}. HIGH PRIORITY CONTENT GAPS (topics with proven demand — prioritize these): ${contentGaps || 'No content gaps added yet — add from TikTok Creator Insights'} BRAND VOICE: ${voiceRules} TARGET AUDIENCE: ${audience} TOP PERFORMING CONTENT: ${topPerformers} CAMPAIGN HISTORY: ${campaignHistory}${visualContext} Create a 7-day content brief. Output ONLY valid JSON: { brief: string, angles: array of 3 strings, daily_topics: array of 7 strings, recommended_formats: array of 3 strings, key_message: string }`
   } else if (agent_type === 'writer') {
-    systemPrompt = `You are a professional copywriter for ${brand.name}. BRAND VOICE — follow exactly: ${voiceRules} TARGET AUDIENCE: ${audience} BEST PERFORMING CONTENT: ${topPerformers}${visualContext}
+    const writerSystemPrompt = `You are a content writer for ${brand.name}.
+Voice: ${(voiceRules || '').substring(0, 200)}
+Audience: ${(audience || '').substring(0, 150)}
 
-Generate exactly 3 post packages — a mix of instagram and facebook, a mix of image and video. Output ONLY valid JSON. Keep it small and flat — no nested objects:
-{
-  "packages": [
-    {
-      "platform": "instagram",
-      "hook": "short hook text max 100 chars",
-      "caption": "full caption text",
-      "cta": "call to action",
-      "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5",
-      "visual_brief": "one sentence description of what the visual should show",
-      "visual_type": "video",
-      "remotion_composition": "HookOpener"
-    }
-  ]
-}
-
-RULES: platform is "instagram" or "facebook". visual_type is "image" or "video". remotion_composition is one of "HookOpener" "QuoteCard" "TradeInsight" "BrandPromo" "ServiceAd". Output ONLY the JSON object — no markdown, no prose, no nested scene breakdown. The Video Producer handles scene breakdown separately. Exactly 3 packages.`
+Generate exactly 3 post packages as a JSON array. Return ONLY the JSON array, no other text:
+[
+  {
+    "platform": "instagram",
+    "hook": "hook text under 100 chars",
+    "caption": "caption 200-300 chars",
+    "cta": "call to action",
+    "hashtags": "#tag1 #tag2 #tag3",
+    "visual_brief": "one sentence visual description",
+    "visual_type": "video",
+    "remotion_composition": "HookOpener"
+  }
+]`
+    systemPrompt = writerSystemPrompt
   } else if (agent_type === 'analytics') {
     systemPrompt = `You are an analytics agent for ${brand.name}. BRAND VOICE: ${voiceRules} TOP PERFORMERS: ${topPerformers}${visualContext} Output ONLY valid JSON: { top_performer: string, key_insight: string, recommendation: string, memory_update: string, avoid: string }`
   } else if (agent_type === 'video_director') {
@@ -490,7 +489,7 @@ RULES: platform is "instagram" or "facebook". visual_type is "image" or "video".
   const requestBody = {
     model: 'claude-sonnet-4-20250514',
     max_tokens:
-      agent_type === 'writer' ? 4000 : isStrategy ? 3000 : 2000,
+      agent_type === 'writer' ? 800 : isStrategy ? 3000 : 2000,
     system: systemPrompt,
     messages: isStrategy
       ? [
@@ -507,25 +506,42 @@ RULES: platform is "instagram" or "facebook". visual_type is "image" or "video".
     ]
   }
 
-  const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify(requestBody),
-  })
+  // Up to 2 attempts: on a rate_limit_error, wait 10s and retry once
+  // (exponential backoff base) before giving up.
+  let apiData
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const anthropicRes = await fetch(
+      'https://api.anthropic.com/v1/messages',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(requestBody),
+      },
+    )
 
-  if (!anthropicRes.ok) {
+    if (anthropicRes.ok) {
+      apiData = await anthropicRes.json()
+      break
+    }
+
     const errBody = await anthropicRes.text()
     console.error('Anthropic error:', errBody)
+    if (
+      attempt === 0 &&
+      (anthropicRes.status === 429 || /rate.?limit/i.test(errBody))
+    ) {
+      console.log('Rate limited — waiting 10s then retrying once')
+      await new Promise((r) => setTimeout(r, 10000))
+      continue
+    }
     const err = new Error('anthropic_call_failed: ' + errBody)
     err.status = 502
     throw err
   }
-
-  const apiData = await anthropicRes.json()
   // With web search the response is a mix of text, server_tool_use and
   // web_search_tool_result blocks — join every text block.
   const rawText = Array.isArray(apiData?.content)
@@ -540,6 +556,13 @@ RULES: platform is "instagram" or "facebook". visual_type is "image" or "video".
 
   let parsed = extractJSON(rawText)
   if (!parsed) parsed = { raw_output: rawText }
+
+  // The writer prompt now returns a bare JSON array; the rest of the
+  // pipeline (fallback recovery, item generation) reads parsed.packages,
+  // so wrap a top-level array back into { packages: [...] }.
+  if (agent_type === 'writer' && Array.isArray(parsed)) {
+    parsed = { packages: parsed }
+  }
 
   // Fallback recovery: if the writer produced no usable packages array,
   // pull "hook"/"caption" values straight out of the raw text and build
