@@ -9,7 +9,7 @@
 
 import { generateVideo } from './video.js'
 import { handleEditVideo } from './workflow.js'
-import { startRemotionRender } from './render.js'
+import { startRemotionRender } from './_render-helper.js'
 
 function validateBrandContext(brand /*, agentType */) {
   const required = ['id', 'name']
@@ -516,51 +516,49 @@ Output ONLY valid JSON:
       const packageId = (pkgInsert?.rows ?? pkgInsert)?.[0]?.id
       itemsGenerated += 1
 
-      // Auto-render a Remotion video for this package. Best-effort: if the
-      // render endpoint times out or fails, the package stays 'needs_visual'
-      // and the UI offers a manual generate / "post without visual" path.
-      const renderComposition = composition || 'HookOpener'
-      const remotionProps = {
-        headline: hookText?.slice(0, 60) || 'Discipline is built quietly.',
-        subtext: ctaText || 'Start journaling your trades.',
-        brandName: brand.name,
-        primaryColor: brand.primary_color || '#c084fc',
-        secondaryColor: brand.secondary_color || '#ffffff',
-        logoUrl: brand.logo_url || null,
-      }
+      // Auto-render a Remotion video for this package by invoking Lambda
+      // directly (no fragile intra-deployment HTTP round-trip). If Remotion
+      // isn't configured or the kickoff fails the package stays
+      // 'needs_visual' and the UI offers manual generate / post-without-visual.
       if (packageId) {
-        try {
-          const base = process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : 'http://localhost:3000'
-          const renderResponse = await fetch(`${base}/api/render`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              composition_id: renderComposition,
-              props: remotionProps,
-              brand_id: brand.id,
-            }),
-          })
-          const renderResult = await renderResponse.json()
-          // Async render: store renderId + bucket and flip the package to
-          // 'rendering' so the UI polls /api/workflow?action=render_status
-          // and backfills visual_url when the Lambda render finishes.
-          if (renderResult.renderId) {
-            await sql.query(
-              'UPDATE post_packages SET render_id=$1, render_bucket=$2, status=$3 WHERE id=$4',
-              [
-                renderResult.renderId,
-                renderResult.bucketName || null,
-                'rendering',
-                packageId,
-              ],
-            )
-          }
-        } catch (renderErr) {
+        const renderComposition = composition || 'HookOpener'
+        const remotionProps = {
+          headline: hookText?.slice(0, 60) || 'Discipline is built quietly.',
+          subtext: ctaText?.slice(0, 80) || 'Start journaling your trades.',
+          brandName: brand.name,
+          primaryColor: brand.primary_color || '#c084fc',
+          secondaryColor: brand.secondary_color || '#ffffff',
+          logoUrl: brand.logo_url || null,
+        }
+
+        const renderResult = await startRemotionRender({
+          compositionId: renderComposition,
+          props: remotionProps,
+          brandId: brand.id,
+          sql,
+        })
+
+        if (renderResult?.renderId) {
+          await sql.query(
+            'UPDATE post_packages SET render_id=$1, render_bucket=$2, status=$3 WHERE id=$4',
+            [
+              renderResult.renderId,
+              renderResult.bucketName,
+              'rendering',
+              packageId,
+            ],
+          )
           console.log(
-            'Auto-render failed, package stays needs_visual:',
-            renderErr.message,
+            'Package',
+            packageId,
+            'render started:',
+            renderResult.renderId,
+          )
+        } else {
+          console.log(
+            'Package',
+            packageId,
+            'render skipped — staying needs_visual',
           )
         }
       }
@@ -609,26 +607,26 @@ Output ONLY valid JSON:
         // later via /api/render.
         const backgroundVideoUrl = videoResult?.success ? videoResult.url : null
         const composition_id = parsed.remotion_composition || 'HookOpener'
-        const remotionProps = parsed.remotion_props || {
+        const baseProps = parsed.remotion_props || {
           headline: parsed.video_prompt?.slice(0, 80) || '',
           subtext: parsed.mood || '',
+        }
+        // The shared helper passes props straight through as inputProps, so
+        // bake brand identity + Higgsfield footage into props here.
+        const remotionProps = {
+          ...baseProps,
           brandName: brand.name,
-          primaryColor: brand.primary_color || '#ffffff',
-          secondaryColor: brand.secondary_color || '#0B0B0D',
           logoUrl: brand.logo_url || null,
+          primaryColor: brand.primary_color || '#ffffff',
+          secondaryColor: brand.secondary_color || '#000000',
+          backgroundVideoUrl,
         }
         try {
           const renderKick = await startRemotionRender({
-            composition_id,
+            compositionId: composition_id,
             props: remotionProps,
-            backgroundVideoUrl,
-            brand_id,
-            brandData: {
-              brandName: brand.name,
-              logoUrl: brand.logo_url || null,
-              primaryColor: brand.primary_color || '#ffffff',
-              secondaryColor: brand.secondary_color || '#000000',
-            },
+            brandId: brand_id,
+            sql,
           })
           if (renderKick?.renderId) {
             await sql.query(

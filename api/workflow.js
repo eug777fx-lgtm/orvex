@@ -806,15 +806,21 @@ async function handlePipelineAdvance(sql, body) {
 // Polls a Remotion Lambda render and backfills the specific package
 // (matched by package_id) when it finishes or fails.
 async function handleRenderStatus(sql, { render_id, bucket, package_id }) {
-  if (!render_id || !bucket || !package_id) {
-    const err = new Error('render_id, bucket and package_id required')
+  if (!render_id || !package_id) {
+    const err = new Error('render_id and package_id required')
     err.status = 400
     throw err
   }
+  // Fall back to the known Remotion Lambda bucket when the caller didn't
+  // persist one (older packages, or render_bucket was null).
+  const bucketName =
+    bucket && bucket !== 'null'
+      ? bucket
+      : process.env.REMOTION_BUCKET_NAME || 'remotionlambda-useast1-bqldmrtdxy'
   const { getRenderProgress } = await import('@remotion/lambda-client')
   const progress = await getRenderProgress({
     renderId: render_id,
-    bucketName: bucket,
+    bucketName,
     functionName: process.env.REMOTION_FUNCTION_NAME,
     region: process.env.REMOTION_AWS_REGION || 'us-east-1',
   })
@@ -831,7 +837,7 @@ async function handleRenderStatus(sql, { render_id, bucket, package_id }) {
       [
         JSON.stringify({
           renderId: render_id,
-          bucketName: bucket,
+          bucketName,
           outputUrl: progress.outputFile,
         }),
         `%${render_id}%`,

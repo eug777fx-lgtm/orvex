@@ -1,42 +1,4 @@
-import { renderMediaOnLambda } from '@remotion/lambda-client'
-
-// Fire-and-forget render kickoff used by agents (e.g. video_director) that
-// can't afford to block on the full Lambda render time. Returns the renderId
-// immediately so callers can persist it and poll via getRenderProgress later.
-// Returns null when REMOTION_FUNCTION_NAME / REMOTION_SERVE_URL aren't set,
-// so callers can degrade gracefully.
-export async function startRemotionRender({
-  composition_id,
-  props,
-  backgroundVideoUrl,
-  brand_id,
-  brandData,
-}) {
-  if (!process.env.REMOTION_FUNCTION_NAME || !process.env.REMOTION_SERVE_URL) {
-    return null
-  }
-  const finalProps = {
-    ...(props || {}),
-    ...(brandData || {}),
-    backgroundVideoUrl:
-      backgroundVideoUrl ?? props?.backgroundVideoUrl ?? null,
-  }
-  const { renderId, bucketName } = await renderMediaOnLambda({
-    region: process.env.REMOTION_AWS_REGION || 'us-east-1',
-    functionName: process.env.REMOTION_FUNCTION_NAME,
-    serveUrl: process.env.REMOTION_SERVE_URL,
-    composition: composition_id,
-    inputProps: finalProps,
-    codec: 'h264',
-    imageFormat: 'jpeg',
-    maxRetries: 1,
-    privacy: 'public',
-    framesPerLambda: 40,
-    concurrencyPerLambda: 1,
-    outName: `${brand_id || 'brand'}-${composition_id}-${Date.now()}.mp4`,
-  })
-  return { renderId, bucketName }
-}
+import { startRemotionRender } from './_render-helper.js'
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -82,21 +44,22 @@ export default async function handler(req, res) {
         backgroundVideoUrl ?? props?.backgroundVideoUrl ?? null,
     }
 
-    // Start Lambda render
-    const { renderId, bucketName } = await renderMediaOnLambda({
-      region: process.env.REMOTION_AWS_REGION || 'us-east-1',
-      functionName: process.env.REMOTION_FUNCTION_NAME,
-      serveUrl: process.env.REMOTION_SERVE_URL,
-      composition: composition_id,
-      inputProps: finalProps,
-      codec: 'h264',
-      imageFormat: 'jpeg',
-      maxRetries: 1,
-      privacy: 'public',
-      framesPerLambda: 40,
-      concurrencyPerLambda: 1,
-      outName: `${brand_id || 'brand'}-${composition_id}-${Date.now()}.mp4`,
+    // Start Lambda render via the shared helper.
+    const started = await startRemotionRender({
+      compositionId: composition_id,
+      props: finalProps,
+      brandId: brand_id,
+      sql,
     })
+    if (!started?.renderId) {
+      return res.status(200).json({
+        success: false,
+        status: 'skipped',
+        message:
+          'Render not started — Remotion not configured or kickoff failed',
+      })
+    }
+    const { renderId, bucketName } = started
 
     // Fire-and-forget: log the render and return immediately. The Lambda
     // render keeps running on AWS (up to 300s). Completion is backfilled by

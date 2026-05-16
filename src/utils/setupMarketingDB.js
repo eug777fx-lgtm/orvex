@@ -123,6 +123,16 @@ export async function setupMarketingDB() {
     `ALTER TABLE post_packages ADD COLUMN IF NOT EXISTS render_bucket TEXT`,
   )
 
+  // Reset packages stuck in 'rendering' with no render_id (the kickoff
+  // failed before persisting an id). Narrow + idempotent — safe every boot.
+  await db.query(
+    `UPDATE post_packages
+        SET status='needs_visual'
+      WHERE status='rendering'
+        AND render_id IS NULL
+        AND created_at < now() - interval '10 minutes'`,
+  )
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS content_pipeline (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
