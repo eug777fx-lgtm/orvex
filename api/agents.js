@@ -132,6 +132,7 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('agents handler error:', error.message)
+    console.log('Writer error:', error.message, error.stack)
     const status = error.status || 500
     return res.status(status).json({ error: error.message })
   }
@@ -512,19 +513,29 @@ RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it 
   const tokensUsed =
     (apiData?.usage?.input_tokens || 0) + (apiData?.usage?.output_tokens || 0)
 
+  if (agent_type === 'writer') {
+    console.log('Writer raw output:', String(rawText).substring(0, 500))
+  }
+
   let parsed
   try {
     const match = rawText.match(/\{[\s\S]*\}/)
     if (!match) {
+      if (agent_type === 'writer')
+        console.log('Writer JSON parse skip: no { } match in output')
       parsed = { raw_output: rawText }
     } else {
       try {
         parsed = JSON.parse(match[0])
-      } catch {
+      } catch (perr) {
+        if (agent_type === 'writer')
+          console.log('Writer JSON parse failed:', perr.message)
         parsed = { raw_output: rawText }
       }
     }
-  } catch {
+  } catch (perr) {
+    if (agent_type === 'writer')
+      console.log('Writer JSON match failed:', perr.message)
     parsed = { raw_output: rawText }
   }
 
@@ -543,6 +554,7 @@ RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it 
   let itemsGenerated = 0
   if (agent_type === 'writer' && parsed && typeof parsed === 'object') {
     const packages = Array.isArray(parsed.packages) ? parsed.packages : []
+    console.log('Writer parsed packages:', packages?.length)
     for (const pkg of packages) {
       if (!pkg) continue
       const hookText = String(pkg.hook || '')
@@ -611,7 +623,8 @@ RULES: The "video" object is REQUIRED only when visual_type is "video" (omit it 
       // No auto-render. Packages are created with status='needs_visual';
       // the user triggers a render manually via the Generate Video button
       // (POST /api/render) — reliable and avoids writer-run timeouts.
-      void (pkgInsert?.rows ?? pkgInsert)?.[0]?.id
+      const packageId = (pkgInsert?.rows ?? pkgInsert)?.[0]?.id
+      console.log('Package inserted:', packageId)
       itemsGenerated += 1
     }
   }
