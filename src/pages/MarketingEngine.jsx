@@ -5964,71 +5964,136 @@ function ContentHub({
     onRefresh?.()
   }
 
-  async function generateVisual(pkg, kind) {
-    if (!brand?.id || !pkg?.id) return
+  async function generateVisual(pkg) {
+    const selectedBrand = brand
+    if (!selectedBrand?.id || !pkg?.id) return
     try {
-      if (kind === 'video') {
-        // Kick off a manual Remotion render. /api/render returns immediately
-        // with renderId/bucketName; we flip the package to 'rendering' and
-        // the 10s render_status poll backfills visual_url when done.
-        const composition = pkg.remotion_composition || 'HookOpener'
-        const r = await fetch('/api/render', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            composition_id: composition,
-            props: {
-              headline:
-                pkg.hook_text?.slice(0, 60) || 'Discipline is built quietly.',
-              subtext: pkg.cta_text?.slice(0, 80) || '',
-              brandName: brand.name,
-              primaryColor: brand.primary_color || '#c084fc',
-              secondaryColor: brand.secondary_color || '#ffffff',
-              logoUrl: brand.logo_url || null,
-            },
-            brand_id: brand.id,
-          }),
-        })
-        const data = await r.json()
-        if (data.renderId) {
-          await db.query(
-            `UPDATE post_packages SET render_id=$1, render_bucket=$2, visual_type='video', status='rendering' WHERE id=$3`,
-            [data.renderId, data.bucketName || null, pkg.id],
-          )
-          showToast?.('Rendering video — ready in ~25s')
-          setPackagesVersion((v) => v + 1)
-        } else {
-          showToast?.(
-            data.error || data.message || 'Render could not start',
-            'error',
-          )
-        }
+      setPackages((prev) =>
+        prev.map((p) =>
+          p.id === pkg.id
+            ? { ...p, status: 'rendering', render_progress: 0 }
+            : p,
+        ),
+      )
+
+      const res = await fetch('/api/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          composition_id: pkg.remotion_composition || 'HookOpener',
+          props: {
+            headline: (pkg.hook_text || 'Discipline is built quietly.').slice(
+              0,
+              60,
+            ),
+            subtext: (pkg.cta_text || '').slice(0, 80),
+            brandName: selectedBrand.name,
+            primaryColor: selectedBrand.primary_color || '#c084fc',
+            secondaryColor: selectedBrand.secondary_color || '#ffffff',
+            logoUrl: selectedBrand.logo_url || null,
+          },
+          brand_id: selectedBrand.id,
+        }),
+      })
+
+      const data = await res.json()
+      console.log('Render response:', data)
+
+      if (data.renderId || data.render_id) {
+        const renderId = data.renderId || data.render_id
+        const bucketName =
+          data.bucketName ||
+          data.bucket_name ||
+          'remotionlambda-useast1-bqldmrtdxy'
+
+        setPackages((prev) =>
+          prev.map((p) =>
+            p.id === pkg.id
+              ? {
+                  ...p,
+                  render_id: renderId,
+                  render_bucket: bucketName,
+                  status: 'rendering',
+                }
+              : p,
+          ),
+        )
+
+        showToast?.('Video rendering — ready in ~25 seconds')
+
+        let attempts = 0
+        const poll = setInterval(async () => {
+          attempts++
+          if (attempts > 30) {
+            clearInterval(poll)
+            setPackages((prev) =>
+              prev.map((p) =>
+                p.id === pkg.id ? { ...p, status: 'needs_visual' } : p,
+              ),
+            )
+            showToast?.('Render timed out — try again')
+            return
+          }
+
+          try {
+            const pollRes = await fetch(
+              `/api/workflow?action=render_status&render_id=${renderId}&bucket=${bucketName}&package_id=${pkg.id}&brand_id=${selectedBrand.id}`,
+            )
+            const pollData = await pollRes.json()
+
+            if (pollData.done && pollData.url) {
+              clearInterval(poll)
+              setPackages((prev) =>
+                prev.map((p) =>
+                  p.id === pkg.id
+                    ? {
+                        ...p,
+                        visual_url: pollData.url,
+                        visual_type: 'video',
+                        status: 'ready',
+                        render_progress: 1,
+                      }
+                    : p,
+                ),
+              )
+              showToast?.('Video ready — approve to schedule')
+            } else if (pollData.error) {
+              clearInterval(poll)
+              setPackages((prev) =>
+                prev.map((p) =>
+                  p.id === pkg.id ? { ...p, status: 'needs_visual' } : p,
+                ),
+              )
+              showToast?.('Render failed — try again')
+            } else {
+              setPackages((prev) =>
+                prev.map((p) =>
+                  p.id === pkg.id
+                    ? { ...p, render_progress: pollData.progress || 0 }
+                    : p,
+                ),
+              )
+            }
+          } catch (e) {
+            console.log('Poll error:', e)
+          }
+        }, 8000)
       } else {
-        // Image via Higgsfield
-        const r = await fetch('/api/video', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            brand_id: brand.id,
-            type: 'text_to_image',
-            prompt: pkg.visual_brief || pkg.visual_brief_parsed || pkg.hook_text || '',
-          }),
-        })
-        const data = await r.json()
-        if (data.url) {
-          await db.query(
-            `UPDATE post_packages SET visual_url=$1, visual_type='image', status='ready' WHERE id=$2`,
-            [data.url, pkg.id],
-          )
-          showToast?.('Image ready')
-        } else {
-          showToast?.(data.error || 'Image generation failed', 'error')
-        }
+        showToast?.('Render failed — ' + (data.error || 'unknown error'))
+        setPackages((prev) =>
+          prev.map((p) =>
+            p.id === pkg.id ? { ...p, status: 'needs_visual' } : p,
+          ),
+        )
       }
-      setPackagesVersion((v) => v + 1)
     } catch (e) {
-      console.error('generate visual failed', e)
-      showToast?.('Visual generation failed', 'error')
+      console.log('Generate video error:', e)
+      showToast?.('Error generating video')
+      setPackages((prev) =>
+        prev.map((p) =>
+          p.id === pkg.id ? { ...p, status: 'needs_visual' } : p,
+        ),
+      )
     }
   }
 
@@ -6782,16 +6847,19 @@ function RenderProgressBar({ pct }) {
         left: 0,
         right: 0,
         bottom: 0,
-        height: 2,
+        height: 3,
         background: 'rgba(194,181,155,0.1)',
         overflow: 'hidden',
       }}
     >
       {determinate ? (
-        <motion.div
-          animate={{ width: `${Math.max(2, pct)}%` }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
-          style={{ height: '100%', background: 'rgba(194,181,155,0.8)' }}
+        <div
+          style={{
+            height: '100%',
+            background: '#C2B59B',
+            width: `${Math.max(2, pct)}%`,
+            transition: 'width 0.5s ease',
+          }}
         />
       ) : (
         <motion.div
@@ -6860,10 +6928,13 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
   const isProducing = pkg.status === 'producing'
   const isRendering = pkg.status === 'rendering' || isProducing
   const needsVisual = !hasVisual && !isRendering
-  const renderPct =
+  const rawProgress =
     typeof progress === 'number' && progress >= 0
-      ? Math.round(progress * 100)
+      ? progress
+      : typeof pkg.render_progress === 'number' && pkg.render_progress >= 0
+      ? pkg.render_progress
       : null
+  const renderPct = rawProgress != null ? Math.round(rawProgress * 100) : null
   const statusBadge = hasVisual
     ? { label: 'Ready', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' }
     : isRendering
@@ -6998,10 +7069,11 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
           >
             {pkg.hook_text || '(no hook)'}
           </div>
-          {!hasVisual && (
+          {(needsVisual || isRendering) && (
             <button
               type="button"
-              onClick={() => onGenerateVisual(pkg, 'image')}
+              onClick={() => !isRendering && onGenerateVisual(pkg, 'video')}
+              disabled={isRendering}
               style={{
                 fontSize: 10,
                 padding: '4px 8px',
@@ -7010,10 +7082,33 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                 border: '0.5px solid rgba(251,191,36,0.4)',
                 color: '#fbbf24',
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: isRendering ? 'not-allowed' : 'pointer',
+                opacity: isRendering ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
               }}
             >
-              Generate Image
+              {isRendering ? (
+                <>
+                  <motion.span
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      border: '2px solid rgba(251,191,36,0.3)',
+                      borderTopColor: '#fbbf24',
+                      display: 'inline-block',
+                    }}
+                  />
+                  {renderPct != null ? `Rendering ${renderPct}%` : 'Rendering…'}
+                </>
+              ) : (
+                'Generate Video'
+              )}
             </button>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
@@ -7155,10 +7250,11 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
           )}
           {isRendering && <RenderProgressBar pct={renderPct} />}
         </div>
-        {needsVisual && (
+        {(needsVisual || isRendering) && (
           <button
             type="button"
-            onClick={() => onGenerateVisual(pkg, 'video')}
+            onClick={() => !isRendering && onGenerateVisual(pkg, 'video')}
+            disabled={isRendering}
             style={{
               width: '100%',
               fontSize: 13,
@@ -7168,10 +7264,33 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
               border: '0.5px solid rgba(194,181,155,0.5)',
               color: '#C2B59B',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: isRendering ? 'not-allowed' : 'pointer',
+              opacity: isRendering ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
             }}
           >
-            Generate Video
+            {isRendering ? (
+              <>
+                <motion.span
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                  style={{
+                    width: 13,
+                    height: 13,
+                    borderRadius: '50%',
+                    border: '2px solid rgba(194,181,155,0.3)',
+                    borderTopColor: '#C2B59B',
+                    display: 'inline-block',
+                  }}
+                />
+                {renderPct != null ? `Rendering ${renderPct}%` : 'Rendering…'}
+              </>
+            ) : (
+              'Generate Video'
+            )}
           </button>
         )}
       </div>

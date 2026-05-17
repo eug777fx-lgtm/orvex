@@ -1,32 +1,15 @@
 import db from '@/lib/db'
 
 export async function setupMarketingDB() {
-  // ===== PERMANENT created_at FIX =====
-  // Before ANY query runs, guarantee a created_at column exists on every
-  // table that is ever filtered/ordered by it. Legacy databases may have
-  // these tables WITHOUT created_at (CREATE TABLE IF NOT EXISTS is a no-op
-  // on a pre-existing table), which is what throws
-  // `column "created_at" does not exist` and aborts the whole setup.
-  // Each ALTER is isolated in its own try/catch so a missing table
-  // (fresh DB — table not created yet) or any other error can never abort.
-  const ensureCreatedAt = [
-    'analytics',
-    'content_pipeline',
-    'schedules',
-    'agent_runs',
-    'post_packages',
-    'content',
-    'brands',
-    'brand_memory',
-  ]
-  for (const t of ensureCreatedAt) {
-    try {
-      await db.query(
-        `ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`,
-      )
-    } catch (e) {
-      console.log('skip:', e.message)
-    }
+  // First ensure created_at exists on any pre-existing tables.
+  // This MUST run before any CREATE TABLE / dedupe / index so that legacy
+  // databases (tables created before created_at existed) never throw
+  // `column "created_at" does not exist`. ALTER TABLE IF EXISTS makes this
+  // a safe no-op on fresh installs where the table isn't created yet.
+  const existingTables = ['analytics', 'content_pipeline', 'schedules', 'agent_runs', 'post_packages', 'content', 'brands', 'brand_memory', 'sales_leads', 'sales_reps', 'deals', 'rep_tasks', 'lead_activities', 'rep_kpis', 'sales_notifications', 'services_catalog']
+  for (const t of existingTables) {
+    try { await db.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`) } catch(e) {}
+    try { await db.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`) } catch(e) {}
   }
 
   await db.query(`

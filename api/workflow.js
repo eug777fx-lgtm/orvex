@@ -127,54 +127,52 @@ async function handleApprove(sql, body) {
 
   // New flow: approving a post_package directly.
   if (package_id) {
-    if (!brand_id) {
-      const err = new Error('brand_id required')
-      err.status = 400
-      throw err
-    }
+    // 1. Find the package by id.
     const pkgRows = await sql.query(
-      'SELECT * FROM post_packages WHERE id=$1 AND brand_id=$2',
-      [package_id, brand_id],
+      'SELECT * FROM post_packages WHERE id=$1',
+      [package_id],
     )
     const pkg = (pkgRows?.rows ?? pkgRows)?.[0]
+    // 2. 404 if not found.
     if (!pkg) {
       const err = new Error('package not found')
       err.status = 404
       throw err
     }
-
-    await sql.query(
-      "UPDATE post_packages SET status='approved' WHERE id=$1",
-      [package_id],
-    )
-
-    const candidate = await findNextSlot(sql, brand_id)
+    const bId = pkg.brand_id || brand_id
     const platform = pkg.platform || 'instagram'
 
-    // schedules.content_id is a FK to content(id). Use the package's hook or
-    // caption content row; if neither exists, insert a placeholder so the
-    // schedule still has a valid content reference.
-    let scheduleContentId = pkg.hook_id || pkg.caption_id || null
-    if (!scheduleContentId) {
-      const placeholder = await sql.query(
-        `INSERT INTO content (brand_id, type, caption, status)
-         VALUES ($1, 'caption', $2, 'approved')
-         RETURNING id`,
-        [brand_id, pkg.caption_text || pkg.hook_text || ''],
-      )
-      scheduleContentId = (placeholder?.rows ?? placeholder)?.[0]?.id
-    }
+    // 3. Next slot: last scheduled_at + 4h, max 3/day (findNextSlot).
+    const candidate = await findNextSlot(sql, bId)
 
+    // 4. Approve + stamp the slot in one update.
     await sql.query(
-      `INSERT INTO schedules (content_id, brand_id, platform, scheduled_at, published)
-       VALUES ($1, $2, $3, $4, false)`,
-      [scheduleContentId, brand_id, platform, candidate.toISOString()],
-    )
-    await sql.query(
-      'UPDATE post_packages SET scheduled_at=$1 WHERE id=$2',
+      "UPDATE post_packages SET status='approved', scheduled_at=$1, updated_at=now() WHERE id=$2",
       [candidate.toISOString(), package_id],
     )
 
+    // 5. schedules.content_id is a FK to content(id). Reuse the package's
+    // hook/caption content row; otherwise create one.
+    let scheduleContentId = pkg.hook_id || pkg.caption_id || null
+    if (!scheduleContentId) {
+      const created = await sql.query(
+        `INSERT INTO content (brand_id, type, hook, caption, status, created_at)
+         VALUES ($1, 'hook', $2, $3, 'approved', now())
+         RETURNING id`,
+        [bId, pkg.hook_text || '', pkg.caption_text || ''],
+      )
+      scheduleContentId = (created?.rows ?? created)?.[0]?.id
+    }
+
+    // 6. Schedule it.
+    await sql.query(
+      `INSERT INTO schedules (content_id, brand_id, platform, scheduled_at, published)
+       VALUES ($1, $2, $3, $4, false)
+       ON CONFLICT DO NOTHING`,
+      [scheduleContentId, bId, platform, candidate.toISOString()],
+    )
+
+    // 7.
     return { success: true, scheduled_at: candidate.toISOString(), platform }
   }
 
@@ -1326,6 +1324,43 @@ async function handleSales(sql, { method, action, query, body }) {
       )
       return { handled: true, payload: { success: true, leads: rowsOf(r) } }
     }
+    if (action === 'admin_leads_pool') {
+      const r = await sql.query(
+        `SELECT sl.*, sr.name AS rep_name, sr.id AS rep_id
+           FROM sales_leads sl
+           LEFT JOIN sales_reps sr ON sl.rep_id = sr.id
+          ORDER BY sl.created_at DESC`,
+      )
+      return { handled: true, payload: { success: true, leads: rowsOf(r) } }
+    }
+    if (action === 'team_overview') {
+      const r = await sql.query(
+        `SELECT sr.id, sr.name, sr.email, sr.commission_rate,
+                COUNT(sl.id) AS total_leads,
+                COUNT(sl.id) FILTER (WHERE sl.status='closed_won') AS closed,
+                COUNT(sl.id) FILTER (WHERE sl.status='new') AS new_leads,
+                COUNT(sl.id) FILTER (WHERE sl.status='interested') AS interested,
+                COUNT(sl.id) FILTER (WHERE sl.status IN ('contacted','followed_up')) AS in_progress
+           FROM sales_reps sr
+           LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
+          WHERE sr.role = 'rep' AND sr.is_active = true
+          GROUP BY sr.id, sr.name, sr.email, sr.commission_rate
+          ORDER BY closed DESC`,
+      )
+      return { handled: true, payload: { success: true, team: rowsOf(r) } }
+    }
+    if (action === 'rep_assigned_leads') {
+      const r = await sql.query(
+        `SELECT sl.*, COUNT(la.id) AS activity_count
+           FROM sales_leads sl
+           LEFT JOIN lead_activities la ON la.lead_id = sl.id
+          WHERE sl.rep_id = $1
+          GROUP BY sl.id
+          ORDER BY sl.updated_at DESC`,
+        [query.rep_id],
+      )
+      return { handled: true, payload: { success: true, leads: rowsOf(r) } }
+    }
     return { handled: false }
   }
 
@@ -1646,6 +1681,55 @@ async function handleSales(sql, { method, action, query, body }) {
         [rep_id, lead_id],
       )
       return { handled: true, payload: { success: true } }
+    }
+    if (action === 'assign_lead') {
+      const { lead_id, rep_id } = body
+      if (!lead_id || !rep_id) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'lead_id and rep_id required' },
+        }
+      }
+      await sql.query(
+        `UPDATE sales_leads SET rep_id=$1, updated_at=now() WHERE id=$2`,
+        [rep_id, lead_id],
+      )
+      await sql.query(
+        `INSERT INTO lead_activities (lead_id, rep_id, activity_type, description)
+         VALUES ($1, $2, 'note', 'Lead assigned by admin')`,
+        [lead_id, rep_id],
+      )
+      await sql.query(
+        `INSERT INTO sales_notifications (recipient_id, type, title, message)
+         VALUES ($1, 'lead_assigned', 'New lead assigned', 'A new lead has been assigned to you')`,
+        [rep_id],
+      )
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'bulk_assign_leads') {
+      const { lead_ids, rep_id } = body
+      const ids = Array.isArray(lead_ids) ? lead_ids : []
+      if (!rep_id || ids.length === 0) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'rep_id and lead_ids required' },
+        }
+      }
+      for (const id of ids) {
+        await sql.query(
+          `UPDATE sales_leads SET rep_id=$1, updated_at=now() WHERE id=$2`,
+          [rep_id, id],
+        )
+      }
+      await sql.query(
+        `INSERT INTO sales_notifications (recipient_id, type, title, message)
+         VALUES ($1, 'lead_assigned', 'New leads assigned', $2)`,
+        [rep_id, `${ids.length} new leads have been assigned to you`],
+      )
+      return {
+        handled: true,
+        payload: { success: true, assigned: ids.length },
+      }
     }
     if (action === 'notify_admin') {
       const { title, message, link } = body

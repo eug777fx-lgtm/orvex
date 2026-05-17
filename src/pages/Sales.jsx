@@ -1155,42 +1155,6 @@ function AddTask({ rep, leads, onClose, onSaved, toast }) {
   )
 }
 
-// ===================== DEMOS =====================
-function Demos({ toast }) {
-  const cards = [
-    { t: 'Live System Demo', d: 'Show the full Lithos Labs platform', b: 'Copy Demo Link', fn: () => { navigator.clipboard?.writeText('https://lithos-labs.vercel.app'); toast('Demo link copied') } },
-    { t: 'AI Content Demo', d: 'Show AI generating real content', b: 'Open Demo', fn: () => window.open('/marketing', '_blank') },
-    { t: 'Custom Proposal', d: 'Create a tailored proposal', b: 'Coming Soon', dis: true },
-    { t: 'Case Studies', d: 'Show real results', b: 'Coming Soon', dis: true },
-  ]
-  return (
-    <div>
-      <div style={{ fontSize: 20, fontWeight: 600, color: WHITE }}>Demos</div>
-      <div style={{ fontSize: 12, color: T35, marginBottom: 16 }}>Show clients what's possible before they commit</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 12 }}>
-        {cards.map((c) => (
-          <div key={c.t} style={{ background: STAT_BG, border: BORDER, borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: WHITE }}>{c.t}</div>
-            <div style={{ fontSize: 13, color: T40, margin: '6px 0 14px' }}>{c.d}</div>
-            <button onClick={c.fn} disabled={c.dis} style={{ ...(c.dis ? btnGhost : btnPrimary), opacity: c.dis ? 0.4 : 1, cursor: c.dis ? 'default' : 'pointer' }}>
-              {c.b}
-            </button>
-          </div>
-        ))}
-      </div>
-      <Section title="How to demo" style={{ marginTop: 16 }}>
-        <ol style={{ margin: 0, paddingLeft: 18, color: T40, fontSize: 13, lineHeight: 1.8 }}>
-          <li>Open with the prospect's biggest pain point — make it about them.</li>
-          <li>Open the Live System Demo and walk the relevant module only.</li>
-          <li>Show the AI Content Demo generating something for their niche.</li>
-          <li>Tie every feature back to revenue or time saved.</li>
-          <li>Close with a clear next step and book the follow-up before hanging up.</li>
-        </ol>
-      </Section>
-    </div>
-  )
-}
-
 // ===================== ADMIN =====================
 function Admin({ rep, toast }) {
   const [sub, setSub] = useState('overview')
@@ -1234,7 +1198,7 @@ function Admin({ rep, toast }) {
     <div>
       <div style={{ fontSize: 20, fontWeight: 600, color: WHITE, marginBottom: 12 }}>Admin</div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-        {[['overview', 'Overview'], ['pending', `Pending Deals${pending.length ? ` (${pending.length})` : ''}`], ['team', 'Team'], ['leads', 'All Leads'], ['settings', 'Settings']].map(([k, l]) => (
+        {[['overview', 'Overview'], ['assignment', 'Lead Assignment'], ['pending', `Pending Deals${pending.length ? ` (${pending.length})` : ''}`], ['team', 'Team'], ['leads', 'All Leads'], ['settings', 'Settings']].map(([k, l]) => (
           <button key={k} onClick={() => setSub(k)} style={{ fontSize: 12, padding: '6px 12px', borderRadius: 999, cursor: 'pointer', background: sub === k ? 'rgba(255,255,255,0.1)' : 'transparent', border: BORDER, color: sub === k ? WHITE : T45 }}>
             {l}
           </button>
@@ -1266,6 +1230,8 @@ function Admin({ rep, toast }) {
           </Section>
         </>
       )}
+
+      {sub === 'assignment' && <LeadAssignment rep={rep} toast={toast} />}
 
       {sub === 'pending' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1321,6 +1287,330 @@ function Admin({ rep, toast }) {
     </div>
   )
 }
+function LeadAssignment({ rep, toast }) {
+  const [team, setTeam] = useState([])
+  const [pool, setPool] = useState([])
+  const [filterRep, setFilterRep] = useState('all')
+  const [selected, setSelected] = useState([])
+  const [bulkRep, setBulkRep] = useState('')
+
+  const load = useCallback(async () => {
+    const [to, lp] = await Promise.all([
+      salesApi('team_overview'),
+      salesApi('admin_leads_pool'),
+    ])
+    setTeam(to.team || [])
+    setPool(lp.leads || [])
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const unassigned = (pool || []).filter((l) => !l.rep_id)
+  const maxLeads = Math.max(1, ...(team || []).map((t) => Number(t.total_leads || 0)))
+
+  async function assign(leadId, repId, repName) {
+    if (!repId) return
+    await salesApi('assign_lead', {
+      method: 'POST',
+      body: { lead_id: leadId, rep_id: repId, admin_id: rep.id },
+    })
+    setPool((p) => p.filter((x) => x.id !== leadId))
+    setSelected((s) => s.filter((x) => x !== leadId))
+    toast(`Assigned to ${repName || 'rep'}`)
+    load()
+  }
+  async function bulkAssign() {
+    if (!bulkRep || selected.length === 0) return
+    await salesApi('bulk_assign_leads', {
+      method: 'POST',
+      body: { lead_ids: selected, rep_id: bulkRep, admin_id: rep.id },
+    })
+    toast(`Assigned ${selected.length} leads`)
+    setSelected([])
+    setBulkRep('')
+    load()
+  }
+  function toggle(id) {
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+  }
+
+  const byRep =
+    filterRep === 'all'
+      ? pool
+      : (pool || []).filter((l) => l.rep_id === filterRep)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 18, fontWeight: 600, color: WHITE }}>
+          Lead Assignment
+        </div>
+        <div style={{ fontSize: 12, color: T35 }}>
+          Distribute leads to your sales team
+        </div>
+      </div>
+
+      {/* TASK 7 — weekly distribution */}
+      <Section title="This Week's Distribution">
+        {(team || []).length === 0 && (
+          <div style={{ fontSize: 12, color: T35 }}>No reps yet</div>
+        )}
+        {(team || []).map((t) => {
+          const n = Number(t.total_leads || 0)
+          return (
+            <div
+              key={t.id}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}
+            >
+              <span style={{ width: 120, fontSize: 13, color: WHITE }}>
+                {t.name}
+              </span>
+              <div
+                style={{
+                  flex: 1,
+                  height: 10,
+                  background: 'rgba(255,255,255,0.04)',
+                  borderRadius: 5,
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.round((n / maxLeads) * 100)}%`,
+                    height: '100%',
+                    background: BEIGE,
+                  }}
+                />
+              </div>
+              <span style={{ width: 60, fontSize: 12, color: T40, textAlign: 'right' }}>
+                {n} leads
+              </span>
+            </div>
+          )
+        })}
+        {unassigned.length > 0 && (
+          <div style={{ marginTop: 10, fontSize: 12, color: '#fbbf24' }}>
+            Total unassigned: {unassigned.length}
+          </div>
+        )}
+      </Section>
+
+      {/* Team overview cards */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {(team || []).map((t) => (
+          <div
+            key={t.id}
+            onClick={() => setFilterRep(filterRep === t.id ? 'all' : t.id)}
+            style={{
+              flex: '1 1 200px',
+              background: STAT_BG,
+              border:
+                filterRep === t.id
+                  ? `0.5px solid ${BEIGE}`
+                  : BORDER,
+              borderRadius: 12,
+              padding: 16,
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: WHITE,
+                }}
+              >
+                {initials(t.name)}
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 600, color: WHITE }}>
+                {t.name}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
+              <span style={{ fontSize: 12, color: T40 }}>
+                {t.total_leads || 0} total
+              </span>
+              <span style={{ fontSize: 12, color: '#4ade80' }}>
+                {t.closed || 0} closed
+              </span>
+              <span style={{ fontSize: 12, color: '#fbbf24' }}>
+                {t.in_progress || 0} in progress
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Unassigned leads + bulk assign */}
+      <Section
+        title="Unassigned Leads"
+        right={
+          unassigned.length > 0 ? (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#f87171',
+                background: 'rgba(248,113,113,0.12)',
+                border: '0.5px solid rgba(248,113,113,0.4)',
+                borderRadius: 999,
+                padding: '2px 8px',
+              }}
+            >
+              {unassigned.length}
+            </span>
+          ) : null
+        }
+      >
+        {selected.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 12, color: T40 }}>
+              {selected.length} selected · Assign to:
+            </span>
+            <select
+              style={{ ...inputStyle, width: 'auto', padding: '6px 10px' }}
+              value={bulkRep}
+              onChange={(e) => setBulkRep(e.target.value)}
+            >
+              <option value="">Select rep…</option>
+              {(team || []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <button style={btnPrimary} onClick={bulkAssign} disabled={!bulkRep}>
+              Assign
+            </button>
+          </div>
+        )}
+        {unassigned.length === 0 && (
+          <div style={{ fontSize: 12, color: T35 }}>All leads are assigned</div>
+        )}
+        {unassigned.map((l) => (
+          <div
+            key={l.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 0',
+              borderBottom: '0.5px solid rgba(255,255,255,0.04)',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={selected.includes(l.id)}
+              onChange={() => toggle(l.id)}
+            />
+            <span style={{ flex: 1, fontSize: 13, color: WHITE }}>
+              {l.company_name}
+            </span>
+            <span style={{ fontSize: 12, color: T40, width: 110 }}>
+              {l.contact_name || '—'}
+            </span>
+            <span style={{ fontSize: 12, color: T40, width: 90 }}>
+              {l.industry || '—'}
+            </span>
+            <span style={{ fontSize: 11, color: T35, width: 90 }}>
+              {timeAgo(l.created_at)}
+            </span>
+            <select
+              style={{ ...inputStyle, width: 'auto', padding: '5px 8px', fontSize: 12 }}
+              defaultValue=""
+              onChange={(e) => {
+                const t = (team || []).find((x) => x.id === e.target.value)
+                assign(l.id, e.target.value, t?.name)
+              }}
+            >
+              <option value="">Assign to…</option>
+              {(team || []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </Section>
+
+      {/* All leads by rep */}
+      <Section title="All Leads by Rep">
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+          {['all', ...(team || []).map((t) => t.id)].map((id) => {
+            const label =
+              id === 'all'
+                ? 'All'
+                : (team || []).find((t) => t.id === id)?.name || 'Rep'
+            return (
+              <button
+                key={id}
+                onClick={() => setFilterRep(id)}
+                style={{
+                  fontSize: 12,
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  background:
+                    filterRep === id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  border: BORDER,
+                  color: filterRep === id ? WHITE : T45,
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        {(byRep || []).slice(0, 100).map((l) => (
+          <div
+            key={l.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 0',
+              borderBottom: '0.5px solid rgba(255,255,255,0.04)',
+            }}
+          >
+            <span style={{ flex: 1, fontSize: 13, color: WHITE }}>
+              {l.company_name}
+            </span>
+            <StatusPill status={l.status} />
+            <span style={{ fontSize: 11, color: T35, width: 90 }}>
+              {timeAgo(l.updated_at)}
+            </span>
+            <select
+              style={{ ...inputStyle, width: 'auto', padding: '5px 8px', fontSize: 12 }}
+              value={l.rep_id || ''}
+              onChange={(e) => {
+                const t = (team || []).find((x) => x.id === e.target.value)
+                assign(l.id, e.target.value, t?.name)
+              }}
+            >
+              <option value="">Unassigned</option>
+              {(team || []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </Section>
+    </div>
+  )
+}
+
 function PendingDeal({ d, onDecide }) {
   const [notes, setNotes] = useState('')
   const [rej, setRej] = useState(false)
@@ -1409,7 +1699,6 @@ export default function Sales() {
     ['offers', 'Offers'],
     ['scripts', 'Scripts'],
     ['tasks', 'Tasks'],
-    ['demos', 'Demos'],
     ...(rep.role === 'admin' ? [['admin', 'Admin']] : []),
   ]
   const mobileNav = [
@@ -1481,7 +1770,6 @@ export default function Sales() {
         {tab === 'offers' && <Offers rep={rep} toast={toast} />}
         {tab === 'scripts' && <Scripts toast={toast} />}
         {tab === 'tasks' && <Tasks rep={rep} tasks={data.tasks || []} leads={data.leads || []} reload={reload} toast={toast} />}
-        {tab === 'demos' && <Demos toast={toast} />}
         {tab === 'admin' && rep.role === 'admin' && <Admin rep={rep} toast={toast} />}
       </div>
 
