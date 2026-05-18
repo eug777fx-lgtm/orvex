@@ -9,7 +9,7 @@
   "crons": [
     {
       "path": "/api/workflow?action=process_productions",
-      "schedule": "*/2 * * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }
