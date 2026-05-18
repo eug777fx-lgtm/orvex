@@ -45,48 +45,32 @@ import AppLogin from './components/AppLogin'
 import { AuthContext } from './lib/auth'
 import useIsMobile from './utils/useIsMobile'
 
-const NAV = {
-  dashboard: { to: '/', label: 'Dashboard', end: true, icon: LayoutDashboard },
-  leads: { to: '/leads', label: 'Leads', icon: Users },
-  pipeline: { to: '/pipeline', label: 'Pipeline', icon: Kanban },
-  discover: { to: '/discover', label: 'Discover', icon: Compass },
-  offers: { to: '/offers', label: 'Offers', icon: Package },
-  scripts: { to: '/scripts', label: 'Scripts', icon: BookOpen },
-  tasks: { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  workflow: { to: '/workflow', label: 'Workflow', icon: ListChecks },
-  documents: { to: '/documents', label: 'Documents', icon: FileText },
-  automations: { to: '/automations', label: 'Automations', icon: Zap },
-  marketing: { to: '/marketing', label: 'AI Office', icon: Sparkles },
-  demos: { to: '/demos', label: 'Demos', icon: Monitor },
-  import: { to: '/import', label: 'Import', icon: Upload },
-}
-
-const ADMIN_NAV = [
-  NAV.dashboard,
-  NAV.leads,
-  NAV.pipeline,
-  NAV.offers,
-  NAV.scripts,
-  NAV.tasks,
-  NAV.workflow,
-  NAV.documents,
-  NAV.automations,
-  NAV.marketing,
-  NAV.demos,
-  NAV.import,
+// Single source of truth for navigation.
+//  - adminOnly: only the admin sees it
+//  - repOnly:   only a sales rep sees it
+//  - (neither): everyone sees it
+const navItems = [
+  { path: '/', label: 'Dashboard', end: true, icon: LayoutDashboard },
+  { path: '/leads', label: 'Leads', icon: Users },
+  { path: '/pipeline', label: 'Pipeline', icon: Kanban },
+  { path: '/discover', label: 'Discover', icon: Compass, repOnly: true },
+  { path: '/offers', label: 'Offers', icon: Package },
+  { path: '/scripts', label: 'Scripts', icon: BookOpen },
+  { path: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { path: '/workflow', label: 'Workflow', icon: ListChecks, adminOnly: true },
+  { path: '/documents', label: 'Documents', icon: FileText, adminOnly: true },
+  { path: '/automations', label: 'Automations', icon: Zap, adminOnly: true },
+  { path: '/marketing', label: 'AI Office', icon: Sparkles, adminOnly: true },
+  { path: '/demos', label: 'Demos', icon: Monitor, adminOnly: true },
+  { path: '/import', label: 'Import', icon: Upload, adminOnly: true },
 ]
 
-const REP_NAV = [
-  NAV.dashboard,
-  NAV.leads,
-  NAV.pipeline,
-  NAV.discover,
-  NAV.offers,
-  NAV.scripts,
-  NAV.tasks,
-]
-
-const navForRole = (role) => (role === 'admin' ? ADMIN_NAV : REP_NAV)
+const navForRole = (role) =>
+  navItems.filter((item) => {
+    if (item.adminOnly) return role === 'admin'
+    if (item.repOnly) return role === 'rep'
+    return true
+  })
 
 const avatarStyle = {
   width: 32,
@@ -133,12 +117,12 @@ function NavTabs({ items }) {
     >
       {items.map((item) => {
         const active = item.end
-          ? location.pathname === item.to
-          : location.pathname.startsWith(item.to)
+          ? location.pathname === item.path
+          : location.pathname.startsWith(item.path)
         return (
           <NavLink
-            key={item.to}
-            to={item.to}
+            key={item.path}
+            to={item.path}
             end={item.end}
             style={{
               position: 'relative',
@@ -198,12 +182,12 @@ function MobileBottomNav({ items }) {
       {bottomItems.map((item) => {
         const Icon = item.icon
         const active = item.end
-          ? location.pathname === item.to
-          : location.pathname.startsWith(item.to)
+          ? location.pathname === item.path
+          : location.pathname.startsWith(item.path)
         return (
           <NavLink
-            key={item.to}
-            to={item.to}
+            key={item.path}
+            to={item.path}
             end={item.end}
             style={{
               flex: 1,
