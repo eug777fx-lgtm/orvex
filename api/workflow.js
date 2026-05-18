@@ -1371,20 +1371,29 @@ async function handleSales(sql, { method, action, query, body }) {
       return { handled: true, payload: { success: true, reps: rowsOf(r) } }
     }
     if (action === 'get_all_reps') {
-      const r = await sql.query(
-        `SELECT sr.id, sr.name, sr.email, sr.role, sr.is_active,
-                sr.commission_rate, sr.created_at,
-                COUNT(DISTINCT sl.id) AS total_leads,
-                COUNT(DISTINCT d.id) FILTER (WHERE d.status IN ('approved','commission_paid')) AS deals_closed,
-                COALESCE(SUM(d.commission_amount) FILTER (WHERE d.status IN ('approved','commission_paid')), 0) AS total_commission
-           FROM sales_reps sr
-           LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
-           LEFT JOIN deals d ON d.rep_id = sr.id
-          GROUP BY sr.id, sr.name, sr.email, sr.role, sr.is_active,
-                   sr.commission_rate, sr.created_at
-          ORDER BY sr.created_at DESC`,
-      )
-      return { handled: true, payload: { success: true, reps: rowsOf(r) } }
+      // CASE WHEN instead of FILTER — compatible with older PostgreSQL.
+      const result = await sql.query(`
+        SELECT
+          sr.id,
+          sr.name,
+          sr.email,
+          sr.role,
+          sr.is_active,
+          sr.commission_rate,
+          sr.created_at,
+          COUNT(DISTINCT sl.id) as total_leads,
+          COUNT(DISTINCT CASE WHEN d.status IN ('approved','commission_paid') THEN d.id END) as deals_closed,
+          COALESCE(SUM(CASE WHEN d.status IN ('approved','commission_paid') THEN d.commission_amount ELSE 0 END), 0) as total_commission
+        FROM sales_reps sr
+        LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
+        LEFT JOIN deals d ON d.rep_id = sr.id
+        GROUP BY sr.id, sr.name, sr.email, sr.role, sr.is_active, sr.commission_rate, sr.created_at
+        ORDER BY sr.created_at DESC
+      `)
+      return {
+        handled: true,
+        payload: { success: true, reps: rowsOf(result) },
+      }
     }
     if (action === 'get_clients') {
       const r = await sql.query(
