@@ -1380,7 +1380,8 @@ async function handleSales(sql, { method, action, query, body }) {
            FROM sales_reps sr
            LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
            LEFT JOIN deals d ON d.rep_id = sr.id
-          GROUP BY sr.id
+          GROUP BY sr.id, sr.name, sr.email, sr.role, sr.is_active,
+                   sr.commission_rate, sr.created_at
           ORDER BY sr.created_at DESC`,
       )
       return { handled: true, payload: { success: true, reps: rowsOf(r) } }

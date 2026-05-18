@@ -61,6 +61,17 @@ export function migrateSchema() {
       await db.query(
         'ALTER TABLE deals ADD COLUMN IF NOT EXISTS stage_changed_at timestamptz DEFAULT now()',
       )
+      // The sales/rep deals flow (workflow.js: get_all_reps, leaderboard,
+      // admin_deals, approve_deal) reads deals.status / deals.commission_amount.
+      // On databases where `deals` was first created by the main-app schema
+      // (which only has `stage`), these columns are absent and every such
+      // query throws `column d.status does not exist`. Add them idempotently.
+      await db.query(
+        "ALTER TABLE deals ADD COLUMN IF NOT EXISTS status text DEFAULT 'pending_approval'",
+      )
+      await db.query(
+        'ALTER TABLE deals ADD COLUMN IF NOT EXISTS commission_amount float',
+      )
 
       await db.query('ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at timestamptz')
 

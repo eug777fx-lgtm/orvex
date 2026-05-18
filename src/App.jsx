@@ -306,9 +306,17 @@ function Shell({ appAuth, onLogout }) {
     .map((p) => p[0]?.toUpperCase())
     .join('')
 
-  const roleLabel = appAuth.role === 'admin' ? 'Admin' : 'Rep'
+  const roleLabel = {
+    admin: 'ADMIN',
+    manager: 'MANAGER',
+    rep: 'SALES',
+  }[appAuth?.role] || 'SALES'
   const roleColor =
-    appAuth.role === 'admin' ? '#C2B59B' : 'rgba(125,211,252,0.9)'
+    {
+      admin: '#C2B59B',
+      manager: 'rgba(125,211,252,0.9)',
+      rep: 'rgba(125,211,252,0.9)',
+    }[appAuth?.role] || 'rgba(125,211,252,0.9)'
 
   const topbarStyle = {
     height: isMobile ? 52 : 56,
