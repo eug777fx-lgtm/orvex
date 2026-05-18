@@ -1398,39 +1398,41 @@ async function handleSales(sql, { method, action, query, body }) {
   // ---- POST actions ----
   if (method === 'POST') {
     if (action === 'rep_login') {
-      const email = String(body.email || '').trim().toLowerCase()
+      const email = String(body.email || '').trim()
       const password = body.password
-      // Make sure the admin account always exists so the CEO can never be
-      // locked out, even on a fresh database where the seed hasn't run.
-      if (email === 'admin@lithoslabs.com') {
-        try {
-          await sql.query(
-            `INSERT INTO sales_reps (name, email, password_hash, role, commission_rate, is_active)
-             VALUES ('Eugene', 'admin@lithoslabs.com', 'admin123', 'admin', 0, true)
-             ON CONFLICT (email) DO UPDATE SET role='admin', is_active=true`,
-          )
-        } catch (e) {
-          /* non-fatal */
+
+      // Hard CEO bypass — no database required, so the admin can never be
+      // locked out even on a fresh / unreachable database.
+      if (
+        email.toLowerCase() === 'admin@lithoslabs.com' &&
+        password === 'admin123'
+      ) {
+        return {
+          handled: true,
+          payload: {
+            success: true,
+            rep: {
+              id: 'admin',
+              name: 'Eugene',
+              email: 'admin@lithoslabs.com',
+              role: 'admin',
+              commission_rate: 0,
+            },
+          },
         }
       }
+
       const r = await sql.query(
-        'SELECT * FROM sales_reps WHERE lower(email)=$1 AND is_active=true',
+        'SELECT * FROM sales_reps WHERE LOWER(email) = LOWER($1) AND is_active = true',
         [email],
       )
       const rep = firstOf(r)
       if (!rep || rep.password_hash !== password) {
         return {
           handled: true,
-          payload: { success: false, error: 'Invalid email or password' },
+          payload: { success: false, error: 'Invalid credentials' },
         }
       }
-      // Hard bypass: the CEO credentials always resolve to admin.
-      const role =
-        email === 'admin@lithoslabs.com' && password === 'admin123'
-          ? 'admin'
-          : rep.role === 'admin'
-            ? 'admin'
-            : 'rep'
       return {
         handled: true,
         payload: {
@@ -1439,7 +1441,7 @@ async function handleSales(sql, { method, action, query, body }) {
             id: rep.id,
             name: rep.name,
             email: rep.email,
-            role,
+            role: rep.role === 'admin' ? 'admin' : 'rep',
             commission_rate: rep.commission_rate,
           },
         },

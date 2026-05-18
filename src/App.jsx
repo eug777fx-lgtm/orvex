@@ -449,7 +449,8 @@ export default function App() {
   const navigate = useNavigate()
   const [appAuth, setAppAuth] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('lithos_auth') || 'null')
+      const stored = localStorage.getItem('lithos_auth')
+      return stored ? JSON.parse(stored) : null
     } catch {
       return null
     }
@@ -487,7 +488,14 @@ export default function App() {
   }
 
   if (!appAuth) {
-    return <AppLogin onAuthed={(auth) => setAppAuth(auth)} />
+    return (
+      <AppLogin
+        onAuth={(user) => {
+          localStorage.setItem('lithos_auth', JSON.stringify(user))
+          setAppAuth(user)
+        }}
+      />
+    )
   }
 
   return (
