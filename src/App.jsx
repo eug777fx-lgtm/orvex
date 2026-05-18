@@ -23,6 +23,7 @@ import {
   Compass,
   FileText,
   Zap,
+  UserCog,
 } from 'lucide-react'
 import { migrateSchema } from './utils/migrateSchema'
 import Background from './components/Background'
@@ -41,6 +42,7 @@ import MarketingEngine from './pages/MarketingEngine'
 import Discover from './pages/Discover'
 import Documents from './pages/Documents'
 import Automations from './pages/Automations'
+import Team from './pages/Team'
 import AppLogin from './components/AppLogin'
 import { AuthContext } from './lib/auth'
 import useIsMobile from './utils/useIsMobile'
@@ -60,6 +62,7 @@ const navItems = [
   { path: '/workflow', label: 'Workflow', icon: ListChecks, adminOnly: true },
   { path: '/documents', label: 'Documents', icon: FileText, adminOnly: true },
   { path: '/automations', label: 'Automations', icon: Zap, adminOnly: true },
+  { path: '/team', label: 'Team', icon: UserCog, adminOnly: true },
   { path: '/marketing', label: 'AI Office', icon: Sparkles, adminOnly: true },
   { path: '/demos', label: 'Demos', icon: Monitor, adminOnly: true },
   { path: '/import', label: 'Import', icon: Upload, adminOnly: true },
@@ -251,6 +254,14 @@ function AnimatedRoutes({ role }) {
           element={
             <AdminOnly role={role}>
               <Automations />
+            </AdminOnly>
+          }
+        />
+        <Route
+          path="/team"
+          element={
+            <AdminOnly role={role}>
+              <Team />
             </AdminOnly>
           }
         />

@@ -1370,6 +1370,21 @@ async function handleSales(sql, { method, action, query, body }) {
       )
       return { handled: true, payload: { success: true, reps: rowsOf(r) } }
     }
+    if (action === 'get_all_reps') {
+      const r = await sql.query(
+        `SELECT sr.id, sr.name, sr.email, sr.role, sr.is_active,
+                sr.commission_rate, sr.created_at,
+                COUNT(DISTINCT sl.id) AS total_leads,
+                COUNT(DISTINCT d.id) FILTER (WHERE d.status IN ('approved','commission_paid')) AS deals_closed,
+                COALESCE(SUM(d.commission_amount) FILTER (WHERE d.status IN ('approved','commission_paid')), 0) AS total_commission
+           FROM sales_reps sr
+           LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
+           LEFT JOIN deals d ON d.rep_id = sr.id
+          GROUP BY sr.id
+          ORDER BY sr.created_at DESC`,
+      )
+      return { handled: true, payload: { success: true, reps: rowsOf(r) } }
+    }
     if (action === 'get_clients') {
       const r = await sql.query(
         `SELECT * FROM clients ORDER BY created_at DESC`,
@@ -2117,6 +2132,50 @@ async function handleSales(sql, { method, action, query, body }) {
         }
       }
       return { handled: true, payload: { success: true, text } }
+    }
+    // ---- Team management (admin only) ----
+    if (action === 'update_rep_role') {
+      const { rep_id, role } = body
+      const allowed = ['rep', 'manager', 'admin']
+      if (!rep_id || !allowed.includes(role)) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'rep_id and valid role required' },
+        }
+      }
+      await sql.query('UPDATE sales_reps SET role=$1 WHERE id=$2', [
+        role,
+        rep_id,
+      ])
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'toggle_rep_status') {
+      const { rep_id, is_active } = body
+      if (!rep_id) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'rep_id required' },
+        }
+      }
+      await sql.query('UPDATE sales_reps SET is_active=$1 WHERE id=$2', [
+        !!is_active,
+        rep_id,
+      ])
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'reset_rep_password') {
+      const { rep_id } = body
+      if (!rep_id) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'rep_id required' },
+        }
+      }
+      await sql.query(
+        "UPDATE sales_reps SET password_hash='reset123' WHERE id=$1",
+        [rep_id],
+      )
+      return { handled: true, payload: { success: true } }
     }
     return { handled: false }
   }
