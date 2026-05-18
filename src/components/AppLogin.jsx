@@ -70,8 +70,16 @@ export default function AppLogin({ onAuth }) {
     <div style={{ minHeight: '100vh', background: '#0B0B0D', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 380 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#F5F5F2', letterSpacing: '-0.5px', marginBottom: 6 }}>
-            Lithos<span style={{ fontWeight: 300, color: 'rgba(194,181,155,0.7)' }}>Labs</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
+            <img
+              src="/lithos-logo.png"
+              alt="Lithos Labs"
+              style={{ width: 36, height: 36, objectFit: 'contain' }}
+              onError={e => e.target.style.display='none'}
+            />
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#F5F5F2', letterSpacing: '-0.5px' }}>
+              Lithos<span style={{ fontWeight: 300, color: 'rgba(194,181,155,0.6)' }}>Labs</span>
+            </div>
           </div>
           <div style={{ fontSize: 13, color: 'rgba(242,237,228,0.4)' }}>
             {mode === 'login' ? 'Sign in to your dashboard' : 'Create your account'}
