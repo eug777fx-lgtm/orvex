@@ -463,13 +463,18 @@ export async function setupMarketingDB() {
 
   try {
     await db.query(`
-      INSERT INTO sales_reps (name, email, password_hash, role, commission_rate) VALUES
-      ('Eugene', 'admin@lithoslabs.com', 'admin123', 'admin', 0)
-      ON CONFLICT (email) DO UPDATE SET password_hash='admin123', role='admin'
+      INSERT INTO sales_reps (name, email, password_hash, role, commission_rate)
+      VALUES ('Eugene', 'admin@lithoslabs.com', 'admin123', 'admin', 0)
+      ON CONFLICT (email) DO UPDATE SET role='admin', password_hash='admin123'
     `)
   } catch (e) {
     console.log('Migration skip:', e.message)
   }
+
+  // Roles are now: sales | manager | admin. Convert any legacy 'rep' rows.
+  try {
+    await db.query("UPDATE sales_reps SET role='sales' WHERE role='rep'")
+  } catch (e) {}
 
   // One-time fresh start: wipe all generated content but keep brands and
   // brand_memory completely intact. Runs before the seed inserts below.

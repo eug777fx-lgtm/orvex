@@ -51,18 +51,22 @@ import useIsMobile from './utils/useIsMobile'
 //  - adminOnly: only the admin sees it
 //  - repOnly:   only a sales rep sees it
 //  - (neither): everyone sees it
+// Roles: 'admin' | 'manager' | 'sales'.
+//  - adminOnly:   only admin
+//  - roles:       explicit allow-list (admin always sees everything)
+//  - (neither):   every role sees it
 const navItems = [
   { path: '/', label: 'Dashboard', end: true, icon: LayoutDashboard },
   { path: '/leads', label: 'Leads', icon: Users },
   { path: '/pipeline', label: 'Pipeline', icon: Kanban },
-  { path: '/discover', label: 'Discover', icon: Compass, repOnly: true },
+  { path: '/discover', label: 'Discover', icon: Compass },
   { path: '/offers', label: 'Offers', icon: Package },
   { path: '/scripts', label: 'Scripts', icon: BookOpen },
   { path: '/tasks', label: 'Tasks', icon: CheckSquare },
   { path: '/workflow', label: 'Workflow', icon: ListChecks, adminOnly: true },
   { path: '/documents', label: 'Documents', icon: FileText, adminOnly: true },
   { path: '/automations', label: 'Automations', icon: Zap, adminOnly: true },
-  { path: '/team', label: 'Team', icon: UserCog, adminOnly: true },
+  { path: '/team', label: 'Team', icon: UserCog, roles: ['admin', 'manager'] },
   { path: '/marketing', label: 'AI Office', icon: Sparkles, adminOnly: true },
   { path: '/demos', label: 'Demos', icon: Monitor, adminOnly: true },
   { path: '/import', label: 'Import', icon: Upload, adminOnly: true },
@@ -70,8 +74,9 @@ const navItems = [
 
 const navForRole = (role) =>
   navItems.filter((item) => {
-    if (item.adminOnly) return role === 'admin'
-    if (item.repOnly) return role === 'rep'
+    if (role === 'admin') return true
+    if (item.adminOnly) return false
+    if (item.roles) return item.roles.includes(role)
     return true
   })
 
@@ -214,9 +219,15 @@ function MobileBottomNav({ items }) {
   )
 }
 
-// Admin-only route guard. Reps hitting an admin URL bounce to the dashboard.
+// Admin-only route guard. Non-admins hitting an admin URL bounce home.
 function AdminOnly({ role, children }) {
   if (role !== 'admin') return <Navigate to="/" replace />
+  return children
+}
+
+// Allow-list route guard for routes shared by a subset of roles.
+function RoleGuard({ role, allow, children }) {
+  if (!allow.includes(role)) return <Navigate to="/" replace />
   return children
 }
 
@@ -260,9 +271,9 @@ function AnimatedRoutes({ role }) {
         <Route
           path="/team"
           element={
-            <AdminOnly role={role}>
+            <RoleGuard role={role} allow={['admin', 'manager']}>
               <Team />
-            </AdminOnly>
+            </RoleGuard>
           }
         />
         <Route
@@ -309,13 +320,13 @@ function Shell({ appAuth, onLogout }) {
   const roleLabel = {
     admin: 'ADMIN',
     manager: 'MANAGER',
-    rep: 'SALES',
+    sales: 'SALES',
   }[appAuth?.role] || 'SALES'
   const roleColor =
     {
       admin: '#C2B59B',
       manager: 'rgba(125,211,252,0.9)',
-      rep: 'rgba(125,211,252,0.9)',
+      sales: 'rgba(125,211,252,0.9)',
     }[appAuth?.role] || 'rgba(125,211,252,0.9)'
 
   const topbarStyle = {

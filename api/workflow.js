@@ -1371,8 +1371,8 @@ async function handleSales(sql, { method, action, query, body }) {
       return { handled: true, payload: { success: true, reps: rowsOf(r) } }
     }
     if (action === 'get_all_reps') {
-      // CASE WHEN instead of FILTER — compatible with older PostgreSQL.
-      const result = await sql.query(`
+      // Pre-aggregated subqueries — no FILTER, no GROUP BY on the main row.
+      const repsResult = await sql.query(`
         SELECT
           sr.id,
           sr.name,
@@ -1381,18 +1381,29 @@ async function handleSales(sql, { method, action, query, body }) {
           sr.is_active,
           sr.commission_rate,
           sr.created_at,
-          COUNT(DISTINCT sl.id) as total_leads,
-          COUNT(DISTINCT CASE WHEN d.status IN ('approved','commission_paid') THEN d.id END) as deals_closed,
-          COALESCE(SUM(CASE WHEN d.status IN ('approved','commission_paid') THEN d.commission_amount ELSE 0 END), 0) as total_commission
+          COALESCE(leads.total_leads, 0) as total_leads,
+          COALESCE(deals_agg.deals_closed, 0) as deals_closed,
+          COALESCE(deals_agg.total_commission, 0) as total_commission
         FROM sales_reps sr
-        LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
-        LEFT JOIN deals d ON d.rep_id = sr.id
-        GROUP BY sr.id, sr.name, sr.email, sr.role, sr.is_active, sr.commission_rate, sr.created_at
+        LEFT JOIN (
+          SELECT rep_id, COUNT(*) as total_leads
+          FROM sales_leads
+          GROUP BY rep_id
+        ) leads ON leads.rep_id = sr.id
+        LEFT JOIN (
+          SELECT
+            rep_id,
+            COUNT(*) as deals_closed,
+            SUM(commission_amount) as total_commission
+          FROM deals
+          WHERE status IN ('approved', 'commission_paid')
+          GROUP BY rep_id
+        ) deals_agg ON deals_agg.rep_id = sr.id
         ORDER BY sr.created_at DESC
       `)
       return {
         handled: true,
-        payload: { success: true, reps: rowsOf(result) },
+        payload: { success: true, reps: rowsOf(repsResult) },
       }
     }
     if (action === 'get_clients') {
@@ -1458,6 +1469,13 @@ async function handleSales(sql, { method, action, query, body }) {
           payload: { success: false, error: 'Invalid credentials' },
         }
       }
+      // Roles: admin | manager | sales. Legacy 'rep' rows normalize to 'sales'.
+      const role =
+        rep.role === 'admin'
+          ? 'admin'
+          : rep.role === 'manager'
+            ? 'manager'
+            : 'sales'
       return {
         handled: true,
         payload: {
@@ -1466,7 +1484,7 @@ async function handleSales(sql, { method, action, query, body }) {
             id: rep.id,
             name: rep.name,
             email: rep.email,
-            role: rep.role === 'admin' ? 'admin' : 'rep',
+            role,
             commission_rate: rep.commission_rate,
           },
         },
@@ -1501,7 +1519,7 @@ async function handleSales(sql, { method, action, query, body }) {
       try {
         const r = await sql.query(
           `INSERT INTO sales_reps (name, email, password_hash, role, is_active)
-           VALUES ($1, $2, $3, 'rep', true)
+           VALUES ($1, $2, $3, 'sales', true)
            RETURNING id, name, email, role`,
           [name, email, password],
         )
@@ -1514,7 +1532,7 @@ async function handleSales(sql, { method, action, query, body }) {
               id: rep.id,
               name: rep.name,
               email: rep.email,
-              role: 'rep',
+              role: 'sales',
             },
           },
         }
@@ -2146,7 +2164,7 @@ async function handleSales(sql, { method, action, query, body }) {
     // ---- Team management (admin only) ----
     if (action === 'update_rep_role') {
       const { rep_id, role } = body
-      const allowed = ['rep', 'manager', 'admin']
+      const allowed = ['sales', 'manager', 'admin']
       if (!rep_id || !allowed.includes(role)) {
         return {
           handled: true,

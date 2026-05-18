@@ -256,7 +256,7 @@ export default function Leads() {
   }, [])
 
   const { appAuth } = useAuth()
-  const isRepRole = appAuth?.role === 'rep'
+  const isRepRole = appAuth?.role === 'sales'
 
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)

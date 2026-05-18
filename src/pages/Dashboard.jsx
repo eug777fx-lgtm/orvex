@@ -526,7 +526,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const { appAuth } = useAuth()
-  const isRepRole = appAuth?.role === 'rep'
+  const isRepRole = appAuth?.role === 'sales'
   const isAdminRole = appAuth?.role === 'admin'
   // Rep dashboards are scoped to rows owned by that rep. $1 is the rep id.
   const leadWhere = isRepRole ? ' WHERE (assigned_to = $1 OR rep_id = $1)' : ''
@@ -567,6 +567,30 @@ export default function Dashboard() {
   const [revenueSeries, setRevenueSeries] = useState([])
   const [addLeadOpen, setAddLeadOpen] = useState(false)
   const [addTaskOpen, setAddTaskOpen] = useState(false)
+
+  // Commission earned — shown to sales reps and managers (never admin).
+  const showCommission =
+    appAuth?.role === 'sales' || appAuth?.role === 'manager'
+  const [commissionEarned, setCommissionEarned] = useState(0)
+
+  useEffect(() => {
+    if (!showCommission || !appAuth?.id) return
+    let cancelled = false
+    workflowApi('rep_profile', { params: { rep_id: appAuth.id } })
+      .then((d) => {
+        if (cancelled) return
+        const p = d?.profile || {}
+        const earned =
+          p.total_earnings ?? p.commission_earned ?? p.total_commission ?? 0
+        setCommissionEarned(Number(earned) || 0)
+      })
+      .catch(() => {
+        /* always render the card — falls back to $0.00 */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [showCommission, appAuth?.id])
 
   async function loadDashboard() {
     if (!db) {
@@ -986,6 +1010,23 @@ export default function Dashboard() {
           sub="Close rate"
           loading={loading}
         />
+        {showCommission && (
+          <StatCard
+            label="COMMISSION EARNED"
+            value={
+              <span style={{ color: '#C2B59B' }}>
+                $
+                {commissionEarned.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            }
+            sub="approved deals"
+            loading={loading}
+            ambient
+          />
+        )}
       </motion.div>
 
       {isAdminRole && (

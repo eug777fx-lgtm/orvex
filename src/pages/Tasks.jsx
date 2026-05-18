@@ -312,7 +312,7 @@ function EmptyLine({ children }) {
 export default function Tasks() {
   const navigate = useNavigate()
   const { appAuth } = useAuth()
-  const isRepRole = appAuth?.role === 'rep'
+  const isRepRole = appAuth?.role === 'sales'
   const repFilter = isRepRole
     ? ' AND (tasks.assigned_to = $1 OR tasks.rep_id = $1)'
     : ''

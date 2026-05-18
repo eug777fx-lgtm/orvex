@@ -1,7 +1,8 @@
 import { createContext, useContext } from 'react'
 
 // Shared role-based auth context for the unified Lithos Labs app.
-// appAuth shape: { id, name, email, role }  where role is 'admin' | 'rep'
+// appAuth shape: { id, name, email, role } where role is
+// 'admin' | 'manager' | 'sales'
 export const AuthContext = createContext({
   appAuth: null,
   setAppAuth: () => {},
@@ -12,7 +13,8 @@ export function useAuth() {
   return useContext(AuthContext)
 }
 
-export const isRep = (appAuth) => appAuth?.role === 'rep'
+export const isRep = (appAuth) => appAuth?.role === 'sales'
+export const isManager = (appAuth) => appAuth?.role === 'manager'
 export const isAdmin = (appAuth) => appAuth?.role === 'admin'
 
 // Single helper for talking to the serverless workflow API.
