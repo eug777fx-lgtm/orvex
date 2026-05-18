@@ -1195,7 +1195,7 @@ async function handleSales(sql, { method, action, query, body }) {
            FROM sales_reps sr
            LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
            LEFT JOIN deals d ON d.rep_id = sr.id
-          WHERE sr.role = 'rep' AND sr.is_active = true
+          WHERE sr.role = 'sales' AND sr.is_active = true
           GROUP BY sr.id, sr.name
           ORDER BY revenue DESC`,
       )
@@ -1249,7 +1249,7 @@ async function handleSales(sql, { method, action, query, body }) {
            FROM sales_reps sr
            LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
            LEFT JOIN deals d ON d.rep_id = sr.id
-          WHERE sr.role = 'rep'
+          WHERE sr.role = 'sales'
           GROUP BY sr.id
           ORDER BY sr.created_at ASC`,
       )
@@ -1343,7 +1343,7 @@ async function handleSales(sql, { method, action, query, body }) {
                 COUNT(sl.id) FILTER (WHERE sl.status IN ('contacted','followed_up')) AS in_progress
            FROM sales_reps sr
            LEFT JOIN sales_leads sl ON sl.rep_id = sr.id
-          WHERE sr.role = 'rep' AND sr.is_active = true
+          WHERE sr.role = 'sales' AND sr.is_active = true
           GROUP BY sr.id, sr.name, sr.email, sr.commission_rate
           ORDER BY closed DESC`,
       )
@@ -1365,45 +1365,33 @@ async function handleSales(sql, { method, action, query, body }) {
       const r = await sql.query(
         `SELECT id, name, email, role
            FROM sales_reps
-          WHERE is_active = true AND role = 'rep'
+          WHERE is_active = true AND role = 'sales'
           ORDER BY name`,
       )
       return { handled: true, payload: { success: true, reps: rowsOf(r) } }
     }
     if (action === 'get_all_reps') {
-      // Pre-aggregated subqueries — no FILTER, no GROUP BY on the main row.
-      const repsResult = await sql.query(`
-        SELECT
-          sr.id,
-          sr.name,
-          sr.email,
-          sr.role,
-          sr.is_active,
-          sr.commission_rate,
-          sr.created_at,
-          COALESCE(leads.total_leads, 0) as total_leads,
-          COALESCE(deals_agg.deals_closed, 0) as deals_closed,
-          COALESCE(deals_agg.total_commission, 0) as total_commission
-        FROM sales_reps sr
-        LEFT JOIN (
-          SELECT rep_id, COUNT(*) as total_leads
-          FROM sales_leads
-          GROUP BY rep_id
-        ) leads ON leads.rep_id = sr.id
-        LEFT JOIN (
-          SELECT
-            rep_id,
-            COUNT(*) as deals_closed,
-            SUM(commission_amount) as total_commission
-          FROM deals
-          WHERE status IN ('approved', 'commission_paid')
-          GROUP BY rep_id
-        ) deals_agg ON deals_agg.rep_id = sr.id
-        ORDER BY sr.created_at DESC
-      `)
-      return {
-        handled: true,
-        payload: { success: true, reps: rowsOf(repsResult) },
+      // Per-rep subqueries — avoids every cross-table column-name conflict.
+      try {
+        const reps = await sql.query(`SELECT id, name, email, role, is_active, commission_rate, created_at FROM sales_reps ORDER BY created_at DESC`)
+        const repRows = reps.rows || reps
+
+        const result = await Promise.all(repRows.map(async (rep) => {
+          const leads = await sql.query(`SELECT COUNT(*) as count FROM sales_leads WHERE rep_id = $1`, [rep.id])
+          const dealsResult = await sql.query(`SELECT COUNT(*) as count, COALESCE(SUM(commission_amount), 0) as total FROM deals WHERE rep_id = $1 AND status = ANY($2)`, [rep.id, ['approved', 'commission_paid']])
+          const leadsRow = (leads.rows || leads)[0]
+          const dealsRow = (dealsResult.rows || dealsResult)[0]
+          return {
+            ...rep,
+            total_leads: parseInt(leadsRow?.count || 0),
+            deals_closed: parseInt(dealsRow?.count || 0),
+            total_commission: parseFloat(dealsRow?.total || 0)
+          }
+        }))
+
+        return { handled: true, payload: { success: true, reps: result } }
+      } catch(e) {
+        return { handled: true, payload: { success: false, error: e.message } }
       }
     }
     if (action === 'get_clients') {

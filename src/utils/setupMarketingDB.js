@@ -6,6 +6,9 @@ export async function setupMarketingDB() {
   // these columns existed) would otherwise throw `column "created_at" does
   // not exist` and abort the whole setup. ALTER TABLE IF EXISTS is a safe
   // no-op on fresh installs where the table isn't created yet.
+  // Roles are now: sales | manager | admin. Convert any legacy 'rep' rows.
+  try { await db.query("UPDATE sales_reps SET role='sales' WHERE role='rep'") } catch(e) {}
+
   const allTables = ['analytics','content_pipeline','schedules','agent_runs','post_packages','content','brands','brand_memory','sales_leads','sales_reps','deals','rep_tasks','lead_activities','rep_kpis','sales_notifications','services_catalog','clients','documents','automation_workflows']
   for (const t of allTables) {
     try { await db.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`) } catch(e) {}
@@ -470,11 +473,6 @@ export async function setupMarketingDB() {
   } catch (e) {
     console.log('Migration skip:', e.message)
   }
-
-  // Roles are now: sales | manager | admin. Convert any legacy 'rep' rows.
-  try {
-    await db.query("UPDATE sales_reps SET role='sales' WHERE role='rep'")
-  } catch (e) {}
 
   // One-time fresh start: wipe all generated content but keep brands and
   // brand_memory completely intact. Runs before the seed inserts below.
