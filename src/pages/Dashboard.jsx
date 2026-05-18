@@ -21,6 +21,7 @@ import AddTaskModal from '../components/AddTaskModal'
 import PageShell, { staggerContainer, staggerItem } from '../components/PageShell'
 import { useCountUp } from '../utils/useCountUp'
 import useIsMobile from '../utils/useIsMobile'
+import { useAuth, workflowApi } from '../lib/auth'
 
 const STAGE_ORDER = [
   { key: 'lead', label: 'Lead' },
@@ -524,9 +525,23 @@ function RevenueAreaChart({ data }) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
+  const { appAuth } = useAuth()
+  const isRepRole = appAuth?.role === 'rep'
+  const isAdminRole = appAuth?.role === 'admin'
+  // Rep dashboards are scoped to rows owned by that rep. $1 is the rep id.
+  const leadWhere = isRepRole ? ' WHERE (assigned_to = $1 OR rep_id = $1)' : ''
+  const leadAnd = isRepRole ? ' AND (assigned_to = $1 OR rep_id = $1)' : ''
+  const dealWhere = isRepRole ? ' WHERE (assigned_to = $1 OR rep_id = $1)' : ''
+  const dealAnd = isRepRole ? ' AND (assigned_to = $1 OR rep_id = $1)' : ''
+  const taskAnd = isRepRole
+    ? ' AND (tasks.assigned_to = $1 OR tasks.rep_id = $1)'
+    : ''
+  const scopeParams = isRepRole ? [appAuth.id] : []
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [unassignedCount, setUnassignedCount] = useState(0)
+  const [activeRepCount, setActiveRepCount] = useState(0)
   const [totals, setTotals] = useState({
     totalLeads: 0,
     leadsThisWeek: 0,
@@ -580,35 +595,48 @@ export default function Dashboard() {
         revenueMonthlyRows,
         discoveredRows,
       ] = await Promise.all([
-        db.query('SELECT COUNT(*)::int AS count FROM leads'),
-        db.query(`
+        db.query(
+          `SELECT COUNT(*)::int AS count FROM leads${leadWhere}`,
+          scopeParams,
+        ),
+        db.query(
+          `
           SELECT
             COUNT(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS this_week,
             COUNT(*) FILTER (
               WHERE created_at >= now() - interval '14 days'
                 AND created_at < now() - interval '7 days'
             )::int AS last_week
-          FROM leads
-        `),
-        db.query(`
+          FROM leads${leadWhere}
+        `,
+          scopeParams,
+        ),
+        db.query(
+          `
           SELECT
             COALESCE(SUM(proposed_price) FILTER (WHERE stage NOT IN ('closed_won','closed_lost')), 0)::float AS pipeline_value,
             COALESCE(SUM(COALESCE(final_price, proposed_price)) FILTER (WHERE stage = 'closed_won'), 0)::float AS revenue_closed,
             COUNT(*) FILTER (WHERE stage = 'closed_won')::int AS won_count,
             COUNT(*) FILTER (WHERE stage = 'closed_lost')::int AS lost_count
-          FROM deals
-        `),
-        db.query(`
+          FROM deals${dealWhere}
+        `,
+          scopeParams,
+        ),
+        db.query(
+          `
           SELECT stage, COUNT(*)::int AS count
-          FROM deals
+          FROM deals${dealWhere}
           GROUP BY stage
-        `),
-        db.query(`
+        `,
+          scopeParams,
+        ),
+        db.query(
+          `
           SELECT tasks.*, leads.company_name
           FROM tasks
           LEFT JOIN leads ON tasks.lead_id = leads.id
           WHERE tasks.is_complete = false
-            AND tasks.due_date = CURRENT_DATE
+            AND tasks.due_date = CURRENT_DATE${taskAnd}
           ORDER BY
             CASE tasks.priority
               WHEN 'high' THEN 0
@@ -617,21 +645,29 @@ export default function Dashboard() {
               ELSE 3
             END ASC
           LIMIT 5
-        `),
-        db.query(`
+        `,
+          scopeParams,
+        ),
+        db.query(
+          `
           SELECT industry, COUNT(*)::int AS count
           FROM leads
-          WHERE industry IS NOT NULL AND industry <> ''
+          WHERE industry IS NOT NULL AND industry <> ''${leadAnd}
           GROUP BY industry
           ORDER BY count DESC
           LIMIT 6
-        `),
-        db.query(`
+        `,
+          scopeParams,
+        ),
+        db.query(
+          `
           SELECT id, company_name, industry, status, opportunity_score
-          FROM leads
+          FROM leads${leadWhere}
           ORDER BY created_at DESC
           LIMIT 5
-        `),
+        `,
+          scopeParams,
+        ),
         db.query(`
           SELECT COUNT(*)::int AS count
           FROM activities
@@ -672,11 +708,14 @@ export default function Dashboard() {
           ) AS month_series
           LEFT JOIN deals
             ON deals.stage = 'closed_won'
-            AND date_trunc('month', COALESCE(deals.closed_at, deals.created_at)) = month_series
+            AND date_trunc('month', COALESCE(deals.closed_at, deals.created_at)) = month_series${dealAnd}
           GROUP BY month_series
           ORDER BY month_series ASC
-        `),
-        db.query(`
+        `,
+          scopeParams,
+        ),
+        db.query(
+          `
           SELECT
             COALESCE(SUM(COALESCE(final_price, proposed_price)) FILTER (
               WHERE stage = 'closed_won'
@@ -687,10 +726,13 @@ export default function Dashboard() {
                 AND COALESCE(closed_at, created_at) >= date_trunc('month', now()) - interval '1 month'
                 AND COALESCE(closed_at, created_at) < date_trunc('month', now())
             ), 0)::float AS last_month
-          FROM deals
-        `),
+          FROM deals${dealWhere}
+        `,
+          scopeParams,
+        ),
         db.query(
-          `SELECT COUNT(*)::int AS count FROM leads WHERE source = 'google_places'`,
+          `SELECT COUNT(*)::int AS count FROM leads WHERE source = 'google_places'${leadAnd}`,
+          scopeParams,
         ),
       ])
 
@@ -751,7 +793,33 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRepRole, appAuth?.id])
+
+  // Admin-only lead-assignment stats for the Lead Assignment widget.
+  useEffect(() => {
+    if (!isAdminRole || !db) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [unassignedRows, repsData] = await Promise.all([
+          db.query(
+            `SELECT COUNT(*)::int AS count FROM leads
+              WHERE assigned_to IS NULL AND rep_id IS NULL`,
+          ),
+          workflowApi('get_sales_reps'),
+        ])
+        if (cancelled) return
+        setUnassignedCount(unassignedRows?.[0]?.count ?? 0)
+        setActiveRepCount((repsData?.reps || []).length)
+      } catch (e) {
+        /* widget is best-effort */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isAdminRole])
 
   async function toggleTaskComplete(task) {
     if (!db) return
@@ -919,6 +987,67 @@ export default function Dashboard() {
           loading={loading}
         />
       </motion.div>
+
+      {isAdminRole && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+            background: 'rgba(194,181,155,0.04)',
+            border: '0.5px solid rgba(194,181,155,0.12)',
+            borderRadius: 16,
+            padding: '18px 22px',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
+              Lead Assignment
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: 'rgba(255,255,255,0.5)',
+                marginTop: 6,
+              }}
+            >
+              <span style={{ color: '#C2B59B', fontWeight: 600 }}>
+                {unassignedCount}
+              </span>{' '}
+              unassigned {unassignedCount === 1 ? 'lead' : 'leads'}
+              <span style={{ margin: '0 8px', opacity: 0.4 }}>|</span>
+              <span style={{ color: '#fff', fontWeight: 600 }}>
+                {activeRepCount}
+              </span>{' '}
+              active {activeRepCount === 1 ? 'rep' : 'reps'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              navigate('/leads', { state: { unassigned: true } })
+            }
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#0B0B0D',
+              background: '#C2B59B',
+              border: 'none',
+              borderRadius: 10,
+              padding: '10px 18px',
+              cursor: 'pointer',
+            }}
+          >
+            Manage Assignments
+            <ArrowUpRight size={14} />
+          </button>
+        </div>
+      )}
 
       <div
         style={{

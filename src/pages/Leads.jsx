@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Search, Plus, ExternalLink, Upload, X, Trash2 } from 'lucide-react'
+import { Search, Plus, ExternalLink, Upload, X, Trash2, UserPlus } from 'lucide-react'
 import db from '@/lib/db'
 import AddLeadModal from '../components/AddLeadModal'
 import Discover from '../components/Discover'
 import PageShell from '../components/PageShell'
 import useIsMobile from '../utils/useIsMobile'
+import { useAuth, workflowApi } from '../lib/auth'
 
 const INDUSTRY_FILTERS = [
   'All',
@@ -254,6 +255,9 @@ export default function Leads() {
     }
   }, [])
 
+  const { appAuth } = useAuth()
+  const isRepRole = appAuth?.role === 'rep'
+
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -262,6 +266,9 @@ export default function Leads() {
   const [status, setStatus] = useState('All')
   const [modalOpen, setModalOpen] = useState(false)
   const [tab, setTab] = useState('my')
+  const [reps, setReps] = useState([])
+  const [assignOpenId, setAssignOpenId] = useState(null)
+  const repName = (id) => reps.find((r) => r.id === id)?.name || null
 
   async function fetchLeads() {
     if (!db) {
@@ -274,7 +281,15 @@ export default function Leads() {
     setLoading(true)
     setError(null)
     try {
-      const rows = await db.query('SELECT * FROM leads ORDER BY created_at DESC')
+      // Reps only ever see leads assigned to them; admins see everything.
+      const rows = isRepRole
+        ? await db.query(
+            `SELECT * FROM leads
+              WHERE assigned_to = $1 OR rep_id = $1
+              ORDER BY created_at DESC`,
+            [appAuth.id],
+          )
+        : await db.query('SELECT * FROM leads ORDER BY created_at DESC')
       setLeads(rows)
     } catch (err) {
       console.error(err)
@@ -284,9 +299,39 @@ export default function Leads() {
     }
   }
 
+  async function assignLead(leadId, repId) {
+    setAssignOpenId(null)
+    const prev = leads
+    setLeads((rows) =>
+      rows.map((l) =>
+        l.id === leadId ? { ...l, assigned_to: repId, rep_id: repId } : l,
+      ),
+    )
+    try {
+      const data = await workflowApi('assign_lead', {
+        method: 'POST',
+        body: { lead_id: leadId, rep_id: repId },
+      })
+      if (!data?.success) throw new Error(data?.error || 'Assign failed')
+    } catch (err) {
+      console.error(err)
+      setLeads(prev)
+      setError(err?.message || 'Failed to assign lead.')
+    }
+  }
+
   useEffect(() => {
     fetchLeads()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRepRole, appAuth?.id])
+
+  useEffect(() => {
+    if (appAuth?.role === 'admin') {
+      workflowApi('get_sales_reps')
+        .then((d) => setReps(d?.reps || []))
+        .catch(() => setReps([]))
+    }
+  }, [appAuth?.role])
 
   async function deleteOne(leadId) {
     if (!db) return
@@ -342,15 +387,20 @@ export default function Leads() {
     })
   }
 
+  const [onlyUnassigned, setOnlyUnassigned] = useState(
+    Boolean(location.state?.unassigned),
+  )
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return leads.filter((l) => {
       if (q && !(l.company_name || '').toLowerCase().includes(q)) return false
       if (industry !== 'All' && l.industry !== industry) return false
       if (status !== 'All' && l.status !== status) return false
+      if (onlyUnassigned && (l.assigned_to || l.rep_id)) return false
       return true
     })
-  }, [leads, search, industry, status])
+  }, [leads, search, industry, status, onlyUnassigned])
 
   const hasLeads = leads.length > 0
   const hasFilteredLeads = filtered.length > 0
@@ -512,6 +562,23 @@ export default function Leads() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {!isRepRole && (
+            <button
+              type="button"
+              onClick={() => setOnlyUnassigned((v) => !v)}
+              style={{
+                ...ghostButtonStyle,
+                color: onlyUnassigned ? '#0B0B0D' : '#C2B59B',
+                background: onlyUnassigned
+                  ? '#C2B59B'
+                  : 'rgba(194,181,155,0.08)',
+                borderColor: 'rgba(194,181,155,0.25)',
+              }}
+            >
+              <UserPlus size={12} />
+              {onlyUnassigned ? 'Unassigned only' : 'Show unassigned'}
+            </button>
+          )}
           {selectedIds.size > 0 && (
             <button
               type="button"
@@ -612,6 +679,24 @@ export default function Leads() {
                   )}
                   <span style={statusPillStyle(lead.status)}>{lead.status || 'new'}</span>
                 </div>
+                {!isRepRole && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <select
+                      value={lead.assigned_to || lead.rep_id || ''}
+                      onChange={(e) =>
+                        e.target.value && assignLead(lead.id, e.target.value)
+                      }
+                      style={{ ...selectStyle, width: '100%' }}
+                    >
+                      <option value="">Unassigned — tap to assign</option>
+                      {reps.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div
                   style={{
                     display: 'flex',
@@ -703,6 +788,7 @@ export default function Leads() {
                   <th style={tableHeaderCell}>Location</th>
                   <th style={tableHeaderCell}>Score</th>
                   <th style={tableHeaderCell}>Status</th>
+                  {!isRepRole && <th style={tableHeaderCell}>Assigned</th>}
                   <th style={tableHeaderCell}>Website</th>
                   <th style={{ ...tableHeaderCell, textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -763,6 +849,54 @@ export default function Leads() {
                     <td style={tableCellBase}>
                       <span style={statusPillStyle(lead.status)}>{lead.status || 'new'}</span>
                     </td>
+                    {!isRepRole && (
+                      <td
+                        style={{ ...tableCellBase, position: 'relative' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {assignOpenId === lead.id ? (
+                          <select
+                            autoFocus
+                            defaultValue={lead.assigned_to || lead.rep_id || ''}
+                            onChange={(e) =>
+                              e.target.value &&
+                              assignLead(lead.id, e.target.value)
+                            }
+                            onBlur={() => setAssignOpenId(null)}
+                            style={{
+                              ...selectStyle,
+                              padding: '5px 8px',
+                              fontSize: 12,
+                            }}
+                          >
+                            <option value="" disabled>
+                              Select rep…
+                            </option>
+                            {reps.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setAssignOpenId(lead.id)}
+                            style={{
+                              ...ghostButtonStyle,
+                              padding: '4px 10px',
+                              color: (lead.assigned_to || lead.rep_id)
+                                ? 'rgba(255,255,255,0.7)'
+                                : '#C2B59B',
+                            }}
+                          >
+                            <UserPlus size={11} />
+                            {repName(lead.assigned_to || lead.rep_id) ||
+                              'Assign'}
+                          </button>
+                        )}
+                      </td>
+                    )}
                     <td style={{ ...tableCellBase, color: 'rgba(255,255,255,0.55)' }}>
                       {lead.has_website ? 'Yes' : 'No'}
                     </td>

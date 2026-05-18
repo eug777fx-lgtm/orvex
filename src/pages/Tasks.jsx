@@ -4,6 +4,7 @@ import { Plus, Check, X, ChevronDown, ChevronUp } from 'lucide-react'
 import db from '@/lib/db'
 import AddTaskModal from '../components/AddTaskModal'
 import PageShell from '../components/PageShell'
+import { useAuth } from '../lib/auth'
 import {
   addDays,
   dateKey,
@@ -310,6 +311,12 @@ function EmptyLine({ children }) {
 
 export default function Tasks() {
   const navigate = useNavigate()
+  const { appAuth } = useAuth()
+  const isRepRole = appAuth?.role === 'rep'
+  const repFilter = isRepRole
+    ? ' AND (tasks.assigned_to = $1 OR tasks.rep_id = $1)'
+    : ''
+  const repParams = isRepRole ? [appAuth.id] : []
   const [tasks, setTasks] = useState([])
   const [completed, setCompleted] = useState([])
   const [completedToday, setCompletedToday] = useState(0)
@@ -331,23 +338,29 @@ export default function Tasks() {
     setError(null)
     try {
       const [openRows, countRows] = await Promise.all([
-        db.query(`
+        db.query(
+          `
           SELECT
             tasks.*,
             leads.company_name,
             leads.id AS lead_id
           FROM tasks
           LEFT JOIN leads ON tasks.lead_id = leads.id
-          WHERE tasks.is_complete = false
+          WHERE tasks.is_complete = false${repFilter}
           ORDER BY tasks.due_date ASC NULLS LAST, tasks.priority DESC
-        `),
-        db.query(`
+        `,
+          repParams,
+        ),
+        db.query(
+          `
           SELECT COUNT(*)::int AS count
           FROM tasks
-          WHERE is_complete = true
-            AND completed_at >= date_trunc('day', now())
-            AND completed_at < date_trunc('day', now()) + interval '1 day'
-        `),
+          WHERE tasks.is_complete = true${repFilter}
+            AND tasks.completed_at >= date_trunc('day', now())
+            AND tasks.completed_at < date_trunc('day', now()) + interval '1 day'
+        `,
+          repParams,
+        ),
       ])
       setTasks(openRows || [])
       setCompletedToday(countRows?.[0]?.count ?? 0)
@@ -363,17 +376,20 @@ export default function Tasks() {
     if (!db) return
     setCompletedLoading(true)
     try {
-      const rows = await db.query(`
+      const rows = await db.query(
+        `
         SELECT
           tasks.*,
           leads.company_name,
           leads.id AS lead_id
         FROM tasks
         LEFT JOIN leads ON tasks.lead_id = leads.id
-        WHERE tasks.is_complete = true
+        WHERE tasks.is_complete = true${repFilter}
         ORDER BY tasks.completed_at DESC NULLS LAST
         LIMIT 100
-      `)
+      `,
+        repParams,
+      )
       setCompleted(rows || [])
     } catch (err) {
       console.error(err)

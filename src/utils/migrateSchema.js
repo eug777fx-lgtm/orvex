@@ -37,6 +37,21 @@ export function migrateSchema() {
         'ALTER TABLE leads ADD COLUMN IF NOT EXISTS manual_processes boolean DEFAULT false',
       )
 
+      // Rep ownership columns for the unified role-based app. A rep only ever
+      // sees rows where assigned_to / rep_id matches their sales_reps id.
+      await db.query(
+        'ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_to uuid',
+      )
+      await db.query('ALTER TABLE leads ADD COLUMN IF NOT EXISTS rep_id uuid')
+      await db.query(
+        'ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_to uuid',
+      )
+      await db.query('ALTER TABLE tasks ADD COLUMN IF NOT EXISTS rep_id uuid')
+      await db.query(
+        'ALTER TABLE deals ADD COLUMN IF NOT EXISTS assigned_to uuid',
+      )
+      await db.query('ALTER TABLE deals ADD COLUMN IF NOT EXISTS rep_id uuid')
+
       await db.query('ALTER TABLE offers ADD COLUMN IF NOT EXISTS included text[]')
 
       await db.query('ALTER TABLE deals ADD COLUMN IF NOT EXISTS title text')

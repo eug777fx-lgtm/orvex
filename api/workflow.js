@@ -1361,21 +1361,76 @@ async function handleSales(sql, { method, action, query, body }) {
       )
       return { handled: true, payload: { success: true, leads: rowsOf(r) } }
     }
+    if (action === 'get_sales_reps') {
+      const r = await sql.query(
+        `SELECT id, name, email, role
+           FROM sales_reps
+          WHERE is_active = true AND role = 'rep'
+          ORDER BY name`,
+      )
+      return { handled: true, payload: { success: true, reps: rowsOf(r) } }
+    }
+    if (action === 'get_clients') {
+      const r = await sql.query(
+        `SELECT * FROM clients ORDER BY created_at DESC`,
+      )
+      return { handled: true, payload: { success: true, clients: rowsOf(r) } }
+    }
+    if (action === 'get_documents') {
+      const r = await sql.query(
+        `SELECT * FROM documents WHERE client_id = $1 ORDER BY created_at DESC`,
+        [query.client_id],
+      )
+      return { handled: true, payload: { success: true, documents: rowsOf(r) } }
+    }
+    if (action === 'get_automations') {
+      const r = await sql.query(
+        `SELECT * FROM automation_workflows
+          WHERE ($1::uuid IS NULL OR client_id = $1)
+          ORDER BY created_at DESC`,
+        [query.client_id || null],
+      )
+      return { handled: true, payload: { success: true, automations: rowsOf(r) } }
+    }
     return { handled: false }
   }
 
   // ---- POST actions ----
   if (method === 'POST') {
     if (action === 'rep_login') {
-      const { email, password } = body
+      const email = String(body.email || '').trim().toLowerCase()
+      const password = body.password
+      // Make sure the admin account always exists so the CEO can never be
+      // locked out, even on a fresh database where the seed hasn't run.
+      if (email === 'admin@lithoslabs.com') {
+        try {
+          await sql.query(
+            `INSERT INTO sales_reps (name, email, password_hash, role, commission_rate, is_active)
+             VALUES ('Eugene', 'admin@lithoslabs.com', 'admin123', 'admin', 0, true)
+             ON CONFLICT (email) DO UPDATE SET role='admin', is_active=true`,
+          )
+        } catch (e) {
+          /* non-fatal */
+        }
+      }
       const r = await sql.query(
-        'SELECT * FROM sales_reps WHERE email=$1 AND is_active=true',
+        'SELECT * FROM sales_reps WHERE lower(email)=$1 AND is_active=true',
         [email],
       )
       const rep = firstOf(r)
       if (!rep || rep.password_hash !== password) {
-        return { handled: true, payload: { success: false, error: 'Invalid credentials' } }
+        return {
+          handled: true,
+          payload: { success: false, error: 'Invalid email or password' },
+        }
       }
+      // Hard bypass: the CEO credentials always resolve to admin.
+      const role =
+        email === 'admin@lithoslabs.com' && password === 'admin123'
+          ? 'admin'
+          : rep.role === 'admin'
+            ? 'admin'
+            : 'rep'
       return {
         handled: true,
         payload: {
@@ -1384,24 +1439,58 @@ async function handleSales(sql, { method, action, query, body }) {
             id: rep.id,
             name: rep.name,
             email: rep.email,
-            role: rep.role,
+            role,
             commission_rate: rep.commission_rate,
           },
         },
       }
     }
     if (action === 'rep_register') {
-      const { name, email, password, invite_code } = body
+      const name = String(body.name || '').trim()
+      const email = String(body.email || '').trim().toLowerCase()
+      const { password, invite_code } = body
       if (invite_code !== process.env.SALES_REP_INVITE_CODE) {
-        return { handled: true, payload: { success: false, error: 'Invalid invite code' } }
+        return {
+          handled: true,
+          payload: { success: false, error: 'Invalid invite code' },
+        }
+      }
+      if (!name || !email || !password) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'Name, email and password required' },
+        }
+      }
+      const existing = await sql.query(
+        'SELECT id FROM sales_reps WHERE lower(email)=$1',
+        [email],
+      )
+      if (firstOf(existing)) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'Email already registered' },
+        }
       }
       try {
         const r = await sql.query(
-          `INSERT INTO sales_reps (name, email, password_hash, role)
-           VALUES ($1, $2, $3, 'rep') RETURNING id, name, email, role`,
+          `INSERT INTO sales_reps (name, email, password_hash, role, is_active)
+           VALUES ($1, $2, $3, 'rep', true)
+           RETURNING id, name, email, role`,
           [name, email, password],
         )
-        return { handled: true, payload: { success: true, rep: firstOf(r) } }
+        const rep = firstOf(r)
+        return {
+          handled: true,
+          payload: {
+            success: true,
+            rep: {
+              id: rep.id,
+              name: rep.name,
+              email: rep.email,
+              role: 'rep',
+            },
+          },
+        }
       } catch (e) {
         return {
           handled: true,
@@ -1453,6 +1542,27 @@ async function handleSales(sql, { method, action, query, body }) {
         [leadId, rep_id],
       )
       await bumpKpi(sql, rep_id, 'leads_added', 1)
+      // Mirror into the unified app's main `leads` table so the rep sees it
+      // on the Leads / Dashboard pages (filtered by assigned_to). Best-effort.
+      try {
+        await sql.query(
+          `INSERT INTO leads
+             (company_name, owner_name, location, industry, source,
+              notes, status, assigned_to, rep_id)
+           VALUES ($1,$2,$3,$4,$5,$6,'new',$7,$7)`,
+          [
+            company_name,
+            contact_name || null,
+            location || null,
+            industry || null,
+            source || 'discover',
+            notes || null,
+            rep_id || null,
+          ],
+        )
+      } catch (e) {
+        /* main leads table mirror is best-effort — non-fatal */
+      }
       return { handled: true, payload: { success: true, lead_id: leadId } }
     }
     if (action === 'update_lead_status') {
@@ -1690,21 +1800,48 @@ async function handleSales(sql, { method, action, query, body }) {
           payload: { success: false, error: 'lead_id and rep_id required' },
         }
       }
-      await sql.query(
-        `UPDATE sales_leads SET rep_id=$1, updated_at=now() WHERE id=$2`,
-        [rep_id, lead_id],
-      )
-      await sql.query(
-        `INSERT INTO lead_activities (lead_id, rep_id, activity_type, description)
-         VALUES ($1, $2, 'note', 'Lead assigned by admin')`,
-        [lead_id, rep_id],
-      )
-      await sql.query(
-        `INSERT INTO sales_notifications (recipient_id, type, title, message)
-         VALUES ($1, 'lead_assigned', 'New lead assigned', 'A new lead has been assigned to you')`,
+      // The unified app's Leads page works off the main `leads` table, while
+      // the legacy pipeline uses `sales_leads`. Assign in both so the rep
+      // filter (assigned_to / rep_id) resolves wherever the row lives.
+      try {
+        await sql.query(
+          `UPDATE leads SET assigned_to=$1, rep_id=$1 WHERE id=$2`,
+          [rep_id, lead_id],
+        )
+      } catch (e) {
+        /* leads table / row may not exist — non-fatal */
+      }
+      try {
+        await sql.query(
+          `UPDATE sales_leads SET rep_id=$1, updated_at=now() WHERE id=$2`,
+          [rep_id, lead_id],
+        )
+        await sql.query(
+          `INSERT INTO lead_activities (lead_id, rep_id, activity_type, description)
+           SELECT $1, $2, 'note', 'Lead assigned by admin'
+            WHERE EXISTS (SELECT 1 FROM sales_leads WHERE id = $1)`,
+          [lead_id, rep_id],
+        )
+      } catch (e) {
+        /* not a sales_leads row — non-fatal */
+      }
+      try {
+        await sql.query(
+          `INSERT INTO sales_notifications (recipient_id, type, title, message)
+           VALUES ($1, 'lead_assigned', 'New lead assigned', 'A new lead has been assigned to you')`,
+          [rep_id],
+        )
+      } catch (e) {
+        /* non-fatal */
+      }
+      const rn = await sql.query(
+        'SELECT name FROM sales_reps WHERE id=$1',
         [rep_id],
       )
-      return { handled: true, payload: { success: true } }
+      return {
+        handled: true,
+        payload: { success: true, rep_name: firstOf(rn)?.name || null },
+      }
     }
     if (action === 'bulk_assign_leads') {
       const { lead_ids, rep_id } = body
@@ -1808,6 +1945,176 @@ async function handleSales(sql, { method, action, query, body }) {
           results: Array.isArray(parsed) ? parsed : [],
         },
       }
+    }
+    // ---- Clients & documents ----
+    if (action === 'add_client') {
+      const {
+        company_name,
+        contact_name,
+        contact_email,
+        contact_phone,
+        contact_whatsapp,
+        address,
+        industry,
+        service_package,
+        monthly_retainer,
+        setup_fee,
+        start_date,
+        notes,
+      } = body
+      if (!company_name) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'company_name required' },
+        }
+      }
+      const r = await sql.query(
+        `INSERT INTO clients
+           (company_name, contact_name, contact_email, contact_phone,
+            contact_whatsapp, address, industry, service_package,
+            monthly_retainer, setup_fee, start_date, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         RETURNING *`,
+        [
+          company_name,
+          contact_name || '',
+          contact_email || '',
+          contact_phone || null,
+          contact_whatsapp || null,
+          address || null,
+          industry || null,
+          service_package || null,
+          Number(monthly_retainer) || 0,
+          Number(setup_fee) || 0,
+          start_date || null,
+          notes || null,
+        ],
+      )
+      return { handled: true, payload: { success: true, client: firstOf(r) } }
+    }
+    if (action === 'save_document') {
+      const { client_id, type, title, content } = body
+      const r = await sql.query(
+        `INSERT INTO documents (client_id, type, title, content)
+         VALUES ($1,$2,$3,$4) RETURNING *`,
+        [client_id, type, title, content || ''],
+      )
+      return { handled: true, payload: { success: true, document: firstOf(r) } }
+    }
+    if (action === 'delete_document') {
+      await sql.query('DELETE FROM documents WHERE id=$1', [body.document_id])
+      return { handled: true, payload: { success: true } }
+    }
+    // ---- Automations ----
+    if (action === 'save_automation') {
+      const { client_id, name, type, trigger_type, steps } = body
+      const r = await sql.query(
+        `INSERT INTO automation_workflows
+           (client_id, name, type, status, trigger_type, steps)
+         VALUES ($1,$2,$3,'inactive',$4,$5)
+         RETURNING *`,
+        [
+          client_id || null,
+          name,
+          type,
+          trigger_type || null,
+          steps ? JSON.stringify(steps) : null,
+        ],
+      )
+      return {
+        handled: true,
+        payload: { success: true, automation: firstOf(r) },
+      }
+    }
+    if (action === 'toggle_automation') {
+      const { automation_id, status } = body
+      await sql.query(
+        `UPDATE automation_workflows SET status=$1 WHERE id=$2`,
+        [status, automation_id],
+      )
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'delete_automation') {
+      await sql.query('DELETE FROM automation_workflows WHERE id=$1', [
+        body.automation_id,
+      ])
+      return { handled: true, payload: { success: true } }
+    }
+    if (action === 'voice_agent_request') {
+      const {
+        client_id,
+        business_name,
+        phone_number,
+        business_hours,
+        services,
+        booking_link,
+      } = body
+      await sql.query(
+        `INSERT INTO voice_agent_requests
+           (client_id, business_name, phone_number, business_hours, services, booking_link)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [
+          client_id || null,
+          business_name || null,
+          phone_number || null,
+          business_hours || null,
+          services || null,
+          booking_link || null,
+        ],
+      )
+      try {
+        const admins = rowsOf(
+          await sql.query("SELECT id FROM sales_reps WHERE role='admin'"),
+        )
+        for (const a of admins) {
+          await sql.query(
+            `INSERT INTO sales_notifications (recipient_id, type, title, message, link)
+             VALUES ($1,'request','Voice agent setup requested',$2,'/automations')`,
+            [a.id, `Voice agent request for ${business_name || 'a client'}`],
+          )
+        }
+      } catch (e) {
+        /* non-fatal */
+      }
+      return { handled: true, payload: { success: true } }
+    }
+    // ---- Server-side Claude proxy for document/text generation ----
+    if (action === 'ai_generate') {
+      const { system, prompt, max_tokens } = body
+      if (!process.env.ANTHROPIC_API_KEY) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'AI not configured' },
+        }
+      }
+      const aRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: Number(max_tokens) || 2000,
+          system:
+            system ||
+            'You are a professional document writer for Lithos Labs, a CRM and AI marketing agency in Aruba. Generate complete, professional documents. Return ONLY the document text.',
+          messages: [{ role: 'user', content: prompt || '' }],
+        }),
+      })
+      const aData = await aRes.json()
+      const text = aData?.content?.[0]?.text || ''
+      if (!text) {
+        return {
+          handled: true,
+          payload: {
+            success: false,
+            error: aData?.error?.message || 'AI returned no content',
+          },
+        }
+      }
+      return { handled: true, payload: { success: true, text } }
     }
     return { handled: false }
   }

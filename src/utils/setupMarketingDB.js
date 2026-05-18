@@ -1,17 +1,20 @@
 import db from '@/lib/db'
 
 export async function setupMarketingDB() {
-  // First ensure created_at exists on any pre-existing tables.
-  // This MUST run before any CREATE TABLE / dedupe / index so that legacy
-  // databases (tables created before created_at existed) never throw
-  // `column "created_at" does not exist`. ALTER TABLE IF EXISTS makes this
-  // a safe no-op on fresh installs where the table isn't created yet.
-  const existingTables = ['analytics', 'content_pipeline', 'schedules', 'agent_runs', 'post_packages', 'content', 'brands', 'brand_memory', 'sales_leads', 'sales_reps', 'deals', 'rep_tasks', 'lead_activities', 'rep_kpis', 'sales_notifications', 'services_catalog']
-  for (const t of existingTables) {
+  // FIRST, before anything else: guarantee created_at / updated_at exist on
+  // every table this app touches. Legacy databases (tables created before
+  // these columns existed) would otherwise throw `column "created_at" does
+  // not exist` and abort the whole setup. ALTER TABLE IF EXISTS is a safe
+  // no-op on fresh installs where the table isn't created yet.
+  const allTables = ['analytics','content_pipeline','schedules','agent_runs','post_packages','content','brands','brand_memory','sales_leads','sales_reps','deals','rep_tasks','lead_activities','rep_kpis','sales_notifications','services_catalog','clients','documents','automation_workflows']
+  for (const t of allTables) {
     try { await db.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`) } catch(e) {}
     try { await db.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`) } catch(e) {}
   }
 
+  // Everything below is migration / seed work. A single failing statement
+  // must never abort the rest of the app — swallow and warn, never rethrow.
+  try {
   await db.query(`
     CREATE TABLE IF NOT EXISTS brands (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -373,6 +376,68 @@ export async function setupMarketingDB() {
     )
   `)
 
+  // ---- Clients + generated documents (Documents page) ----
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS clients (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      company_name TEXT NOT NULL,
+      contact_name TEXT NOT NULL,
+      contact_email TEXT NOT NULL,
+      contact_phone TEXT,
+      contact_whatsapp TEXT,
+      address TEXT,
+      industry TEXT,
+      service_package TEXT,
+      monthly_retainer FLOAT DEFAULT 0,
+      setup_fee FLOAT DEFAULT 0,
+      start_date DATE,
+      status TEXT DEFAULT 'active',
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS documents (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id UUID REFERENCES clients(id),
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT,
+      signed BOOLEAN DEFAULT false,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  // ---- Automation workflows (Automations page) ----
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS automation_workflows (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id UUID REFERENCES clients(id),
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      status TEXT DEFAULT 'inactive',
+      trigger_type TEXT,
+      steps JSONB,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  // Voice-agent setup requests captured from the Automations page.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS voice_agent_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id UUID,
+      business_name TEXT,
+      phone_number TEXT,
+      business_hours TEXT,
+      services TEXT,
+      booking_link TEXT,
+      status TEXT DEFAULT 'requested',
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
   // services_catalog has no natural unique key in the spec; add one so the
   // seed below is idempotent across the every-startup setup run. Wrapped so
   // a legacy/duplicated catalog can't abort setup.
@@ -499,6 +564,10 @@ export async function setupMarketingDB() {
        ON CONFLICT (key) DO NOTHING`,
       [awatecVersionKey],
     )
+  }
+  } catch (e) {
+    console.warn('Migration non-fatal:', e.message)
+    // never rethrow — a failed migration must not break the app
   }
 }
 
