@@ -2341,6 +2341,33 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end()
 
+  // Handled before the GET/POST split so it works with either method.
+  const action = req.body?.action || req.query?.action
+
+  if (action === 'test_webhook') {
+    try {
+      const webhookUrl = process.env.MAKE_WEBHOOK_NEW_LEAD
+      if (!webhookUrl) return res.json({ success: false, error: 'No webhook URL set' })
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company_name: 'Test Company',
+          contact_name: 'John Doe',
+          rep_name: 'Test Rep',
+          industry: 'Restaurant',
+          estimated_value: 1500,
+          source: 'test',
+          timestamp: new Date().toISOString(),
+        }),
+      })
+      const text = await response.text()
+      return res.json({ success: true, status: response.status, response: text })
+    } catch (e) {
+      return res.json({ success: false, error: e.message })
+    }
+  }
+
   try {
     const sql = await getDb()
 
@@ -2386,31 +2413,6 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = req.body || {}
       const action = body.action
-      if (action === 'test_webhook') {
-        try {
-          const webhookUrl = process.env.MAKE_WEBHOOK_NEW_LEAD
-          if (!webhookUrl)
-            return res.json({ success: false, error: 'No webhook URL set' })
-
-          const response = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              company_name: 'Test Company',
-              contact_name: 'John Doe',
-              rep_name: 'Test Rep',
-              industry: 'Restaurant',
-              estimated_value: 1500,
-              source: 'test',
-              timestamp: new Date().toISOString(),
-            }),
-          })
-          const text = await response.text()
-          return res.json({ success: true, status: response.status, response: text })
-        } catch (e) {
-          return res.json({ success: false, error: e.message })
-        }
-      }
       if (action === 'approve') {
         const result = await handleApprove(sql, body)
         return res.status(200).json({ success: true, ...result })
