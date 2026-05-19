@@ -1764,6 +1764,38 @@ async function handleSales(sql, { method, action, query, body }) {
           [a.id, `${repRow?.name || 'A rep'} submitted a deal for ${service_name}`],
         )
       }
+
+      // Resolve fields the deal-approval webhook needs (company_name lives on
+      // sales_leads, commission_amount is computed from deal_value × rate).
+      const dealLead = firstOf(
+        await sql.query('SELECT company_name FROM sales_leads WHERE id=$1', [salesLeadId]),
+      )
+      const company_name = dealLead?.company_name || 'Unknown'
+      const commission_amount =
+        (Number(deal_value) || 0) * (Number(commission_rate) || 0) / 100
+
+      const repResult2 = await sql.query('SELECT name FROM sales_reps WHERE id=$1', [rep_id])
+      const repName2 = (repResult2.rows || repResult2)[0]?.name || 'Sales Rep'
+
+      if (process.env.MAKE_WEBHOOK_DEAL_APPROVAL) {
+        try {
+          fetch(process.env.MAKE_WEBHOOK_DEAL_APPROVAL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rep_name: repName2,
+              company_name: company_name || 'Unknown',
+              service_name: service_name || '',
+              deal_value: deal_value || 0,
+              commission_amount: commission_amount || 0,
+              timestamp: new Date().toISOString(),
+            }),
+          }).catch((e) => console.log('Deal webhook error:', e.message))
+        } catch (e) {
+          /* fire-and-forget */
+        }
+      }
+
       return {
         handled: true,
         payload: {
@@ -2345,21 +2377,43 @@ export default async function handler(req, res) {
   const action = req.body?.action || req.query?.action
 
   if (action === 'test_webhook') {
+    const webhookType = req.query?.type || req.body?.type || 'lead'
+    const webhookUrl =
+      webhookType === 'deal'
+        ? process.env.MAKE_WEBHOOK_DEAL_APPROVAL
+        : process.env.MAKE_WEBHOOK_NEW_LEAD
+
+    if (!webhookUrl)
+      return res.json({
+        success: false,
+        error: 'No webhook URL set for: ' + webhookType,
+      })
+
+    const testData =
+      webhookType === 'deal'
+        ? {
+            rep_name: 'Test Rep',
+            company_name: 'Test Company',
+            service_name: 'Website Development',
+            deal_value: 1500,
+            commission_amount: 150,
+            timestamp: new Date().toISOString(),
+          }
+        : {
+            company_name: 'Test Company',
+            contact_name: 'John Doe',
+            rep_name: 'Test Rep',
+            industry: 'Restaurant',
+            estimated_value: 1500,
+            source: 'test',
+            timestamp: new Date().toISOString(),
+          }
+
     try {
-      const webhookUrl = process.env.MAKE_WEBHOOK_NEW_LEAD
-      if (!webhookUrl) return res.json({ success: false, error: 'No webhook URL set' })
       const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company_name: 'Test Company',
-          contact_name: 'John Doe',
-          rep_name: 'Test Rep',
-          industry: 'Restaurant',
-          estimated_value: 1500,
-          source: 'test',
-          timestamp: new Date().toISOString(),
-        }),
+        body: JSON.stringify(testData),
       })
       const text = await response.text()
       return res.json({ success: true, status: response.status, response: text })
