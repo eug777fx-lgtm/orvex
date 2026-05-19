@@ -1603,6 +1603,28 @@ async function handleSales(sql, { method, action, query, body }) {
       } catch (e) {
         /* main leads table mirror is best-effort — non-fatal */
       }
+
+      const repResult = await sql.query('SELECT name FROM sales_reps WHERE id=$1', [rep_id])
+      const repName = (repResult.rows || repResult)[0]?.name || 'Sales Rep'
+
+      if (process.env.MAKE_WEBHOOK_NEW_LEAD) {
+        try {
+          fetch(process.env.MAKE_WEBHOOK_NEW_LEAD, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              company_name: company_name || 'Unknown',
+              contact_name: contact_name || '',
+              rep_name: repName,
+              industry: industry || '',
+              estimated_value: estimated_value || 0,
+              source: source || 'manual',
+              timestamp: new Date().toISOString()
+            })
+          }).catch(e => console.log('Webhook error:', e.message))
+        } catch(e) {}
+      }
+
       return { handled: true, payload: { success: true, lead_id: leadId } }
     }
     if (action === 'update_lead_status') {
