@@ -1214,10 +1214,12 @@ async function handleSales(sql, { method, action, query, body }) {
     }
     if (action === 'admin_deals') {
       const r = await sql.query(
-        `SELECT d.*, sr.name AS rep_name, sl.company_name, sl.contact_name
+        `SELECT d.*, sr.name AS rep_name,
+                COALESCE(sl.company_name, 'Unknown') AS company_name,
+                sl.contact_name
            FROM deals d
-           JOIN sales_reps sr ON d.rep_id = sr.id
-           JOIN sales_leads sl ON d.lead_id = sl.id
+           LEFT JOIN sales_reps sr ON d.rep_id = sr.id
+           LEFT JOIN sales_leads sl ON d.lead_id = sl.id
           WHERE ($1::text IS NULL OR d.status = $1)
           ORDER BY d.created_at DESC`,
         [query.status || null],
@@ -1642,6 +1644,53 @@ async function handleSales(sql, { method, action, query, body }) {
         commission_rate,
         payment_proof_url,
       } = body
+
+      // The unified app's lead detail panel works off the `leads` table, while
+      // deals.lead_id references sales_leads. Bridge the two so a deal closed
+      // from a prospector lead still shows for admins and on the rep dashboard.
+      let salesLeadId = lead_id
+      const inSalesLeads = firstOf(
+        await sql.query('SELECT id FROM sales_leads WHERE id=$1', [lead_id]),
+      )
+      if (!inSalesLeads) {
+        const src = firstOf(
+          await sql.query('SELECT * FROM leads WHERE id=$1', [lead_id]),
+        )
+        if (src) {
+          const mirrored = firstOf(
+            await sql.query(
+              `INSERT INTO sales_leads
+                 (rep_id, company_name, contact_name, contact_email,
+                  contact_phone, industry, location, source, status,
+                  estimated_value, notes)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,'prospector','closed_won',$8,$9)
+               RETURNING id`,
+              [
+                rep_id,
+                src.company_name || 'Unknown',
+                src.owner_name || null,
+                src.email || null,
+                src.phone || null,
+                src.industry || null,
+                src.location || null,
+                Number(deal_value) || Number(src.estimated_value) || null,
+                src.notes || null,
+              ],
+            ),
+          )
+          salesLeadId = mirrored?.id || lead_id
+          // Keep the originating prospector lead in sync with the close.
+          try {
+            await sql.query(
+              `UPDATE leads SET status='closed_won' WHERE id=$1`,
+              [lead_id],
+            )
+          } catch {
+            /* leads table is optional in some deployments */
+          }
+        }
+      }
+
       const r = await sql.query(
         `INSERT INTO deals
            (rep_id, lead_id, service_name, deal_value, commission_rate, status, payment_proof_url)
@@ -1649,7 +1698,7 @@ async function handleSales(sql, { method, action, query, body }) {
          RETURNING id`,
         [
           rep_id,
-          lead_id,
+          salesLeadId,
           service_name,
           deal_value,
           commission_rate,
@@ -1657,9 +1706,26 @@ async function handleSales(sql, { method, action, query, body }) {
         ],
       )
       const dealId = firstOf(r)?.id
+
+      // commission_amount is a GENERATED column under the canonical schema, but
+      // a plain (always-null) column where `deals` was first created by the
+      // main-app schema. Backfill it when it isn't generated; the try/catch
+      // swallows the "cannot update generated column" error otherwise so the
+      // commission still surfaces on the rep dashboard either way.
+      try {
+        await sql.query(
+          `UPDATE deals
+              SET commission_amount = deal_value * commission_rate / 100
+            WHERE id=$1 AND commission_amount IS NULL`,
+          [dealId],
+        )
+      } catch {
+        /* generated column — value already computed */
+      }
+
       await sql.query(
         `UPDATE sales_leads SET status='closed_won', updated_at=now() WHERE id=$1`,
-        [lead_id],
+        [salesLeadId],
       )
       await bumpKpi(sql, rep_id, 'deals_closed', 1)
       await bumpKpi(sql, rep_id, 'revenue_generated', Number(deal_value) || 0)
@@ -1672,7 +1738,7 @@ async function handleSales(sql, { method, action, query, body }) {
       for (const a of admins) {
         await sql.query(
           `INSERT INTO sales_notifications (recipient_id, type, title, message, link)
-           VALUES ($1,'deal_approval','New deal needs approval',$2,'/sales')`,
+           VALUES ($1,'deal_approval','New deal needs approval',$2,'/team')`,
           [a.id, `${repRow?.name || 'A rep'} submitted a deal for ${service_name}`],
         )
       }
@@ -1698,12 +1764,25 @@ async function handleSales(sql, { method, action, query, body }) {
           `UPDATE deals SET status='approved', approved_by=$1, approved_at=now() WHERE id=$2`,
           [admin_id, deal_id],
         )
+        // Ensure the commission is materialised so it shows on the rep
+        // dashboard once approved (no-op when it's a generated column).
+        try {
+          await sql.query(
+            `UPDATE deals
+                SET commission_amount = deal_value * commission_rate / 100
+              WHERE id=$1 AND commission_amount IS NULL`,
+            [deal_id],
+          )
+        } catch {
+          /* generated column — value already computed */
+        }
       } else {
         await sql.query(
           `UPDATE deals SET status='rejected', admin_notes=$1 WHERE id=$2`,
           [admin_notes || null, deal_id],
         )
       }
+      // Always notify the rep of the approve/reject decision.
       if (deal?.rep_id) {
         await sql.query(
           `INSERT INTO sales_notifications (recipient_id, type, title, message, link)

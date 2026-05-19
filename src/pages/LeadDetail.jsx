@@ -20,6 +20,7 @@ import db from '@/lib/db'
 import EditLeadModal from '../components/EditLeadModal'
 import CreateDealModal from '../components/CreateDealModal'
 import PageShell from '../components/PageShell'
+import { useAuth, workflowApi } from '../lib/auth'
 import { pickBestScript } from '../utils/matchScript'
 import { suggestOffer } from '../utils/suggestOffer'
 import useIsMobile from '../utils/useIsMobile'
@@ -1142,6 +1143,287 @@ function RecommendedPackagesPanel({ recommendations, onViewAll }) {
   )
 }
 
+const BEIGE = '#C2B59B'
+
+function formatMoney(n) {
+  const v = Number(n) || 0
+  return `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+}
+
+function SubmitDealPanel({ lead, rep, onSubmitted }) {
+  const [open, setOpen] = useState(false)
+  const [services, setServices] = useState([])
+  const [serviceName, setServiceName] = useState('')
+  const [custom, setCustom] = useState(false)
+  const [customName, setCustomName] = useState('')
+  const [dealValue, setDealValue] = useState(
+    lead.estimated_value || lead.deal_value || '',
+  )
+  const [rate, setRate] = useState(
+    rep?.commission_rate != null ? rep.commission_rate : 10,
+  )
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!open) return
+    workflowApi('services_catalog')
+      .then((d) => setServices(d?.services || []))
+      .catch(() => setServices([]))
+  }, [open])
+
+  const resolvedService = custom ? customName.trim() : serviceName
+  const commission = (Number(dealValue) || 0) * (Number(rate) || 0) / 100
+
+  async function submit(e) {
+    e?.preventDefault?.()
+    if (!resolvedService) {
+      setError('Pick or enter a service.')
+      return
+    }
+    if (!dealValue || Number(dealValue) <= 0) {
+      setError('Enter a deal value.')
+      return
+    }
+    if (!rep?.id) {
+      setError('No account in session.')
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      const d = await workflowApi('submit_deal', {
+        method: 'POST',
+        body: {
+          rep_id: rep.id,
+          lead_id: lead.id,
+          service_name: resolvedService,
+          deal_value: Number(dealValue),
+          commission_rate: Number(rate),
+        },
+      })
+      if (!d?.success) throw new Error(d?.error || 'Failed to submit deal.')
+      setOpen(false)
+      onSubmitted?.(d)
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Failed to submit deal.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div style={cardStyle}>
+      <div style={cardHeaderRowStyle}>
+        <div>
+          <div style={cardTitleStyle}>Submit Deal</div>
+          <div style={cardSubtitleStyle}>This lead is closed won</div>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{
+          width: '100%',
+          background: 'rgba(194,181,155,0.14)',
+          border: '0.5px solid rgba(194,181,155,0.5)',
+          color: BEIGE,
+          fontWeight: 600,
+          borderRadius: 10,
+          padding: '12px 16px',
+          fontSize: 13,
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+        }}
+      >
+        <Plus size={14} strokeWidth={2.5} />
+        Submit Deal
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => !submitting && setOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.75)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 200,
+              padding: 16,
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#111',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                borderRadius: 16,
+                padding: 24,
+                maxWidth: 440,
+                width: '100%',
+              }}
+            >
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>
+                Submit Deal
+              </div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: 'rgba(255,255,255,0.5)',
+                  marginTop: 6,
+                }}
+              >
+                {lead.company_name || 'This lead'} — sent for admin approval
+              </div>
+
+              <form
+                onSubmit={submit}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                  marginTop: 18,
+                }}
+              >
+                <div>
+                  <div style={fieldLabelStyle}>Service</div>
+                  <select
+                    style={selectStyle}
+                    value={custom ? '__custom__' : serviceName}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === '__custom__') {
+                        setCustom(true)
+                        return
+                      }
+                      setCustom(false)
+                      setServiceName(v)
+                      const s = services.find((x) => x.name === v)
+                      if (s && s.commission_rate != null)
+                        setRate(s.commission_rate)
+                    }}
+                  >
+                    <option value="">Select a service…</option>
+                    {services.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                    <option value="__custom__">Other (type a name)…</option>
+                  </select>
+                </div>
+                {custom && (
+                  <div>
+                    <div style={fieldLabelStyle}>Service name</div>
+                    <input
+                      style={inputStyle}
+                      placeholder="e.g. Website + CRM build"
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                    />
+                  </div>
+                )}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div style={fieldLabelStyle}>Deal value ($)</div>
+                    <input
+                      style={inputStyle}
+                      type="number"
+                      min="0"
+                      placeholder="5000"
+                      value={dealValue}
+                      onChange={(e) => setDealValue(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <div style={fieldLabelStyle}>Commission rate (%)</div>
+                    <input
+                      style={inputStyle}
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={rate}
+                      onChange={(e) => setRate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: 'rgba(194,181,155,0.1)',
+                    border: '0.5px solid rgba(194,181,155,0.3)',
+                    borderRadius: 12,
+                    padding: '14px 16px',
+                    textAlign: 'center',
+                    color: BEIGE,
+                    fontWeight: 700,
+                    fontSize: 18,
+                  }}
+                >
+                  You earn: {formatMoney(commission)}
+                </div>
+
+                {error && (
+                  <div style={{ fontSize: 12, color: '#ff8888' }}>{error}</div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    disabled={submitting}
+                    style={{
+                      ...ghostButtonStyle,
+                      flex: 1,
+                      justifyContent: 'center',
+                      padding: '10px',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    style={{
+                      ...solidButtonStyle,
+                      flex: 1,
+                      opacity: submitting ? 0.6 : 1,
+                      cursor: submitting ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {submitting ? 'Submitting…' : 'Submit Deal'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function DealPanel({ deal, onCreate, onView }) {
   return (
     <div style={cardStyle}>
@@ -1217,6 +1499,7 @@ function DealPanel({ deal, onCreate, onView }) {
 export default function LeadDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { appAuth } = useAuth()
 
   const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
@@ -1469,6 +1752,16 @@ export default function LeadDetail() {
             onAddTask={() => setTaskFormOpen(true)}
             onLogCall={() => setActivityPrefill({ type: 'call', ts: Date.now() })}
           />
+          {lead.status === 'closed_won' && (
+            <SubmitDealPanel
+              lead={lead}
+              rep={appAuth}
+              onSubmitted={() => {
+                setToastMessage('Deal submitted for approval')
+                reloadLead()
+              }}
+            />
+          )}
           <SuggestedScriptPanel
             script={pickBestScript(scripts, lead, { type: 'cold_call' })}
             onView={() => navigate('/scripts')}

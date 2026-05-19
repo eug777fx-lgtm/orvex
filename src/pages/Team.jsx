@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, KeyRound, RefreshCw } from 'lucide-react'
 import PageShell from '../components/PageShell'
-import { workflowApi } from '../lib/auth'
+import { useAuth, workflowApi } from '../lib/auth'
 
 const card = {
   background: 'rgba(194,181,155,0.03)',
@@ -61,11 +61,18 @@ function RoleBadge({ role }) {
 }
 
 export default function Team() {
+  const { appAuth } = useAuth()
   const [reps, setReps] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [toast, setToast] = useState('')
+
+  const [pendingDeals, setPendingDeals] = useState([])
+  const [dealsLoading, setDealsLoading] = useState(true)
+  const [dealBusyId, setDealBusyId] = useState(null)
+  const [rejectingId, setRejectingId] = useState(null)
+  const [rejectNotes, setRejectNotes] = useState('')
 
   function showToast(m) {
     setToast(m)
@@ -86,8 +93,52 @@ export default function Team() {
     }
   }
 
+  async function loadDeals() {
+    setDealsLoading(true)
+    try {
+      const data = await workflowApi('admin_deals', {
+        params: { status: 'pending_approval' },
+      })
+      if (data?.success) setPendingDeals(data.deals || [])
+    } catch {
+      // non-fatal: section just shows empty
+    } finally {
+      setDealsLoading(false)
+    }
+  }
+
+  async function decideDeal(deal, approved) {
+    setDealBusyId(deal.id)
+    try {
+      const data = await workflowApi('approve_deal', {
+        method: 'POST',
+        body: {
+          deal_id: deal.id,
+          admin_id: appAuth?.id,
+          approved,
+          admin_notes: approved ? undefined : rejectNotes.trim() || undefined,
+        },
+      })
+      if (!data?.success) throw new Error()
+      setPendingDeals((list) => list.filter((d) => d.id !== deal.id))
+      setRejectingId(null)
+      setRejectNotes('')
+      showToast(
+        approved
+          ? `Deal approved — commission now on ${deal.rep_name || 'rep'}'s dashboard`
+          : 'Deal rejected — rep notified',
+      )
+      load()
+    } catch {
+      showToast('Could not update deal')
+    } finally {
+      setDealBusyId(null)
+    }
+  }
+
   useEffect(() => {
     load()
+    loadDeals()
   }, [])
 
 
@@ -147,7 +198,10 @@ export default function Team() {
         </div>
         <button
           type="button"
-          onClick={load}
+          onClick={() => {
+            load()
+            loadDeals()
+          }}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -314,6 +368,239 @@ export default function Team() {
             </table>
           </div>
         )}
+      </div>
+
+      <div>
+        <div style={{ marginBottom: 14 }}>
+          <h3
+            style={{
+              fontSize: 17,
+              fontWeight: 600,
+              color: '#fff',
+              letterSpacing: '-0.3px',
+            }}
+          >
+            Pending Deals
+            {pendingDeals.length > 0 && (
+              <span style={{ color: '#C2B59B' }}> ({pendingDeals.length})</span>
+            )}
+          </h3>
+          <p
+            style={{
+              fontSize: 13,
+              color: 'rgba(255,255,255,0.4)',
+              marginTop: 4,
+            }}
+          >
+            Deals submitted by reps awaiting your approval
+          </p>
+        </div>
+
+        <div style={{ ...card, overflow: 'hidden' }}>
+          {dealsLoading ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                color: 'rgba(255,255,255,0.5)',
+                fontSize: 13.5,
+                padding: 40,
+              }}
+            >
+              <Loader2 size={18} className="spin" />
+              Loading deals…
+            </div>
+          ) : pendingDeals.length === 0 ? (
+            <div
+              style={{
+                padding: 40,
+                textAlign: 'center',
+                color: 'rgba(255,255,255,0.4)',
+                fontSize: 13.5,
+              }}
+            >
+              No deals waiting for approval.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Rep</th>
+                    <th style={th}>Company</th>
+                    <th style={th}>Service</th>
+                    <th style={th}>Deal value</th>
+                    <th style={th}>Commission</th>
+                    <th style={th}>Submitted</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingDeals.map((deal) => {
+                    const commission =
+                      deal.commission_amount != null
+                        ? deal.commission_amount
+                        : (Number(deal.deal_value) || 0) *
+                          (Number(deal.commission_rate) || 0) /
+                          100
+                    const busy = dealBusyId === deal.id
+                    return (
+                      <tr key={deal.id}>
+                        <td style={{ ...td, color: '#fff', fontWeight: 600 }}>
+                          {deal.rep_name || '—'}
+                        </td>
+                        <td style={{ ...td, color: 'rgba(255,255,255,0.7)' }}>
+                          {deal.company_name || '—'}
+                        </td>
+                        <td style={td}>{deal.service_name || '—'}</td>
+                        <td style={td}>{money(deal.deal_value)}</td>
+                        <td
+                          style={{ ...td, color: '#C2B59B', fontWeight: 600 }}
+                        >
+                          {money(commission)}
+                          <span
+                            style={{
+                              color: 'rgba(255,255,255,0.35)',
+                              fontWeight: 400,
+                            }}
+                          >
+                            {' '}
+                            ({Number(deal.commission_rate) || 0}%)
+                          </span>
+                        </td>
+                        <td style={{ ...td, color: 'rgba(255,255,255,0.5)' }}>
+                          {fmtDate(deal.created_at)}
+                        </td>
+                        <td style={{ ...td, textAlign: 'right' }}>
+                          {rejectingId === deal.id ? (
+                            <div
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                justifyContent: 'flex-end',
+                              }}
+                            >
+                              <input
+                                autoFocus
+                                placeholder="Reason (optional)"
+                                value={rejectNotes}
+                                onChange={(e) =>
+                                  setRejectNotes(e.target.value)
+                                }
+                                style={{
+                                  background: 'rgba(255,255,255,0.06)',
+                                  border: '0.5px solid rgba(255,255,255,0.12)',
+                                  borderRadius: 6,
+                                  padding: '6px 10px',
+                                  color: '#fff',
+                                  fontSize: 12,
+                                  width: 180,
+                                }}
+                              />
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => decideDeal(deal, false)}
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: busy ? 'wait' : 'pointer',
+                                  borderRadius: 8,
+                                  padding: '6px 12px',
+                                  color: 'rgba(248,113,113,0.95)',
+                                  background: 'rgba(248,113,113,0.1)',
+                                  border: '0.5px solid rgba(248,113,113,0.3)',
+                                }}
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => {
+                                  setRejectingId(null)
+                                  setRejectNotes('')
+                                }}
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  borderRadius: 8,
+                                  padding: '6px 10px',
+                                  color: 'rgba(255,255,255,0.6)',
+                                  background: 'rgba(255,255,255,0.04)',
+                                  border: '0.5px solid rgba(255,255,255,0.12)',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                justifyContent: 'flex-end',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => decideDeal(deal, true)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: busy ? 'wait' : 'pointer',
+                                  borderRadius: 8,
+                                  padding: '6px 12px',
+                                  color: 'rgba(74,222,128,0.95)',
+                                  background: 'rgba(74,222,128,0.1)',
+                                  border: '0.5px solid rgba(74,222,128,0.3)',
+                                }}
+                              >
+                                {busy ? (
+                                  <Loader2 size={12} className="spin" />
+                                ) : null}
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => {
+                                  setRejectingId(deal.id)
+                                  setRejectNotes('')
+                                }}
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  borderRadius: 8,
+                                  padding: '6px 12px',
+                                  color: 'rgba(248,113,113,0.9)',
+                                  background: 'rgba(248,113,113,0.08)',
+                                  border: '0.5px solid rgba(248,113,113,0.25)',
+                                }}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       <AnimatePresence>
