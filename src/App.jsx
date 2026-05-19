@@ -20,7 +20,6 @@ import {
   Monitor,
   ListChecks,
   Sparkles,
-  Compass,
   FileText,
   Zap,
   UserCog,
@@ -39,7 +38,6 @@ import Demos from './pages/Demos'
 import Workflow from './pages/Workflow'
 import PublicDemo from './pages/PublicDemo'
 import MarketingEngine from './pages/MarketingEngine'
-import Discover from './pages/Discover'
 import Documents from './pages/Documents'
 import Automations from './pages/Automations'
 import Team from './pages/Team'
@@ -59,7 +57,6 @@ const navItems = [
   { path: '/', label: 'Dashboard', end: true, icon: LayoutDashboard },
   { path: '/leads', label: 'Leads', icon: Users },
   { path: '/pipeline', label: 'Pipeline', icon: Kanban },
-  { path: '/discover', label: 'Discover', icon: Compass },
   { path: '/offers', label: 'Offers', icon: Package },
   { path: '/scripts', label: 'Scripts', icon: BookOpen },
   { path: '/tasks', label: 'Tasks', icon: CheckSquare },
@@ -240,7 +237,6 @@ function AnimatedRoutes({ role }) {
         <Route path="/leads" element={<Leads />} />
         <Route path="/leads/:id" element={<LeadDetail />} />
         <Route path="/pipeline" element={<Pipeline />} />
-        <Route path="/discover" element={<Discover />} />
         <Route path="/offers" element={<Offers />} />
         <Route path="/scripts" element={<Scripts />} />
         <Route path="/tasks" element={<Tasks />} />
