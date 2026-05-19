@@ -257,6 +257,7 @@ export default function Leads() {
 
   const { appAuth } = useAuth()
   const isRepRole = appAuth?.role === 'sales'
+  const isAdmin = appAuth?.role === 'admin'
 
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
@@ -268,7 +269,13 @@ export default function Leads() {
   const [tab, setTab] = useState('my')
   const [reps, setReps] = useState([])
   const [assignOpenId, setAssignOpenId] = useState(null)
+  const [toast, setToast] = useState(null)
   const repName = (id) => reps.find((r) => r.id === id)?.name || null
+
+  function showToast(msg, kind) {
+    setToast({ msg, kind })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   async function fetchLeads() {
     if (!db) {
@@ -281,13 +288,14 @@ export default function Leads() {
     setLoading(true)
     setError(null)
     try {
-      // Reps only ever see leads assigned to them; admins see everything.
-      const rows = isRepRole
+      // Only admins see every lead. Anyone else (sales rep, manager) is
+      // restricted to leads where rep_id (or the legacy assigned_to) is theirs.
+      const rows = !isAdmin
         ? await db.query(
             `SELECT * FROM leads
-              WHERE assigned_to = $1 OR rep_id = $1
+              WHERE rep_id = $1 OR assigned_to = $1
               ORDER BY created_at DESC`,
-            [appAuth.id],
+            [appAuth?.id],
           )
         : await db.query('SELECT * FROM leads ORDER BY created_at DESC')
       setLeads(rows)
@@ -302,6 +310,7 @@ export default function Leads() {
   async function assignLead(leadId, repId) {
     setAssignOpenId(null)
     const prev = leads
+    const fallbackName = repName(repId)
     setLeads((rows) =>
       rows.map((l) =>
         l.id === leadId ? { ...l, assigned_to: repId, rep_id: repId } : l,
@@ -310,20 +319,29 @@ export default function Leads() {
     try {
       const data = await workflowApi('assign_lead', {
         method: 'POST',
-        body: { lead_id: leadId, rep_id: repId },
+        body: { lead_id: leadId, rep_id: repId, admin_id: appAuth?.id },
       })
       if (!data?.success) throw new Error(data?.error || 'Assign failed')
+      const name = data.rep_name || fallbackName || 'rep'
+      setLeads((rows) =>
+        rows.map((l) =>
+          l.id === leadId
+            ? { ...l, assigned_to: repId, rep_id: repId, rep_name: name }
+            : l,
+        ),
+      )
+      showToast(`Lead assigned to ${name}`)
     } catch (err) {
       console.error(err)
       setLeads(prev)
-      setError(err?.message || 'Failed to assign lead.')
+      showToast(err?.message || 'Failed to assign lead.', 'error')
     }
   }
 
   useEffect(() => {
     fetchLeads()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRepRole, appAuth?.id])
+  }, [isAdmin, appAuth?.id])
 
   useEffect(() => {
     if (appAuth?.role === 'admin') {
