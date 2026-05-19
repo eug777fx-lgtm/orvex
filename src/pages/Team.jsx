@@ -185,7 +185,7 @@ export default function Team() {
     try {
       const data = await workflowApi('delete_rep', {
         method: 'POST',
-        body: { rep_id: deleteConfirm.id, admin_id: appAuth?.id },
+        body: { rep_id: deleteConfirm.id },
       })
       if (!data?.success) throw new Error(data?.error || 'failed')
       setReps((list) => list.filter((r) => r.id !== deleteConfirm.id))

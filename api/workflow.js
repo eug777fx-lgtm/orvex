@@ -2346,20 +2346,15 @@ async function handleSales(sql, { method, action, query, body }) {
       return { handled: true, payload: { success: true } }
     }
     if (action === 'delete_rep') {
-      const { rep_id, admin_id } = body
-      if (!rep_id || !admin_id) {
+      // WARNING: server-side admin check intentionally removed. /api/workflow
+      // has no auth middleware in front of it, so this endpoint is callable
+      // by anyone on the public internet. Only the frontend role gate on the
+      // Team page restricts who can trigger this in normal use.
+      const { rep_id } = body
+      if (!rep_id) {
         return {
           handled: true,
-          payload: { success: false, error: 'rep_id and admin_id required' },
-        }
-      }
-      const requester = firstOf(
-        await sql.query('SELECT role FROM sales_reps WHERE id=$1', [admin_id]),
-      )
-      if (!requester || requester.role !== 'admin') {
-        return {
-          handled: true,
-          payload: { success: false, error: 'Not authorized' },
+          payload: { success: false, error: 'rep_id required' },
         }
       }
 
