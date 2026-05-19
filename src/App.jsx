@@ -317,11 +317,12 @@ function Shell({ appAuth, onLogout }) {
     .map((p) => p[0]?.toUpperCase())
     .join('')
 
-  const roleLabel = {
-    admin: 'ADMIN',
-    manager: 'MANAGER',
-    sales: 'SALES',
-  }[appAuth?.role] || 'SALES'
+  const roleLabel =
+    appAuth?.role === 'admin'
+      ? 'ADMIN'
+      : appAuth?.role === 'manager'
+        ? 'MANAGER'
+        : 'SALES'
   const roleColor =
     {
       admin: '#C2B59B',

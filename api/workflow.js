@@ -2152,17 +2152,10 @@ async function handleSales(sql, { method, action, query, body }) {
     // ---- Team management (admin only) ----
     if (action === 'update_rep_role') {
       const { rep_id, role } = body
-      const allowed = ['sales', 'manager', 'admin']
-      if (!rep_id || !allowed.includes(role)) {
-        return {
-          handled: true,
-          payload: { success: false, error: 'rep_id and valid role required' },
-        }
-      }
-      await sql.query('UPDATE sales_reps SET role=$1 WHERE id=$2', [
-        role,
-        rep_id,
-      ])
+      const validRoles = ['sales', 'manager', 'admin']
+      if (!validRoles.includes(role))
+        return { handled: true, payload: { success: false, error: 'Invalid role' } }
+      await sql.query('UPDATE sales_reps SET role=$1 WHERE id=$2', [role, rep_id])
       return { handled: true, payload: { success: true } }
     }
     if (action === 'toggle_rep_status') {

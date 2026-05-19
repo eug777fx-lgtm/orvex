@@ -29,17 +29,6 @@ const td = {
   whiteSpace: 'nowrap',
 }
 
-const selectStyle = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '0.5px solid rgba(255,255,255,0.12)',
-  borderRadius: 8,
-  color: '#F5F5F2',
-  fontSize: 12,
-  padding: '5px 8px',
-  outline: 'none',
-  fontFamily: 'inherit',
-  cursor: 'pointer',
-}
 
 const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString()
 const fmtDate = (d) =>
@@ -101,22 +90,6 @@ export default function Team() {
     load()
   }, [])
 
-  async function changeRole(rep, role) {
-    if (role === rep.role) return
-    const prev = reps
-    setReps((list) => list.map((r) => (r.id === rep.id ? { ...r, role } : r)))
-    try {
-      const data = await workflowApi('update_rep_role', {
-        method: 'POST',
-        body: { rep_id: rep.id, role },
-      })
-      if (!data?.success) throw new Error()
-      showToast(`${rep.name || 'Rep'} is now ${role}`)
-    } catch (e) {
-      setReps(prev)
-      showToast('Could not update role')
-    }
-  }
 
   async function toggleStatus(rep) {
     const next = !rep.is_active
@@ -263,13 +236,21 @@ export default function Team() {
                         }}
                       >
                         <select
-                          value={rep.role || 'rep'}
-                          onChange={(e) => changeRole(rep, e.target.value)}
-                          style={selectStyle}
+                          value={rep.role}
+                          onChange={async (e) => {
+                            const newRole = e.target.value
+                            await fetch('/api/workflow', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'update_rep_role', rep_id: rep.id, role: newRole })
+                            })
+                            setReps(prev => prev.map(r => r.id === rep.id ? { ...r, role: newRole } : r))
+                          }}
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 10px', color: '#fff', fontSize: 12, cursor: 'pointer' }}
                         >
-                          <option value="rep">rep</option>
-                          <option value="manager">manager</option>
-                          <option value="admin">admin</option>
+                          <option value="sales">Sales</option>
+                          <option value="manager">Manager</option>
+                          <option value="admin">Admin</option>
                         </select>
                         <button
                           type="button"
