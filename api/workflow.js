@@ -2276,6 +2276,32 @@ async function handleSales(sql, { method, action, query, body }) {
       )
       return { handled: true, payload: { success: true } }
     }
+    if (action === 'delete_rep') {
+      const { rep_id, admin_id } = body
+      if (!rep_id || !admin_id) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'rep_id and admin_id required' },
+        }
+      }
+      const requester = firstOf(
+        await sql.query('SELECT role FROM sales_reps WHERE id=$1', [admin_id]),
+      )
+      if (!requester || requester.role !== 'admin') {
+        return {
+          handled: true,
+          payload: { success: false, error: 'Not authorized' },
+        }
+      }
+      await sql.query('DELETE FROM sales_notifications WHERE recipient_id = $1', [rep_id])
+      await sql.query('DELETE FROM lead_activities WHERE rep_id = $1', [rep_id])
+      await sql.query('DELETE FROM rep_kpis WHERE rep_id = $1', [rep_id])
+      await sql.query('DELETE FROM sales_leads WHERE rep_id = $1', [rep_id])
+      await sql.query('DELETE FROM deals WHERE rep_id = $1', [rep_id])
+      await sql.query('DELETE FROM rep_tasks WHERE rep_id = $1', [rep_id])
+      await sql.query('DELETE FROM sales_reps WHERE id = $1', [rep_id])
+      return { handled: true, payload: { success: true } }
+    }
     return { handled: false }
   }
 

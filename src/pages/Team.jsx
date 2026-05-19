@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, KeyRound, RefreshCw } from 'lucide-react'
+import { Loader2, KeyRound, RefreshCw, AlertTriangle } from 'lucide-react'
 import PageShell from '../components/PageShell'
 import { useAuth, workflowApi } from '../lib/auth'
 
@@ -67,6 +67,8 @@ export default function Team() {
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [toast, setToast] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [pendingDeals, setPendingDeals] = useState([])
   const [dealsLoading, setDealsLoading] = useState(true)
@@ -174,6 +176,25 @@ export default function Team() {
       showToast('Could not reset password')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  async function deleteRep() {
+    if (!deleteConfirm) return
+    setDeleting(true)
+    try {
+      const data = await workflowApi('delete_rep', {
+        method: 'POST',
+        body: { rep_id: deleteConfirm.id, admin_id: appAuth?.id },
+      })
+      if (!data?.success) throw new Error(data?.error || 'failed')
+      setReps((list) => list.filter((r) => r.id !== deleteConfirm.id))
+      showToast('Account deleted')
+      setDeleteConfirm(null)
+    } catch (e) {
+      showToast('Could not delete account')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -359,6 +380,22 @@ export default function Team() {
                             <KeyRound size={12} />
                           )}
                           Reset password
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirm(rep)}
+                          title="Delete account"
+                          style={{
+                            background: 'rgba(248,113,113,0.1)',
+                            border: '0.5px solid rgba(248,113,113,0.3)',
+                            color: 'rgba(248,113,113,0.8)',
+                            borderRadius: 6,
+                            padding: '5px 12px',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Delete
                         </button>
                       </div>
                     </td>
@@ -602,6 +639,128 @@ export default function Team() {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {deleteConfirm && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !deleting && setDeleteConfirm(null)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.7)',
+                zIndex: 999,
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              style={{
+                background: '#111113',
+                border: '0.5px solid rgba(248,113,113,0.3)',
+                borderRadius: 16,
+                padding: 32,
+                maxWidth: 400,
+                width: 'calc(100% - 40px)',
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%,-50%)',
+                zIndex: 1000,
+              }}
+            >
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '50%',
+                  background: 'rgba(248,113,113,0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 18,
+                }}
+              >
+                <AlertTriangle size={22} color="rgba(248,113,113,0.9)" />
+              </div>
+              <h3
+                style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: '#fff',
+                  margin: 0,
+                }}
+              >
+                Delete Account
+              </h3>
+              <p
+                style={{
+                  fontSize: 13.5,
+                  color: 'rgba(255,255,255,0.55)',
+                  lineHeight: 1.6,
+                  margin: '12px 0 24px',
+                }}
+              >
+                Are you sure you want to permanently delete{' '}
+                <span style={{ color: '#C2B59B', fontWeight: 600 }}>
+                  {deleteConfirm.name || 'this rep'}
+                </span>
+                's account? This cannot be undone.
+              </p>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(null)}
+                  disabled={deleting}
+                  style={{
+                    background: 'transparent',
+                    border: '0.5px solid rgba(255,255,255,0.15)',
+                    color: 'rgba(255,255,255,0.7)',
+                    borderRadius: 8,
+                    padding: '9px 18px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: deleting ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteRep}
+                  disabled={deleting}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    background: 'rgba(248,113,113,0.15)',
+                    border: '0.5px solid rgba(248,113,113,0.4)',
+                    color: 'rgba(248,113,113,0.9)',
+                    borderRadius: 8,
+                    padding: '9px 18px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: deleting ? 'wait' : 'pointer',
+                  }}
+                >
+                  {deleting && <Loader2 size={13} className="spin" />}
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {toast && (
