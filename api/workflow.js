@@ -1777,9 +1777,15 @@ async function handleSales(sql, { method, action, query, body }) {
       const repResult2 = await sql.query('SELECT name FROM sales_reps WHERE id=$1', [rep_id])
       const repName2 = (repResult2.rows || repResult2)[0]?.name || 'Sales Rep'
 
-      if (process.env.MAKE_WEBHOOK_DEAL_APPROVAL) {
+      // TEMP DIAGNOSTIC: fire against the working lead webhook to isolate
+      // whether the issue is the firing pipeline or the deal Make.com scenario
+      // (scenario 5120947 Gmail module). Revert to MAKE_WEBHOOK_DEAL_APPROVAL
+      // once confirmed. If an email arrives, the code path is fine and the
+      // deal scenario needs fixing/rebuilding. If not, the issue is upstream.
+      const dealWebhookUrl = process.env.MAKE_WEBHOOK_NEW_LEAD
+      if (dealWebhookUrl) {
         try {
-          fetch(process.env.MAKE_WEBHOOK_DEAL_APPROVAL, {
+          fetch(dealWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1789,6 +1795,7 @@ async function handleSales(sql, { method, action, query, body }) {
               deal_value: deal_value || 0,
               commission_amount: commission_amount || 0,
               timestamp: new Date().toISOString(),
+              _diagnostic: 'deal-routed-to-lead-webhook',
             }),
           }).catch((e) => console.log('Deal webhook error:', e.message))
         } catch (e) {
