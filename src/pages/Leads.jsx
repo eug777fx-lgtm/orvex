@@ -697,7 +697,7 @@ export default function Leads() {
                   )}
                   <span style={statusPillStyle(lead.status)}>{lead.status || 'new'}</span>
                 </div>
-                {!isRepRole && (
+                {isAdmin && (
                   <div onClick={(e) => e.stopPropagation()}>
                     <select
                       value={lead.assigned_to || lead.rep_id || ''}
@@ -806,7 +806,7 @@ export default function Leads() {
                   <th style={tableHeaderCell}>Location</th>
                   <th style={tableHeaderCell}>Score</th>
                   <th style={tableHeaderCell}>Status</th>
-                  {!isRepRole && <th style={tableHeaderCell}>Assigned</th>}
+                  {isAdmin && <th style={tableHeaderCell}>Assigned</th>}
                   <th style={tableHeaderCell}>Website</th>
                   <th style={{ ...tableHeaderCell, textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -867,7 +867,7 @@ export default function Leads() {
                     <td style={tableCellBase}>
                       <span style={statusPillStyle(lead.status)}>{lead.status || 'new'}</span>
                     </td>
-                    {!isRepRole && (
+                    {isAdmin && (
                       <td
                         style={{ ...tableCellBase, position: 'relative' }}
                         onClick={(e) => e.stopPropagation()}
@@ -909,7 +909,8 @@ export default function Leads() {
                             }}
                           >
                             <UserPlus size={11} />
-                            {repName(lead.assigned_to || lead.rep_id) ||
+                            {lead.rep_name ||
+                              repName(lead.assigned_to || lead.rep_id) ||
                               'Assign'}
                           </button>
                         )}
@@ -1062,6 +1063,33 @@ export default function Leads() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 70,
+            right: 16,
+            zIndex: 300,
+            background: 'rgba(20,18,16,0.97)',
+            border: `0.5px solid ${
+              toast.kind === 'error'
+                ? 'rgba(248,113,113,0.5)'
+                : 'rgba(194,181,155,0.5)'
+            }`,
+            color: toast.kind === 'error' ? '#f87171' : '#C2B59B',
+            padding: '10px 16px',
+            borderRadius: 10,
+            fontSize: 13,
+            maxWidth: 320,
+            backdropFilter: 'blur(12px) saturate(160%)',
+            WebkitBackdropFilter: 'blur(12px) saturate(160%)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          }}
+        >
+          {toast.msg}
         </div>
       )}
 

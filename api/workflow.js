@@ -1161,6 +1161,11 @@ async function handleSales(sql, { method, action, query, body }) {
       return { handled: true, payload: { success: true, profile: firstOf(r) || null } }
     }
     if (action === 'rep_leads') {
+      // Never run unscoped: without a rep_id this must return nothing
+      // rather than risk leaking another rep's leads.
+      if (!query.rep_id) {
+        return { handled: true, payload: { success: true, leads: [] } }
+      }
       const r = await sql.query(
         `SELECT sl.*,
                 COUNT(la.id) AS activity_count,
@@ -1826,7 +1831,7 @@ async function handleSales(sql, { method, action, query, body }) {
       return { handled: true, payload: { success: true } }
     }
     if (action === 'assign_lead') {
-      const { lead_id, rep_id } = body
+      const { lead_id, rep_id, admin_id } = body
       if (!lead_id || !rep_id) {
         return {
           handled: true,
@@ -1851,9 +1856,15 @@ async function handleSales(sql, { method, action, query, body }) {
         )
         await sql.query(
           `INSERT INTO lead_activities (lead_id, rep_id, activity_type, description)
-           SELECT $1, $2, 'note', 'Lead assigned by admin'
+           SELECT $1, $2, 'note', $3
             WHERE EXISTS (SELECT 1 FROM sales_leads WHERE id = $1)`,
-          [lead_id, rep_id],
+          [
+            lead_id,
+            rep_id,
+            admin_id
+              ? `Lead assigned by admin (${admin_id})`
+              : 'Lead assigned by admin',
+          ],
         )
       } catch (e) {
         /* not a sales_leads row — non-fatal */
