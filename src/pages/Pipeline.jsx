@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, X, Check, ArrowUpRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Check, ArrowUpRight, Trash2 } from 'lucide-react'
 import db from '@/lib/db'
+import { workflowApi } from '../lib/auth'
 import PageShell from '../components/PageShell'
 import useIsMobile from '../utils/useIsMobile'
 
@@ -279,7 +280,7 @@ function Pill({ children }) {
   return <span style={pillStyle}>{children}</span>
 }
 
-function DealCard({ deal, onOpen, onMove, canMoveLeft, canMoveRight }) {
+function DealCard({ deal, onOpen, onMove, onDelete, canMoveLeft, canMoveRight }) {
   const days = daysSince(deal.stage_changed_at || deal.created_at)
   return (
     <div
@@ -362,13 +363,36 @@ function DealCard({ deal, onOpen, onMove, canMoveLeft, canMoveRight }) {
               <ChevronRight size={14} />
             </button>
           )}
+          <button
+            type="button"
+            style={{
+              ...moveButtonStyle,
+              color: '#ff6b6b',
+              borderColor: 'rgba(255,107,107,0.25)',
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete?.(deal)
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,107,107,0.12)'
+              e.currentTarget.style.borderColor = 'rgba(255,107,107,0.5)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+              e.currentTarget.style.borderColor = 'rgba(255,107,107,0.25)'
+            }}
+            aria-label="Delete deal"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-function Column({ stage, deals, onOpen, onMove, isMobile }) {
+function Column({ stage, deals, onOpen, onMove, onDelete, isMobile }) {
   const stageIdx = STAGE_KEYS.indexOf(stage.value)
   const canLeft = stageIdx > 0
   const canRight = !CLOSED_STAGES.has(stage.value) && stageIdx < STAGE_KEYS.length - 1
@@ -404,6 +428,7 @@ function Column({ stage, deals, onOpen, onMove, isMobile }) {
               deal={deal}
               onOpen={onOpen}
               onMove={onMove}
+              onDelete={onDelete}
               canMoveLeft={canLeft}
               canMoveRight={canRight}
             />
@@ -731,6 +756,26 @@ export default function Pipeline() {
     setDeals((prev) => prev.map((d) => (d.id === updated.id ? { ...d, ...updated } : d)))
   }
 
+  async function deleteDeal(deal) {
+    if (!deal?.id) return
+    if (!window.confirm('Delete this deal?')) return
+    // Optimistic remove; restore the row if the API rejects.
+    const prev = deals
+    setDeals((rows) => rows.filter((d) => d.id !== deal.id))
+    if (selectedId === deal.id) setSelectedId(null)
+    try {
+      const r = await workflowApi('delete_deal', {
+        method: 'POST',
+        body: { deal_id: deal.id },
+      })
+      if (!r?.success) throw new Error(r?.error || 'delete failed')
+    } catch (err) {
+      console.error(err)
+      setDeals(prev)
+      setError(err?.message || 'Failed to delete deal.')
+    }
+  }
+
   const selectedDeal = deals.find((d) => d.id === selectedId) || null
 
   return (
@@ -798,6 +843,7 @@ export default function Pipeline() {
               deals={grouped[stage.value] || []}
               onOpen={(d) => setSelectedId(d.id)}
               onMove={moveDeal}
+              onDelete={deleteDeal}
               isMobile={isMobile}
             />
           ))}

@@ -1869,6 +1869,14 @@ async function handleSales(sql, { method, action, query, body }) {
       )
       return { handled: true, payload: { success: true } }
     }
+    if (action === 'delete_deal') {
+      const { deal_id } = body
+      if (!deal_id) {
+        return { handled: true, payload: { success: false, error: 'deal_id required' } }
+      }
+      await sql.query('DELETE FROM deals WHERE id=$1', [deal_id])
+      return { handled: true, payload: { success: true } }
+    }
     if (action === 'mark_notifications_read') {
       const { rep_id } = body
       await sql.query(
@@ -2354,12 +2362,68 @@ async function handleSales(sql, { method, action, query, body }) {
           payload: { success: false, error: 'Not authorized' },
         }
       }
-      await sql.query('DELETE FROM sales_notifications WHERE recipient_id = $1', [rep_id])
-      await sql.query('DELETE FROM lead_activities WHERE rep_id = $1', [rep_id])
+
+      // Order matters: child rows (especially anything pointing at this
+      // rep's sales_leads) must go before the leads, and survivor rows
+      // referencing the rep must be NULLed before the final rep delete,
+      // otherwise the foreign-key constraints abort the cascade.
+
+      // 1. Survivor references on rows we are NOT deleting.
+      await sql.query(
+        'UPDATE sales_leads SET assigned_by = NULL WHERE assigned_by = $1',
+        [rep_id],
+      )
+      await sql.query(
+        'UPDATE deals SET approved_by = NULL WHERE approved_by = $1',
+        [rep_id],
+      )
+
+      // 2. Per-rep rows that don't point at anything else.
+      await sql.query(
+        'DELETE FROM sales_notifications WHERE recipient_id = $1',
+        [rep_id],
+      )
       await sql.query('DELETE FROM rep_kpis WHERE rep_id = $1', [rep_id])
+
+      // 3. Everything tied to this rep's sales_leads (any rep), plus this
+      //    rep's own activities/tasks/deals on other reps' leads.
+      await sql.query(
+        `DELETE FROM lead_activities
+          WHERE rep_id = $1
+             OR lead_id IN (SELECT id FROM sales_leads WHERE rep_id = $1)`,
+        [rep_id],
+      )
+      await sql.query(
+        `DELETE FROM rep_tasks
+          WHERE rep_id = $1
+             OR lead_id IN (SELECT id FROM sales_leads WHERE rep_id = $1)`,
+        [rep_id],
+      )
+      await sql.query(
+        `DELETE FROM deals
+          WHERE rep_id = $1
+             OR lead_id IN (SELECT id FROM sales_leads WHERE rep_id = $1)`,
+        [rep_id],
+      )
+
+      // 4. Now the leads themselves.
       await sql.query('DELETE FROM sales_leads WHERE rep_id = $1', [rep_id])
-      await sql.query('DELETE FROM deals WHERE rep_id = $1', [rep_id])
-      await sql.query('DELETE FROM rep_tasks WHERE rep_id = $1', [rep_id])
+
+      // 5. Best-effort cleanup of the unified app's `leads` table —
+      //    its schema is owned elsewhere, so swallow errors rather than
+      //    abort the rep delete on a missing column / missing table.
+      try {
+        await sql.query(
+          `UPDATE leads
+              SET rep_id = NULL, assigned_to = NULL
+            WHERE rep_id = $1 OR assigned_to = $1`,
+          [rep_id],
+        )
+      } catch {
+        /* unified leads table absent or column missing — non-fatal */
+      }
+
+      // 6. Finally the rep.
       await sql.query('DELETE FROM sales_reps WHERE id = $1', [rep_id])
       return { handled: true, payload: { success: true } }
     }
