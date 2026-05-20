@@ -52,7 +52,7 @@ const pageSubStyle = {
 }
 
 const glassCardStyle = {
-  background: 'rgba(17,17,20,0.55)',
+  background: 'rgba(17, 17, 17,0.55)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   overflow: 'hidden',
@@ -586,11 +586,11 @@ export default function Leads() {
               onClick={() => setOnlyUnassigned((v) => !v)}
               style={{
                 ...ghostButtonStyle,
-                color: onlyUnassigned ? '#0B0B0D' : '#C2B59B',
+                color: onlyUnassigned ? '#000000' : '#FFFFFF',
                 background: onlyUnassigned
-                  ? '#C2B59B'
-                  : 'rgba(194,181,155,0.08)',
-                borderColor: 'rgba(194,181,155,0.25)',
+                  ? '#FFFFFF'
+                  : 'rgba(255, 255, 255,0.08)',
+                borderColor: 'rgba(255, 255, 255,0.25)',
               }}
             >
               <UserPlus size={12} />
@@ -603,9 +603,9 @@ export default function Leads() {
               onClick={() => setBulkDeleteOpen(true)}
               style={{
                 ...ghostButtonStyle,
-                color: '#ff8888',
-                borderColor: 'rgba(255,80,80,0.3)',
-                background: 'rgba(255,80,80,0.06)',
+                color: '#FF4444',
+                borderColor: 'rgba(255, 68, 68,0.3)',
+                background: 'rgba(255, 68, 68,0.06)',
               }}
             >
               <Trash2 size={12} />
@@ -646,7 +646,7 @@ export default function Leads() {
           <CenteredMessage>Loading leads...</CenteredMessage>
         ) : error ? (
           <CenteredMessage>
-            <div style={{ color: '#ff8888' }}>{error}</div>
+            <div style={{ color: '#FF4444' }}>{error}</div>
           </CenteredMessage>
         ) : !hasLeads ? (
           <EmptyState onAdd={() => setModalOpen(true)} />
@@ -659,7 +659,7 @@ export default function Leads() {
                 key={lead.id}
                 onClick={() => navigate(`/leads/${lead.id}`)}
                 style={{
-                  background: 'rgba(17,17,20,0.85)',
+                  background: 'rgba(17, 17, 17,0.85)',
                   border: '0.5px solid rgba(255,255,255,0.08)',
                   borderRadius: 14,
                   padding: 14,
@@ -737,9 +737,9 @@ export default function Leads() {
                     style={{
                       ...ghostButtonStyle,
                       padding: '10px 14px',
-                      color: '#ff8888',
-                      borderColor: 'rgba(255, 80, 80, 0.3)',
-                      background: 'rgba(255, 80, 80, 0.06)',
+                      color: '#FF4444',
+                      borderColor: 'rgba(255, 68, 68, 0.3)',
+                      background: 'rgba(255, 68, 68, 0.06)',
                     }}
                     onClick={() => setPendingDeleteId(lead.id)}
                   >
@@ -752,14 +752,14 @@ export default function Leads() {
                       display: 'flex',
                       gap: 8,
                       padding: '8px 10px',
-                      background: 'rgba(255,80,80,0.08)',
+                      background: 'rgba(255, 68, 68,0.08)',
                       borderRadius: 10,
                       fontSize: 12,
                       alignItems: 'center',
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <span style={{ flex: 1, color: '#ffdddd' }}>Delete this lead?</span>
+                    <span style={{ flex: 1, color: '#FF4444' }}>Delete this lead?</span>
                     <button
                       type="button"
                       style={{ ...ghostButtonStyle, padding: '6px 12px' }}
@@ -772,9 +772,9 @@ export default function Leads() {
                       style={{
                         ...ghostButtonStyle,
                         padding: '6px 12px',
-                        background: '#ff8888',
+                        background: '#FF4444',
                         color: '#000',
-                        borderColor: '#ff8888',
+                        borderColor: '#FF4444',
                       }}
                       onClick={() => deleteOne(lead.id)}
                     >
@@ -905,7 +905,7 @@ export default function Leads() {
                               padding: '4px 10px',
                               color: (lead.assigned_to || lead.rep_id)
                                 ? 'rgba(255,255,255,0.7)'
-                                : '#C2B59B',
+                                : '#FFFFFF',
                             }}
                           >
                             <UserPlus size={11} />
@@ -938,13 +938,13 @@ export default function Leads() {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: 4,
-                              background: 'rgba(255,80,80,0.12)',
-                              border: '0.5px solid rgba(255,80,80,0.35)',
+                              background: 'rgba(255, 68, 68,0.12)',
+                              border: '0.5px solid rgba(255, 68, 68,0.35)',
                               borderRadius: 8,
                               padding: '2px 4px',
                             }}
                           >
-                            <span style={{ fontSize: 11, color: '#ffdddd', padding: '0 6px' }}>
+                            <span style={{ fontSize: 11, color: '#FF4444', padding: '0 6px' }}>
                               Delete?
                             </span>
                             <button
@@ -953,7 +953,7 @@ export default function Leads() {
                                 fontSize: 11,
                                 padding: '3px 8px',
                                 borderRadius: 6,
-                                background: '#ff8888',
+                                background: '#FF4444',
                                 color: '#000',
                                 fontWeight: 600,
                               }}
@@ -983,7 +983,7 @@ export default function Leads() {
                               color: 'rgba(255,255,255,0.3)',
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#ff8888'
+                              e.currentTarget.style.color = '#FF4444'
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.color = 'rgba(255,255,255,0.3)'
@@ -1073,13 +1073,13 @@ export default function Leads() {
             top: 70,
             right: 16,
             zIndex: 300,
-            background: 'rgba(20,18,16,0.97)',
+            background: 'rgba(20, 20, 20,0.97)',
             border: `0.5px solid ${
               toast.kind === 'error'
-                ? 'rgba(248,113,113,0.5)'
-                : 'rgba(194,181,155,0.5)'
+                ? 'rgba(255, 68, 68,0.5)'
+                : 'rgba(255, 255, 255,0.5)'
             }`,
-            color: toast.kind === 'error' ? '#f87171' : '#C2B59B',
+            color: toast.kind === 'error' ? '#FF4444' : '#FFFFFF',
             padding: '10px 16px',
             borderRadius: 10,
             fontSize: 13,

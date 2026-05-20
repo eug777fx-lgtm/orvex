@@ -26,7 +26,7 @@ const ARUBA_LOCATIONS = [
 ]
 
 const glassCardStyle = {
-  background: 'rgba(17,17,20,0.55)',
+  background: 'rgba(17, 17, 17,0.55)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   padding: '1.5rem',
@@ -35,7 +35,7 @@ const glassCardStyle = {
 }
 
 const cardStyle = {
-  background: 'rgba(17,17,20,0.7)',
+  background: 'rgba(17, 17, 17,0.7)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   padding: '1.25rem',

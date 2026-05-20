@@ -5,8 +5,8 @@ import PageShell from '../components/PageShell'
 import { useAuth, workflowApi } from '../lib/auth'
 
 const card = {
-  background: 'rgba(194,181,155,0.03)',
-  border: '0.5px solid rgba(194,181,155,0.08)',
+  background: 'rgba(255, 255, 255,0.03)',
+  border: '0.5px solid rgba(255, 255, 255,0.08)',
   borderRadius: 14,
 }
 
@@ -36,8 +36,8 @@ const fmtDate = (d) =>
 
 function RoleBadge({ role }) {
   const map = {
-    admin: { c: '#C2B59B', bg: 'rgba(194,181,155,0.12)', b: 'rgba(194,181,155,0.25)' },
-    manager: { c: '#7DD3FC', bg: 'rgba(125,211,252,0.1)', b: 'rgba(125,211,252,0.25)' },
+    admin: { c: '#FFFFFF', bg: 'rgba(255, 255, 255,0.12)', b: 'rgba(255, 255, 255,0.25)' },
+    manager: { c: '#FFFFFF', bg: 'rgba(255, 255, 255,0.1)', b: 'rgba(255, 255, 255,0.25)' },
     rep: { c: 'rgba(255,255,255,0.65)', bg: 'rgba(255,255,255,0.05)', b: 'rgba(255,255,255,0.12)' },
   }
   const s = map[role] || map.rep
@@ -229,9 +229,9 @@ export default function Team() {
             gap: 7,
             fontSize: 12.5,
             fontWeight: 600,
-            color: '#C2B59B',
-            background: 'rgba(194,181,155,0.08)',
-            border: '0.5px solid rgba(194,181,155,0.22)',
+            color: '#FFFFFF',
+            background: 'rgba(255, 255, 255,0.08)',
+            border: '0.5px solid rgba(255, 255, 255,0.22)',
             borderRadius: 10,
             padding: '8px 14px',
             cursor: 'pointer',
@@ -295,7 +295,7 @@ export default function Team() {
                     </td>
                     <td style={td}>{Number(rep.total_leads) || 0}</td>
                     <td style={td}>{Number(rep.deals_closed) || 0}</td>
-                    <td style={{ ...td, color: '#C2B59B', fontWeight: 600 }}>
+                    <td style={{ ...td, color: '#FFFFFF', fontWeight: 600 }}>
                       {money(rep.total_commission)}
                     </td>
                     <td style={{ ...td, color: 'rgba(255,255,255,0.5)' }}>
@@ -341,15 +341,15 @@ export default function Team() {
                             borderRadius: 8,
                             padding: '6px 10px',
                             color: rep.is_active
-                              ? 'rgba(248,113,113,0.9)'
-                              : 'rgba(74,222,128,0.9)',
+                              ? 'rgba(255, 68, 68,0.9)'
+                              : 'rgba(255, 255, 255,0.9)',
                             background: rep.is_active
-                              ? 'rgba(248,113,113,0.08)'
-                              : 'rgba(74,222,128,0.08)',
+                              ? 'rgba(255, 68, 68,0.08)'
+                              : 'rgba(255, 255, 255,0.08)',
                             border: `0.5px solid ${
                               rep.is_active
-                                ? 'rgba(248,113,113,0.25)'
-                                : 'rgba(74,222,128,0.25)'
+                                ? 'rgba(255, 68, 68,0.25)'
+                                : 'rgba(255, 255, 255,0.25)'
                             }`,
                           }}
                         >
@@ -386,9 +386,9 @@ export default function Team() {
                           onClick={() => setDeleteConfirm(rep)}
                           title="Delete account"
                           style={{
-                            background: 'rgba(248,113,113,0.1)',
-                            border: '0.5px solid rgba(248,113,113,0.3)',
-                            color: 'rgba(248,113,113,0.8)',
+                            background: 'rgba(255, 68, 68,0.1)',
+                            border: '0.5px solid rgba(255, 68, 68,0.3)',
+                            color: 'rgba(255, 68, 68,0.8)',
                             borderRadius: 6,
                             padding: '5px 12px',
                             fontSize: 12,
@@ -419,7 +419,7 @@ export default function Team() {
           >
             Pending Deals
             {pendingDeals.length > 0 && (
-              <span style={{ color: '#C2B59B' }}> ({pendingDeals.length})</span>
+              <span style={{ color: '#FFFFFF' }}> ({pendingDeals.length})</span>
             )}
           </h3>
           <p
@@ -494,7 +494,7 @@ export default function Team() {
                         <td style={td}>{deal.service_name || '—'}</td>
                         <td style={td}>{money(deal.deal_value)}</td>
                         <td
-                          style={{ ...td, color: '#C2B59B', fontWeight: 600 }}
+                          style={{ ...td, color: '#FFFFFF', fontWeight: 600 }}
                         >
                           {money(commission)}
                           <span
@@ -547,9 +547,9 @@ export default function Team() {
                                   cursor: busy ? 'wait' : 'pointer',
                                   borderRadius: 8,
                                   padding: '6px 12px',
-                                  color: 'rgba(248,113,113,0.95)',
-                                  background: 'rgba(248,113,113,0.1)',
-                                  border: '0.5px solid rgba(248,113,113,0.3)',
+                                  color: 'rgba(255, 68, 68,0.95)',
+                                  background: 'rgba(255, 68, 68,0.1)',
+                                  border: '0.5px solid rgba(255, 68, 68,0.3)',
                                 }}
                               >
                                 Confirm
@@ -597,9 +597,9 @@ export default function Team() {
                                   cursor: busy ? 'wait' : 'pointer',
                                   borderRadius: 8,
                                   padding: '6px 12px',
-                                  color: 'rgba(74,222,128,0.95)',
-                                  background: 'rgba(74,222,128,0.1)',
-                                  border: '0.5px solid rgba(74,222,128,0.3)',
+                                  color: 'rgba(255, 255, 255,0.95)',
+                                  background: 'rgba(255, 255, 255,0.1)',
+                                  border: '0.5px solid rgba(255, 255, 255,0.3)',
                                 }}
                               >
                                 {busy ? (
@@ -620,9 +620,9 @@ export default function Team() {
                                   cursor: 'pointer',
                                   borderRadius: 8,
                                   padding: '6px 12px',
-                                  color: 'rgba(248,113,113,0.9)',
-                                  background: 'rgba(248,113,113,0.08)',
-                                  border: '0.5px solid rgba(248,113,113,0.25)',
+                                  color: 'rgba(255, 68, 68,0.9)',
+                                  background: 'rgba(255, 68, 68,0.08)',
+                                  border: '0.5px solid rgba(255, 68, 68,0.25)',
                                 }}
                               >
                                 Reject
@@ -660,8 +660,8 @@ export default function Team() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
               style={{
-                background: '#111113',
-                border: '0.5px solid rgba(248,113,113,0.3)',
+                background: '#111111',
+                border: '0.5px solid rgba(255, 68, 68,0.3)',
                 borderRadius: 16,
                 padding: 32,
                 maxWidth: 400,
@@ -678,14 +678,14 @@ export default function Team() {
                   width: 44,
                   height: 44,
                   borderRadius: '50%',
-                  background: 'rgba(248,113,113,0.12)',
+                  background: 'rgba(255, 68, 68,0.12)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginBottom: 18,
                 }}
               >
-                <AlertTriangle size={22} color="rgba(248,113,113,0.9)" />
+                <AlertTriangle size={22} color="rgba(255, 68, 68,0.9)" />
               </div>
               <h3
                 style={{
@@ -706,7 +706,7 @@ export default function Team() {
                 }}
               >
                 Are you sure you want to permanently delete{' '}
-                <span style={{ color: '#C2B59B', fontWeight: 600 }}>
+                <span style={{ color: '#FFFFFF', fontWeight: 600 }}>
                   {deleteConfirm.name || 'this rep'}
                 </span>
                 's account? This cannot be undone.
@@ -743,9 +743,9 @@ export default function Team() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 7,
-                    background: 'rgba(248,113,113,0.15)',
-                    border: '0.5px solid rgba(248,113,113,0.4)',
-                    color: 'rgba(248,113,113,0.9)',
+                    background: 'rgba(255, 68, 68,0.15)',
+                    border: '0.5px solid rgba(255, 68, 68,0.4)',
+                    color: 'rgba(255, 68, 68,0.9)',
                     borderRadius: 8,
                     padding: '9px 18px',
                     fontSize: 13,
@@ -773,8 +773,8 @@ export default function Team() {
               bottom: 28,
               left: '50%',
               transform: 'translateX(-50%)',
-              background: '#16161A',
-              border: '0.5px solid rgba(194,181,155,0.2)',
+              background: '#1A1A1A',
+              border: '0.5px solid rgba(255, 255, 255,0.2)',
               color: '#fff',
               fontSize: 13,
               fontWeight: 500,

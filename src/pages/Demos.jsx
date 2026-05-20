@@ -43,7 +43,7 @@ const pageSubStyle = {
 }
 
 const cardStyle = {
-  background: 'rgba(17,17,20,0.7)',
+  background: 'rgba(17, 17, 17,0.7)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   padding: '1.5rem',
@@ -52,7 +52,7 @@ const cardStyle = {
 }
 
 const glassCardStyle = {
-  background: 'rgba(17,17,20,0.55)',
+  background: 'rgba(17, 17, 17,0.55)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   overflow: 'hidden',
@@ -156,15 +156,15 @@ const THEME_BADGES = {
     label: 'Eclipse',
     glyph: '\u{1F311}',
     bg: 'rgba(255,255,255,0.10)',
-    color: 'rgba(180,195,255,0.95)',
+    color: 'rgba(170, 170, 170,0.95)',
     border: 'rgba(255,255,255,0.22)',
   },
   ember: {
     label: 'Ember',
     glyph: '\u{1F525}',
-    bg: 'rgba(255,140,50,0.13)',
-    color: 'rgba(255,170,80,0.95)',
-    border: 'rgba(255,160,60,0.28)',
+    bg: 'rgba(170, 170, 170,0.13)',
+    color: 'rgba(170, 170, 170,0.95)',
+    border: 'rgba(170, 170, 170,0.28)',
   },
   pearl: {
     label: 'Pearl',
@@ -183,9 +183,9 @@ const THEME_BADGES = {
   pulse: {
     label: 'Pulse',
     glyph: '\u{26A1}',
-    bg: 'rgba(0,255,136,0.10)',
-    color: 'rgba(0,255,136,0.95)',
-    border: 'rgba(0,255,136,0.28)',
+    bg: 'rgba(255, 255, 255,0.10)',
+    color: 'rgba(255, 255, 255,0.95)',
+    border: 'rgba(255, 255, 255,0.28)',
   },
 }
 
@@ -544,37 +544,37 @@ export default function Demos() {
                       {
                         key: 'eclipse',
                         title: 'Eclipse · Dark Glass',
-                        bg: 'linear-gradient(135deg, #0a0a0a 0%, #1f1f24 100%)',
+                        bg: 'linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 100%)',
                         border: 'rgba(255,255,255,0.18)',
                         accent: 'radial-gradient(circle at 80% 50%, rgba(255,255,255,0.25), transparent 60%)',
                       },
                       {
                         key: 'ember',
                         title: 'Ember · Warm Premium',
-                        bg: 'linear-gradient(135deg, #0d0a08 0%, #221710 100%)',
-                        border: 'rgba(255,160,60,0.18)',
-                        accent: 'radial-gradient(circle at 80% 50%, rgba(255,140,50,0.3), transparent 60%)',
+                        bg: 'linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 100%)',
+                        border: 'rgba(170, 170, 170,0.18)',
+                        accent: 'radial-gradient(circle at 80% 50%, rgba(170, 170, 170,0.3), transparent 60%)',
                       },
                       {
                         key: 'pearl',
                         title: 'Pearl · Light Minimal',
-                        bg: 'linear-gradient(135deg, #fafaf8 0%, #e8e6dd 100%)',
+                        bg: 'linear-gradient(135deg, #FFFFFF 0%, #FFFFFF 100%)',
                         border: 'rgba(0,0,0,0.15)',
                         accent: 'radial-gradient(circle at 30% 50%, rgba(0,0,0,0.12), transparent 60%)',
                       },
                       {
                         key: 'titan',
                         title: 'Titan · Bold Agency',
-                        bg: '#080808',
+                        bg: '#0A0A0A',
                         border: 'rgba(255,255,255,0.2)',
                         accent: 'linear-gradient(180deg, transparent 0%, transparent 60%, rgba(255,255,255,0.4) 60%, rgba(255,255,255,0.4) 80%, transparent 80%)',
                       },
                       {
                         key: 'pulse',
                         title: 'Pulse · Neon Cyber',
-                        bg: 'linear-gradient(135deg, #060610 0%, #080820 100%)',
-                        border: 'rgba(0,255,136,0.25)',
-                        accent: 'radial-gradient(circle at 80% 50%, rgba(0,255,136,0.35), transparent 60%)',
+                        bg: 'linear-gradient(135deg, #000000 0%, #0A0A0A 100%)',
+                        border: 'rgba(255, 255, 255,0.25)',
+                        accent: 'radial-gradient(circle at 80% 50%, rgba(255, 255, 255,0.35), transparent 60%)',
                       },
                     ].map((sw) => (
                       <div
@@ -624,7 +624,7 @@ export default function Demos() {
             style={{
               padding: '4rem 1rem',
               textAlign: 'center',
-              color: '#ff8888',
+              color: '#FF4444',
               fontSize: 13,
             }}
           >
@@ -872,7 +872,7 @@ export default function Demos() {
               position: 'fixed',
               bottom: 24,
               right: 24,
-              background: '#1a1a1e',
+              background: '#1A1A1A',
               color: '#ffffff',
               border: '0.5px solid rgba(255,255,255,0.12)',
               borderRadius: 12,

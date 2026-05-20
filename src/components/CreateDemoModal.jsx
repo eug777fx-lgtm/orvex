@@ -90,9 +90,9 @@ const ghostButtonStyle = {
 const errorStyle = {
   marginTop: 12,
   padding: '10px 12px',
-  background: 'rgba(255, 80, 80, 0.08)',
-  border: '1px solid rgba(255, 80, 80, 0.3)',
-  color: '#ff8888',
+  background: 'rgba(255, 68, 68, 0.08)',
+  border: '1px solid rgba(255, 68, 68, 0.3)',
+  color: '#FF4444',
   borderRadius: 10,
   fontSize: 12,
 }
@@ -202,14 +202,14 @@ const THEME_OPTIONS = [
     name: 'Ember',
     vibe: 'Warm Premium',
     desc: 'Cinematic amber with floating widgets',
-    accent: 'rgba(255,160,60,0.95)',
+    accent: 'rgba(170, 170, 170,0.95)',
   },
   {
     key: 'pearl',
     name: 'Pearl',
     vibe: 'Light Minimal',
     desc: 'Clean Apple-style white design',
-    accent: '#0a0a0a',
+    accent: '#0A0A0A',
   },
   {
     key: 'titan',
@@ -223,7 +223,7 @@ const THEME_OPTIONS = [
     name: 'Pulse',
     vibe: 'Neon Cyber',
     desc: 'Tech-forward with electric accents',
-    accent: '#00ff88',
+    accent: '#FFFFFF',
   },
 ]
 
@@ -238,7 +238,7 @@ function ThemePreview({ themeKey }) {
   }
   if (themeKey === 'eclipse') {
     return (
-      <div style={{ ...base, background: 'linear-gradient(135deg, #0c0c0e 0%, #111114 100%)' }}>
+      <div style={{ ...base, background: 'linear-gradient(135deg, #0A0A0A 0%, #111111 100%)' }}>
         {[28, 50, 72].map((top, i) => (
           <div
             key={i}
@@ -270,7 +270,7 @@ function ThemePreview({ themeKey }) {
   }
   if (themeKey === 'ember') {
     return (
-      <div style={{ ...base, background: 'linear-gradient(135deg, #0d0a07 0%, #1a1005 100%)' }}>
+      <div style={{ ...base, background: 'linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 100%)' }}>
         <div
           style={{
             position: 'absolute',
@@ -280,7 +280,7 @@ function ThemePreview({ themeKey }) {
             height: 80,
             borderRadius: '50%',
             background:
-              'radial-gradient(circle, rgba(255,140,50,0.4) 0%, rgba(255,140,50,0.05) 60%, transparent 80%)',
+              'radial-gradient(circle, rgba(170, 170, 170,0.4) 0%, rgba(170, 170, 170,0.05) 60%, transparent 80%)',
             filter: 'blur(8px)',
           }}
         />
@@ -292,8 +292,8 @@ function ThemePreview({ themeKey }) {
             width: 60,
             height: 22,
             borderRadius: 5,
-            background: 'rgba(40,28,16,0.9)',
-            border: '1px solid rgba(255,160,60,0.25)',
+            background: 'rgba(26,26,26,0.9)',
+            border: '1px solid rgba(170, 170, 170,0.25)',
           }}
         />
         <div
@@ -304,8 +304,8 @@ function ThemePreview({ themeKey }) {
             width: 70,
             height: 22,
             borderRadius: 5,
-            background: 'rgba(40,28,16,0.9)',
-            border: '1px solid rgba(255,160,60,0.25)',
+            background: 'rgba(26,26,26,0.9)',
+            border: '1px solid rgba(170, 170, 170,0.25)',
           }}
         />
       </div>
@@ -313,7 +313,7 @@ function ThemePreview({ themeKey }) {
   }
   if (themeKey === 'pearl') {
     return (
-      <div style={{ ...base, background: 'linear-gradient(135deg, #fafaf8 0%, #f0f0e8 100%)' }}>
+      <div style={{ ...base, background: 'linear-gradient(135deg, #FFFFFF 0%, #FFFFFF 100%)' }}>
         {[28, 46, 60].map((top, i) => (
           <div
             key={i}
@@ -324,7 +324,7 @@ function ThemePreview({ themeKey }) {
               width: i === 0 ? '50%' : i === 1 ? '70%' : '35%',
               height: 3,
               borderRadius: 2,
-              background: '#0a0a0a',
+              background: '#0A0A0A',
             }}
           />
         ))}
@@ -336,7 +336,7 @@ function ThemePreview({ themeKey }) {
             width: 36,
             height: 12,
             borderRadius: 999,
-            background: '#0a0a0a',
+            background: '#0A0A0A',
           }}
         />
       </div>
@@ -344,7 +344,7 @@ function ThemePreview({ themeKey }) {
   }
   if (themeKey === 'titan') {
     return (
-      <div style={{ ...base, background: '#080808' }}>
+      <div style={{ ...base, background: '#0A0A0A' }}>
         <div
           style={{
             position: 'absolute',
@@ -376,9 +376,9 @@ function ThemePreview({ themeKey }) {
   }
   if (themeKey === 'pulse') {
     const dotPattern =
-      'radial-gradient(rgba(0,255,136,0.18) 1px, transparent 1px)'
+      'radial-gradient(rgba(255, 255, 255,0.18) 1px, transparent 1px)'
     return (
-      <div style={{ ...base, background: 'linear-gradient(135deg, #060610 0%, #080818 100%)' }}>
+      <div style={{ ...base, background: 'linear-gradient(135deg, #000000 0%, #0A0A0A 100%)' }}>
         <div
           style={{
             position: 'absolute',
@@ -396,8 +396,8 @@ function ThemePreview({ themeKey }) {
             width: 32,
             height: 12,
             borderRadius: 3,
-            background: '#00ff88',
-            boxShadow: '0 0 12px rgba(0,255,136,0.5)',
+            background: '#FFFFFF',
+            boxShadow: '0 0 12px rgba(255, 255, 255,0.5)',
           }}
         />
       </div>

@@ -190,8 +190,8 @@ const PRINT_CSS = `
 `
 
 const card = {
-  background: 'rgba(194,181,155,0.03)',
-  border: '0.5px solid rgba(194,181,155,0.08)',
+  background: 'rgba(255, 255, 255,0.03)',
+  border: '0.5px solid rgba(255, 255, 255,0.08)',
   borderRadius: 14,
 }
 
@@ -469,9 +469,9 @@ export default function Documents() {
                 gap: 5,
                 fontSize: 12,
                 fontWeight: 600,
-                color: '#C2B59B',
-                background: 'rgba(194,181,155,0.08)',
-                border: '0.5px solid rgba(194,181,155,0.2)',
+                color: '#FFFFFF',
+                background: 'rgba(255, 255, 255,0.08)',
+                border: '0.5px solid rgba(255, 255, 255,0.2)',
                 borderRadius: 8,
                 padding: '6px 10px',
                 cursor: 'pointer',
@@ -520,10 +520,10 @@ export default function Documents() {
                     style={{
                       textAlign: 'left',
                       background: active
-                        ? 'rgba(194,181,155,0.1)'
+                        ? 'rgba(255, 255, 255,0.1)'
                         : 'transparent',
                       border: active
-                        ? '0.5px solid rgba(194,181,155,0.25)'
+                        ? '0.5px solid rgba(255, 255, 255,0.25)'
                         : '0.5px solid transparent',
                       borderRadius: 10,
                       padding: '10px 12px',
@@ -541,7 +541,7 @@ export default function Documents() {
                         flexShrink: 0,
                         background:
                           c.status === 'active'
-                            ? '#7DD3FC'
+                            ? '#FFFFFF'
                             : 'rgba(255,255,255,0.25)',
                       }}
                     />
@@ -605,10 +605,10 @@ export default function Documents() {
                       gap: 7,
                       fontSize: 12.5,
                       fontWeight: 600,
-                      color: active ? '#0B0B0D' : 'rgba(255,255,255,0.7)',
-                      background: active ? '#C2B59B' : 'rgba(255,255,255,0.03)',
+                      color: active ? '#000000' : 'rgba(255,255,255,0.7)',
+                      background: active ? '#FFFFFF' : 'rgba(255,255,255,0.03)',
                       border: active
-                        ? '0.5px solid #C2B59B'
+                        ? '0.5px solid #FFFFFF'
                         : '0.5px solid rgba(255,255,255,0.1)',
                       borderRadius: 10,
                       padding: '9px 16px',
@@ -684,8 +684,8 @@ export default function Documents() {
               bottom: 28,
               left: '50%',
               transform: 'translateX(-50%)',
-              background: '#16161A',
-              border: '0.5px solid rgba(194,181,155,0.2)',
+              background: '#1A1A1A',
+              border: '0.5px solid rgba(255, 255, 255,0.2)',
               color: '#fff',
               fontSize: 13,
               fontWeight: 500,
@@ -758,9 +758,9 @@ function ContractsTab({
                   display: 'inline-block',
                   fontSize: 12,
                   fontWeight: 600,
-                  color: '#C2B59B',
-                  background: 'rgba(194,181,155,0.1)',
-                  border: '0.5px solid rgba(194,181,155,0.2)',
+                  color: '#FFFFFF',
+                  background: 'rgba(255, 255, 255,0.1)',
+                  border: '0.5px solid rgba(255, 255, 255,0.2)',
                   borderRadius: 999,
                   padding: '5px 14px',
                 }}
@@ -918,8 +918,8 @@ function SavedDocsTab({ selected, docs, onDownload, onDelete }) {
                 style={{
                   fontSize: 10.5,
                   fontWeight: 600,
-                  color: '#C2B59B',
-                  background: 'rgba(194,181,155,0.1)',
+                  color: '#FFFFFF',
+                  background: 'rgba(255, 255, 255,0.1)',
                   borderRadius: 6,
                   padding: '3px 8px',
                   whiteSpace: 'nowrap',
@@ -960,7 +960,7 @@ function SavedDocsTab({ selected, docs, onDownload, onDelete }) {
               <button
                 type="button"
                 onClick={() => onDelete(d.id)}
-                style={{ ...iconBtn, color: 'rgba(255,120,120,0.7)' }}
+                style={{ ...iconBtn, color: 'rgba(255, 68, 68,0.7)' }}
                 aria-label="Delete"
               >
                 <Trash2 size={13} />
@@ -1080,8 +1080,8 @@ function BankingCard({ banking, onSave }) {
             }}
             style={{
               width: '100%',
-              background: '#C2B59B',
-              color: '#0B0B0D',
+              background: '#FFFFFF',
+              color: '#000000',
               border: 'none',
               borderRadius: 10,
               padding: 10,
@@ -1419,7 +1419,7 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                       justifyContent: 'space-between',
                       gap: 12,
                       fontSize: 12.5,
-                      color: '#C2B59B',
+                      color: '#FFFFFF',
                     }}
                   >
                     <span style={{ minWidth: 0 }}>{retainer.name}</span>
@@ -1453,14 +1453,14 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                     One-time total
                   </span>
                   <span style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: 22, fontWeight: 700, color: '#C2B59B' }}>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: '#FFFFFF' }}>
                       {money(subtotal)}
                     </span>
                     <span
                       style={{
                         display: 'block',
                         fontSize: 12,
-                        color: 'rgba(194,181,155,0.6)',
+                        color: 'rgba(255, 255, 255,0.6)',
                         marginTop: 2,
                       }}
                     >
@@ -1482,14 +1482,14 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                     Monthly recurring
                   </span>
                   <span style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: '#C2B59B' }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: '#FFFFFF' }}>
                       {money(monthly)}/mo
                     </span>
                     <span
                       style={{
                         display: 'block',
                         fontSize: 11,
-                        color: 'rgba(194,181,155,0.6)',
+                        color: 'rgba(255, 255, 255,0.6)',
                         marginTop: 2,
                       }}
                     >
@@ -1502,7 +1502,7 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                 <div
                   style={{
                     fontSize: 11,
-                    color: 'rgba(194,181,155,0.7)',
+                    color: 'rgba(255, 255, 255,0.7)',
                     marginTop: 10,
                     lineHeight: 1.5,
                   }}
@@ -1517,8 +1517,8 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                 style={{
                   width: '100%',
                   marginTop: 18,
-                  background: '#C2B59B',
-                  color: '#0B0B0D',
+                  background: '#FFFFFF',
+                  color: '#000000',
                   border: 'none',
                   borderRadius: 12,
                   padding: 13,
@@ -1643,7 +1643,7 @@ function SummaryGroupHeader({ children, accent }) {
         fontSize: 11,
         fontWeight: 600,
         letterSpacing: '0.6px',
-        color: accent ? 'rgba(194,181,155,0.7)' : 'rgba(255,255,255,0.35)',
+        color: accent ? 'rgba(255, 255, 255,0.7)' : 'rgba(255,255,255,0.35)',
         textTransform: 'uppercase',
         margin: '6px 0 2px',
       }}
@@ -1680,7 +1680,7 @@ function SummaryLine({ item, monthly }) {
         <div
           style={{
             fontSize: 10.5,
-            color: 'rgba(194,181,155,0.55)',
+            color: 'rgba(255, 255, 255,0.55)',
             textAlign: 'right',
           }}
         >
@@ -1699,9 +1699,9 @@ function PackageCard({ pkg, active, onClick }) {
       style={{
         textAlign: 'left',
         cursor: 'pointer',
-        background: active ? 'rgba(194,181,155,0.08)' : 'rgba(255,255,255,0.02)',
+        background: active ? 'rgba(255, 255, 255,0.08)' : 'rgba(255,255,255,0.02)',
         border: active
-          ? '0.5px solid rgba(194,181,155,0.5)'
+          ? '0.5px solid rgba(255, 255, 255,0.5)'
           : '0.5px solid rgba(255,255,255,0.08)',
         borderRadius: 12,
         padding: 16,
@@ -1726,8 +1726,8 @@ function PackageCard({ pkg, active, onClick }) {
             style={{
               fontSize: 10,
               fontWeight: 600,
-              color: '#0B0B0D',
-              background: '#C2B59B',
+              color: '#000000',
+              background: '#FFFFFF',
               borderRadius: 6,
               padding: '2px 7px',
             }}
@@ -1736,12 +1736,12 @@ function PackageCard({ pkg, active, onClick }) {
           </span>
         )}
       </div>
-      <div style={{ fontSize: 11.5, color: 'rgba(194,181,155,0.85)' }}>{pkg.subtitle}</div>
+      <div style={{ fontSize: 11.5, color: 'rgba(255, 255, 255,0.85)' }}>{pkg.subtitle}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: '#C2B59B' }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: '#FFFFFF' }}>
           {money(pkg.price_usd)}
         </span>
-        <span style={{ fontSize: 11.5, color: 'rgba(194,181,155,0.7)' }}>
+        <span style={{ fontSize: 11.5, color: 'rgba(255, 255, 255,0.7)' }}>
           {awg(pkg.price_awg)}
         </span>
       </div>
@@ -1770,7 +1770,7 @@ function PackageCard({ pkg, active, onClick }) {
       >
         {pkg.includes.map((line, i) => (
           <li key={i} style={{ display: 'flex', gap: 6 }}>
-            <span style={{ color: '#C2B59B' }}>✓</span>
+            <span style={{ color: '#FFFFFF' }}>✓</span>
             <span>{line}</span>
           </li>
         ))}
@@ -1795,9 +1795,9 @@ function AddonRow({ addon, active, onToggle }) {
       style={{
         padding: '10px 12px',
         borderRadius: 10,
-        background: active ? 'rgba(194,181,155,0.07)' : 'rgba(255,255,255,0.02)',
+        background: active ? 'rgba(255, 255, 255,0.07)' : 'rgba(255,255,255,0.02)',
         border: active
-          ? '0.5px solid rgba(194,181,155,0.3)'
+          ? '0.5px solid rgba(255, 255, 255,0.3)'
           : '0.5px solid rgba(255,255,255,0.06)',
         display: 'flex',
         gap: 12,
@@ -1812,8 +1812,8 @@ function AddonRow({ addon, active, onToggle }) {
           height: 16,
           flexShrink: 0,
           borderRadius: 4,
-          border: active ? '1px solid #C2B59B' : '1px solid rgba(255,255,255,0.25)',
-          background: active ? '#C2B59B' : 'transparent',
+          border: active ? '1px solid #FFFFFF' : '1px solid rgba(255,255,255,0.25)',
+          background: active ? '#FFFFFF' : 'transparent',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1822,7 +1822,7 @@ function AddonRow({ addon, active, onToggle }) {
         aria-hidden="true"
       >
         {active && (
-          <span style={{ width: 8, height: 2, background: '#0B0B0D', borderRadius: 1 }} />
+          <span style={{ width: 8, height: 2, background: '#000000', borderRadius: 1 }} />
         )}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1850,12 +1850,12 @@ function AddonRow({ addon, active, onToggle }) {
                 fontWeight: 600,
                 letterSpacing: '0.4px',
                 textTransform: 'uppercase',
-                color: isMonthly ? 'rgba(194,181,155,0.8)' : 'rgba(255,255,255,0.45)',
+                color: isMonthly ? 'rgba(255, 255, 255,0.8)' : 'rgba(255,255,255,0.45)',
                 background: isMonthly
-                  ? 'rgba(194,181,155,0.12)'
+                  ? 'rgba(255, 255, 255,0.12)'
                   : 'rgba(255,255,255,0.06)',
                 border: isMonthly
-                  ? '0.5px solid rgba(194,181,155,0.3)'
+                  ? '0.5px solid rgba(255, 255, 255,0.3)'
                   : '0.5px solid rgba(255,255,255,0.08)',
                 borderRadius: 999,
                 padding: '2px 8px',
@@ -1869,7 +1869,7 @@ function AddonRow({ addon, active, onToggle }) {
               style={{
                 fontSize: 13,
                 fontWeight: 700,
-                color: active ? '#C2B59B' : 'rgba(255,255,255,0.6)',
+                color: active ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
               }}
             >
               {money(addon.price_usd)}{isMonthly ? '/mo' : ''}
@@ -1878,7 +1878,7 @@ function AddonRow({ addon, active, onToggle }) {
               style={{
                 display: 'block',
                 fontSize: 11,
-                color: active ? 'rgba(194,181,155,0.7)' : 'rgba(255,255,255,0.35)',
+                color: active ? 'rgba(255, 255, 255,0.7)' : 'rgba(255,255,255,0.35)',
                 marginTop: 2,
               }}
             >
@@ -1910,9 +1910,9 @@ function RetainerCard({ retainer, active, onClick }) {
       style={{
         textAlign: 'left',
         cursor: 'pointer',
-        background: active ? 'rgba(194,181,155,0.08)' : 'rgba(255,255,255,0.02)',
+        background: active ? 'rgba(255, 255, 255,0.08)' : 'rgba(255,255,255,0.02)',
         border: active
-          ? '0.5px solid rgba(194,181,155,0.5)'
+          ? '0.5px solid rgba(255, 255, 255,0.5)'
           : '0.5px solid rgba(255,255,255,0.08)',
         borderRadius: 12,
         padding: 14,
@@ -1932,7 +1932,7 @@ function RetainerCard({ retainer, active, onClick }) {
       >
         <span style={{ fontSize: 13.5, fontWeight: 700 }}>{retainer.name}</span>
         {hasFixedPrice ? (
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#C2B59B' }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF' }}>
             {money(retainer.price_usd)}/mo
           </span>
         ) : (
@@ -1940,7 +1940,7 @@ function RetainerCard({ retainer, active, onClick }) {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: '#C2B59B',
+              color: '#FFFFFF',
               fontStyle: 'italic',
             }}
           >
@@ -1949,7 +1949,7 @@ function RetainerCard({ retainer, active, onClick }) {
         )}
       </div>
       {hasFixedPrice && retainer.price_awg != null && (
-        <div style={{ fontSize: 11, color: 'rgba(194,181,155,0.6)', marginTop: -2 }}>
+        <div style={{ fontSize: 11, color: 'rgba(255, 255, 255,0.6)', marginTop: -2 }}>
           {awg(retainer.price_awg)}/mo
         </div>
       )}
@@ -1960,7 +1960,7 @@ function RetainerCard({ retainer, active, onClick }) {
         <div
           style={{
             fontSize: 10.5,
-            color: 'rgba(194,181,155,0.65)',
+            color: 'rgba(255, 255, 255,0.65)',
             marginTop: 2,
             fontStyle: 'italic',
           }}
@@ -2002,9 +2002,9 @@ function SelectRow({ type, active, label, price, suffix, onClick }) {
           flexShrink: 0,
           borderRadius: type === 'radio' ? '50%' : 5,
           border: active
-            ? '1px solid #C2B59B'
+            ? '1px solid #FFFFFF'
             : '1px solid rgba(255,255,255,0.25)',
-          background: active ? '#C2B59B' : 'transparent',
+          background: active ? '#FFFFFF' : 'transparent',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2016,7 +2016,7 @@ function SelectRow({ type, active, label, price, suffix, onClick }) {
               width: type === 'radio' ? 6 : 8,
               height: type === 'radio' ? 6 : 8,
               borderRadius: type === 'radio' ? '50%' : 2,
-              background: '#0B0B0D',
+              background: '#000000',
             }}
           />
         )}
@@ -2035,7 +2035,7 @@ function SelectRow({ type, active, label, price, suffix, onClick }) {
         style={{
           fontSize: 12.5,
           fontWeight: 600,
-          color: active ? '#C2B59B' : 'rgba(255,255,255,0.45)',
+          color: active ? '#FFFFFF' : 'rgba(255,255,255,0.45)',
           whiteSpace: 'nowrap',
         }}
       >
@@ -2303,7 +2303,7 @@ function InvoicePreview({ invoice, banking, onSave, showToast }) {
               <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>
                 TOTAL DUE
               </span>
-              <span style={{ fontSize: 26, fontWeight: 700, color: '#9c8f74' }}>
+              <span style={{ fontSize: 26, fontWeight: 700, color: '#FFFFFF' }}>
                 {money(invoice.subtotal)}
               </span>
             </div>
@@ -2315,7 +2315,7 @@ function InvoicePreview({ invoice, banking, onSave, showToast }) {
           style={{
             marginTop: 36,
             padding: 20,
-            background: '#f7f6f3',
+            background: '#FFFFFF',
             borderRadius: 8,
           }}
         >
@@ -2378,8 +2378,8 @@ function ActionBtn({ icon: Icon, label, onClick }) {
         fontSize: 12.5,
         fontWeight: 600,
         color: '#fff',
-        background: 'rgba(194,181,155,0.08)',
-        border: '0.5px solid rgba(194,181,155,0.2)',
+        background: 'rgba(255, 255, 255,0.08)',
+        border: '0.5px solid rgba(255, 255, 255,0.2)',
         borderRadius: 10,
         padding: '9px 16px',
         cursor: 'pointer',
@@ -2472,7 +2472,7 @@ function AddClientModal({ onClose, onSaved }) {
         animate={{ scale: 1, y: 0 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#111113',
+          background: '#111111',
           border: '0.5px solid rgba(255,255,255,0.1)',
           borderRadius: 16,
           padding: 24,
@@ -2580,7 +2580,7 @@ function AddClientModal({ onClose, onSaved }) {
         </div>
 
         {error && (
-          <div style={{ color: '#ff6b6b', fontSize: 12.5, marginTop: 12 }}>{error}</div>
+          <div style={{ color: '#FF4444', fontSize: 12.5, marginTop: 12 }}>{error}</div>
         )}
 
         <button
@@ -2590,8 +2590,8 @@ function AddClientModal({ onClose, onSaved }) {
           style={{
             width: '100%',
             marginTop: 18,
-            background: '#C2B59B',
-            color: '#0B0B0D',
+            background: '#FFFFFF',
+            color: '#000000',
             border: 'none',
             borderRadius: 12,
             padding: 13,

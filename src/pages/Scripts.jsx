@@ -57,7 +57,7 @@ const pageSubStyle = {
 }
 
 const cardStyle = {
-  background: 'rgba(17,17,20,0.7)',
+  background: 'rgba(17, 17, 17,0.7)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   padding: '1.5rem',
@@ -374,7 +374,7 @@ function ScriptCard({ script, onSaved, onToast }) {
   const editingCardStyle = {
     ...cardStyle,
     border: '1px solid rgba(255,255,255,0.25)',
-    background: 'rgba(20,20,24,0.9)',
+    background: 'rgba(20, 20, 20,0.9)',
     transition: 'border-color 0.2s ease, background 0.2s ease',
   }
 
@@ -980,7 +980,7 @@ export default function Scripts() {
               position: 'fixed',
               bottom: 24,
               right: 24,
-              background: '#1a1a1e',
+              background: '#1A1A1A',
               color: '#ffffff',
               border: '0.5px solid rgba(255,255,255,0.12)',
               borderRadius: 12,

@@ -63,7 +63,7 @@ const statNumberStyle = {
 const columnStyle = {
   width: 280,
   flexShrink: 0,
-  background: 'rgba(17,17,20,0.55)',
+  background: 'rgba(17, 17, 17,0.55)',
   border: '0.5px solid rgba(255,255,255,0.06)',
   borderRadius: 14,
   padding: '1rem',
@@ -104,7 +104,7 @@ const countBadgeStyle = {
 }
 
 const cardStyle = {
-  background: 'rgba(26,26,30,0.85)',
+  background: 'rgba(26,26,26,0.85)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 12,
   padding: '1rem',
@@ -367,20 +367,20 @@ function DealCard({ deal, onOpen, onMove, onDelete, canMoveLeft, canMoveRight })
             type="button"
             style={{
               ...moveButtonStyle,
-              color: '#ff6b6b',
-              borderColor: 'rgba(255,107,107,0.25)',
+              color: '#FF4444',
+              borderColor: 'rgba(255, 68, 68,0.25)',
             }}
             onClick={(e) => {
               e.stopPropagation()
               onDelete?.(deal)
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255,107,107,0.12)'
-              e.currentTarget.style.borderColor = 'rgba(255,107,107,0.5)'
+              e.currentTarget.style.background = 'rgba(255, 68, 68,0.12)'
+              e.currentTarget.style.borderColor = 'rgba(255, 68, 68,0.5)'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-              e.currentTarget.style.borderColor = 'rgba(255,107,107,0.25)'
+              e.currentTarget.style.borderColor = 'rgba(255, 68, 68,0.25)'
             }}
             aria-label="Delete deal"
           >
@@ -620,7 +620,7 @@ function DealDetailModal({ deal, onClose, onUpdate, onNavigateLead }) {
           </div>
 
           {error && (
-            <div style={{ fontSize: 12, color: '#ff8888' }}>{error}</div>
+            <div style={{ fontSize: 12, color: '#FF4444' }}>{error}</div>
           )}
 
           <div

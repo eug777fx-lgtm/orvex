@@ -14,14 +14,14 @@ const wrapperStyle = {
   zIndex: 0,
   pointerEvents: 'none',
   overflow: 'hidden',
-  background: '#0B0B0D',
+  background: '#000000',
 }
 
 const warmGradientStyle = {
   position: 'absolute',
   inset: 0,
   background:
-    'radial-gradient(ellipse 70% 40% at 50% 0%, rgba(194,181,155,0.05) 0%, transparent 60%)',
+    'radial-gradient(ellipse 70% 40% at 50% 0%, rgba(255, 255, 255,0.05) 0%, transparent 60%)',
   pointerEvents: 'none',
 }
 

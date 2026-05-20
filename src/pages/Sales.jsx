@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import useIsMobile from '../utils/useIsMobile'
 
 // ===== Lithos Labs — Sales Portal (CEO-identical shell) =====
-const BG = '#0B0B0D'
-const NAV_BG = 'rgba(11,11,13,0.95)'
-const STAT_BG = '#111113'
-const SECTION_BG = '#0e0e10'
+const BG = '#000000'
+const NAV_BG = 'rgba(0, 0, 0,0.95)'
+const STAT_BG = '#111111'
+const SECTION_BG = '#0A0A0A'
 const BORDER = '0.5px solid rgba(255,255,255,0.06)'
-const BEIGE = '#C2B59B'
+const BEIGE = '#FFFFFF'
 const WHITE = '#ffffff'
 const T40 = 'rgba(255,255,255,0.4)'
 const T35 = 'rgba(255,255,255,0.35)'
@@ -17,13 +17,13 @@ const T70 = 'rgba(255,255,255,0.7)'
 const AUTH_KEY = 'lithos_sales_auth'
 
 const STAGES = [
-  { key: 'new', label: 'New', color: '#9ca3af' },
-  { key: 'contacted', label: 'Contacted', color: '#60a5fa' },
-  { key: 'interested', label: 'Interested', color: '#c084fc' },
-  { key: 'demo_booked', label: 'Demo Booked', color: '#fbbf24' },
-  { key: 'proposal_sent', label: 'Proposal Sent', color: '#fb923c' },
-  { key: 'closed_won', label: 'Closed Won', color: '#4ade80' },
-  { key: 'closed_lost', label: 'Closed Lost', color: '#f87171' },
+  { key: 'new', label: 'New', color: '#AAAAAA' },
+  { key: 'contacted', label: 'Contacted', color: '#AAAAAA' },
+  { key: 'interested', label: 'Interested', color: '#AAAAAA' },
+  { key: 'demo_booked', label: 'Demo Booked', color: '#AAAAAA' },
+  { key: 'proposal_sent', label: 'Proposal Sent', color: '#AAAAAA' },
+  { key: 'closed_won', label: 'Closed Won', color: '#FFFFFF' },
+  { key: 'closed_lost', label: 'Closed Lost', color: '#FF4444' },
 ]
 const STAGE_COLOR = Object.fromEntries(STAGES.map((s) => [s.key, s.color]))
 const STAGE_LABEL = Object.fromEntries(STAGES.map((s) => [s.key, s.label]))
@@ -133,7 +133,7 @@ function Section({ title, subtitle, right, children, style }) {
   )
 }
 function StatusPill({ status }) {
-  const c = STAGE_COLOR[status] || '#9ca3af'
+  const c = STAGE_COLOR[status] || '#AAAAAA'
   return (
     <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: `${c}1f`, border: `0.5px solid ${c}55`, color: c, whiteSpace: 'nowrap' }}>
       {STAGE_LABEL[status] || status}
@@ -179,7 +179,7 @@ function Login({ onAuthed }) {
         <img src="/lithos-logo.png" alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} />
         <span style={{ fontWeight: 700, color: WHITE, fontSize: 18 }}>Lithos</span>
         <span style={{ fontWeight: 300, color: T40, fontSize: 18 }}>Labs</span>
-        <span style={{ border: `0.5px solid rgba(194,181,155,0.4)`, color: BEIGE, fontSize: 10, padding: '2px 8px', borderRadius: 999, marginLeft: 4 }}>
+        <span style={{ border: `0.5px solid rgba(255, 255, 255,0.4)`, color: BEIGE, fontSize: 10, padding: '2px 8px', borderRadius: 999, marginLeft: 4 }}>
           SALES
         </span>
       </div>
@@ -206,7 +206,7 @@ function Login({ onAuthed }) {
         <button type="submit" disabled={busy} style={{ ...btnPrimary, width: '100%', padding: 12, fontSize: 14, marginTop: 8 }}>
           {busy ? 'Please wait…' : mode === 'login' ? 'Login' : 'Register'}
         </button>
-        {err && <div style={{ fontSize: 12, color: 'rgba(248,113,113,0.8)', marginTop: 8 }}>{err}</div>}
+        {err && <div style={{ fontSize: 12, color: 'rgba(255, 68, 68,0.8)', marginTop: 8 }}>{err}</div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 14px' }}>
           <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
           <span style={{ fontSize: 11, color: T35 }}>or</span>
@@ -252,7 +252,7 @@ function Bell({ repId }) {
       <button onClick={() => setOpen(!open)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', position: 'relative', padding: 4 }}>
         <I d={IC.bell} size={20} color={WHITE} />
         {unread > 0 && (
-          <span style={{ position: 'absolute', top: 0, right: 0, background: '#f87171', color: '#fff', fontSize: 9, fontWeight: 700, borderRadius: 999, minWidth: 15, height: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+          <span style={{ position: 'absolute', top: 0, right: 0, background: '#FF4444', color: '#fff', fontSize: 9, fontWeight: 700, borderRadius: 999, minWidth: 15, height: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
             {unread}
           </span>
         )}
@@ -457,7 +457,7 @@ function LeadDetail({ rep, lead, onClose, onChanged, toast }) {
         {lead.contact_email && <a href={`mailto:${lead.contact_email}`} style={{ color: BEIGE }}>{lead.contact_email}</a>}
         {lead.contact_phone && <a href={`tel:${lead.contact_phone}`} style={{ color: BEIGE }}>{lead.contact_phone}</a>}
         {lead.contact_whatsapp && (
-          <a href={`https://wa.me/${String(lead.contact_whatsapp).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ color: '#4ade80' }}>
+          <a href={`https://wa.me/${String(lead.contact_whatsapp).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ color: '#FFFFFF' }}>
             WhatsApp
           </a>
         )}
@@ -526,12 +526,12 @@ function SubmitDeal({ rep, lead, toast, onDone }) {
   }
   if (!open)
     return (
-      <button onClick={() => setOpen(true)} style={{ width: '100%', background: 'rgba(194,181,155,0.14)', border: `0.5px solid rgba(194,181,155,0.5)`, color: BEIGE, fontWeight: 600, borderRadius: 8, padding: 12, fontSize: 13, cursor: 'pointer' }}>
+      <button onClick={() => setOpen(true)} style={{ width: '100%', background: 'rgba(255, 255, 255,0.14)', border: `0.5px solid rgba(255, 255, 255,0.5)`, color: BEIGE, fontWeight: 600, borderRadius: 8, padding: 12, fontSize: 13, cursor: 'pointer' }}>
         Submit Deal
       </button>
     )
   return (
-    <div style={{ border: `0.5px solid rgba(194,181,155,0.3)`, borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ border: `0.5px solid rgba(255, 255, 255,0.3)`, borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <select style={inputStyle} value={svc} onChange={(e) => { setSvc(e.target.value); const s = services.find((x) => x.name === e.target.value); if (s) setRate(s.commission_rate) }}>
         <option value="">Select service…</option>
         {services.map((s) => (
@@ -653,7 +653,7 @@ function Dashboard({ rep, data, onTab, onAddLead }) {
             return (
               <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
                 <div style={{ fontSize: 13, color: WHITE }}>
-                  {od && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#f87171', marginRight: 6 }} />}
+                  {od && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#FF4444', marginRight: 6 }} />}
                   {l.company_name}
                 </div>
                 <span style={{ fontSize: 11, color: T35 }}>{new Date(l.next_followup).toLocaleDateString()}</span>
@@ -939,7 +939,7 @@ function Offers({ rep, toast }) {
           {busy ? 'Thinking…' : 'Get AI Recommendation'}
         </button>
         {rec && (
-          <div style={{ marginTop: 12, background: 'rgba(194,181,155,0.06)', border: `0.5px solid rgba(194,181,155,0.2)`, borderRadius: 10, padding: 16, color: '#F5F5F2', fontSize: 13 }}>
+          <div style={{ marginTop: 12, background: 'rgba(255, 255, 255,0.06)', border: `0.5px solid rgba(255, 255, 255,0.2)`, borderRadius: 10, padding: 16, color: '#FFFFFF', fontSize: 13 }}>
             <b style={{ color: BEIGE }}>{rec.recommended_service}</b>
             <div style={{ marginTop: 6 }}>{rec.why}</div>
             <div style={{ marginTop: 6, color: T70 }}>{rec.pitch}</div>
@@ -1025,7 +1025,7 @@ function Scripts({ toast }) {
             {busy ? 'Thinking…' : 'Get Response'}
           </button>
           {resp && (
-            <div style={{ marginTop: 12, background: 'rgba(194,181,155,0.06)', border: `0.5px solid rgba(194,181,155,0.2)`, borderRadius: 10, padding: 16, color: '#F5F5F2', fontSize: 13, lineHeight: 1.6 }}>
+            <div style={{ marginTop: 12, background: 'rgba(255, 255, 255,0.06)', border: `0.5px solid rgba(255, 255, 255,0.2)`, borderRadius: 10, padding: 16, color: '#FFFFFF', fontSize: 13, lineHeight: 1.6 }}>
               {resp}
               <button style={{ ...btnGhost, display: 'block', marginTop: 10, fontSize: 12 }} onClick={() => { navigator.clipboard?.writeText(resp); toast('Copied') }}>Copy Response</button>
             </div>
@@ -1059,7 +1059,7 @@ function Tasks({ rep, tasks, leads, reload, toast }) {
     await salesApi('delete_task', { method: 'POST', body: { task_id: t.id } })
     reload()
   }
-  const PRI = { high: '#f87171', medium: '#fbbf24', low: '#9ca3af' }
+  const PRI = { high: '#FF4444', medium: '#AAAAAA', low: '#AAAAAA' }
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -1089,12 +1089,12 @@ function Tasks({ rep, tasks, leads, reload, toast }) {
                 padding: '12px',
                 borderBottom: '0.5px solid rgba(255,255,255,0.04)',
                 opacity: t.status === 'done' ? 0.4 : 1,
-                background: overdue ? 'rgba(251,191,36,0.04)' : 'transparent',
-                borderLeft: overdue ? '2px solid rgba(251,191,36,0.4)' : '2px solid transparent',
+                background: overdue ? 'rgba(170, 170, 170,0.04)' : 'transparent',
+                borderLeft: overdue ? '2px solid rgba(170, 170, 170,0.4)' : '2px solid transparent',
               }}
             >
               <button onClick={() => toggle(t)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
-                <I d={IC.check} size={16} color={t.status === 'done' ? '#4ade80' : T40} />
+                <I d={IC.check} size={16} color={t.status === 'done' ? '#FFFFFF' : T40} />
               </button>
               <span style={{ flex: 1, fontSize: 14, color: WHITE, textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>
                 {t.title}
@@ -1223,7 +1223,7 @@ function Admin({ rep, toast }) {
                 <span style={{ flex: 1, fontSize: 14, color: WHITE }}>{r.name}</span>
                 <span style={{ fontSize: 12, color: T40, width: 70 }}>{r.total_leads} leads</span>
                 <span style={{ fontSize: 12, color: T40, width: 70 }}>{r.deals_closed} deals</span>
-                <span style={{ fontSize: 12, color: '#fbbf24', width: 110 }}>{money(r.pending_commission)} owed</span>
+                <span style={{ fontSize: 12, color: '#AAAAAA', width: 110 }}>{money(r.pending_commission)} owed</span>
                 <span style={{ fontSize: 12, color: BEIGE, width: 100 }}>{money(r.paid_commission)} paid</span>
               </div>
             ))}
@@ -1390,7 +1390,7 @@ function LeadAssignment({ rep, toast }) {
           )
         })}
         {unassigned.length > 0 && (
-          <div style={{ marginTop: 10, fontSize: 12, color: '#fbbf24' }}>
+          <div style={{ marginTop: 10, fontSize: 12, color: '#AAAAAA' }}>
             Total unassigned: {unassigned.length}
           </div>
         )}
@@ -1439,10 +1439,10 @@ function LeadAssignment({ rep, toast }) {
               <span style={{ fontSize: 12, color: T40 }}>
                 {t.total_leads || 0} total
               </span>
-              <span style={{ fontSize: 12, color: '#4ade80' }}>
+              <span style={{ fontSize: 12, color: '#FFFFFF' }}>
                 {t.closed || 0} closed
               </span>
-              <span style={{ fontSize: 12, color: '#fbbf24' }}>
+              <span style={{ fontSize: 12, color: '#AAAAAA' }}>
                 {t.in_progress || 0} in progress
               </span>
             </div>
@@ -1459,9 +1459,9 @@ function LeadAssignment({ rep, toast }) {
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#f87171',
-                background: 'rgba(248,113,113,0.12)',
-                border: '0.5px solid rgba(248,113,113,0.4)',
+                color: '#FF4444',
+                background: 'rgba(255, 68, 68,0.12)',
+                border: '0.5px solid rgba(255, 68, 68,0.4)',
                 borderRadius: 999,
                 padding: '2px 8px',
               }}
@@ -1629,10 +1629,10 @@ function PendingDeal({ d, onDecide }) {
       )}
       {rej && <textarea style={{ ...inputStyle, minHeight: 50, marginTop: 8, fontSize: 12 }} placeholder="Rejection notes" value={notes} onChange={(e) => setNotes(e.target.value)} />}
       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-        <button onClick={() => onDecide(d, true)} style={{ flex: 1, background: 'rgba(74,222,128,0.15)', border: '0.5px solid rgba(74,222,128,0.4)', color: '#4ade80', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+        <button onClick={() => onDecide(d, true)} style={{ flex: 1, background: 'rgba(255, 255, 255,0.15)', border: '0.5px solid rgba(255, 255, 255,0.4)', color: '#FFFFFF', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
           Approve
         </button>
-        <button onClick={() => (rej ? onDecide(d, false, notes) : setRej(true))} style={{ flex: 1, background: 'rgba(248,113,113,0.12)', border: '0.5px solid rgba(248,113,113,0.4)', color: '#f87171', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+        <button onClick={() => (rej ? onDecide(d, false, notes) : setRej(true))} style={{ flex: 1, background: 'rgba(255, 68, 68,0.12)', border: '0.5px solid rgba(255, 68, 68,0.4)', color: '#FF4444', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
           {rej ? 'Confirm Reject' : 'Reject'}
         </button>
       </div>
@@ -1721,7 +1721,7 @@ export default function Sales() {
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
-            style={{ position: 'fixed', top: 70, right: 16, zIndex: 300, background: 'rgba(20,18,16,0.97)', border: `0.5px solid ${toastState.kind === 'error' ? 'rgba(248,113,113,0.5)' : 'rgba(194,181,155,0.5)'}`, color: toastState.kind === 'error' ? '#f87171' : BEIGE, padding: '10px 16px', borderRadius: 10, fontSize: 13, maxWidth: 320 }}
+            style={{ position: 'fixed', top: 70, right: 16, zIndex: 300, background: 'rgba(20, 20, 20,0.97)', border: `0.5px solid ${toastState.kind === 'error' ? 'rgba(255, 68, 68,0.5)' : 'rgba(255, 255, 255,0.5)'}`, color: toastState.kind === 'error' ? '#FF4444' : BEIGE, padding: '10px 16px', borderRadius: 10, fontSize: 13, maxWidth: 320 }}
           >
             {toastState.msg}
           </motion.div>
@@ -1734,7 +1734,7 @@ export default function Sales() {
           <img src="/lithos-logo.png" alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} />
           <span style={{ fontWeight: 700, color: WHITE }}>Lithos</span>
           <span style={{ fontWeight: 300, color: T40 }}>Labs</span>
-          <span style={{ border: `0.5px solid rgba(194,181,155,0.4)`, color: BEIGE, fontSize: 10, padding: '2px 8px', borderRadius: 999, marginLeft: 4 }}>
+          <span style={{ border: `0.5px solid rgba(255, 255, 255,0.4)`, color: BEIGE, fontSize: 10, padding: '2px 8px', borderRadius: 999, marginLeft: 4 }}>
             SALES
           </span>
         </div>

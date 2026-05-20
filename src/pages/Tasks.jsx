@@ -64,7 +64,7 @@ const sectionLabelStyle = {
 }
 
 const glassCardStyle = {
-  background: 'rgba(17,17,20,0.55)',
+  background: 'rgba(17, 17, 17,0.55)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   overflow: 'hidden',

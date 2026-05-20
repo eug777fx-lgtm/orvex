@@ -43,7 +43,7 @@ const pageSubStyle = {
 }
 
 const glassCardStyle = {
-  background: 'rgba(17,17,20,0.55)',
+  background: 'rgba(17, 17, 17,0.55)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   padding: '1.5rem',
@@ -777,9 +777,9 @@ export default function Import() {
         <div
           style={{
             fontSize: 13,
-            color: '#ff8888',
-            background: 'rgba(255, 80, 80, 0.08)',
-            border: '1px solid rgba(255, 80, 80, 0.3)',
+            color: '#FF4444',
+            background: 'rgba(255, 68, 68, 0.08)',
+            border: '1px solid rgba(255, 68, 68, 0.3)',
             borderRadius: 10,
             padding: '10px 14px',
           }}

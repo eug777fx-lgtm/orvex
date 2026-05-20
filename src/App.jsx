@@ -114,8 +114,8 @@ function NavTabs({ items }) {
         display: 'flex',
         alignItems: 'center',
         gap: 2,
-        background: 'rgba(194,181,155,0.04)',
-        border: '0.5px solid rgba(194,181,155,0.1)',
+        background: 'rgba(255, 255, 255,0.04)',
+        border: '0.5px solid rgba(255, 255, 255,0.1)',
         padding: 3,
         borderRadius: 999,
       }}
@@ -136,7 +136,7 @@ function NavTabs({ items }) {
               fontSize: 12.5,
               fontWeight: 500,
               letterSpacing: '0.01em',
-              color: active ? '#0B0B0D' : 'rgba(242,237,228,0.55)',
+              color: active ? '#000000' : 'rgba(255,255,255,0.55)',
               transition: 'color 0.15s ease',
             }}
           >
@@ -147,7 +147,7 @@ function NavTabs({ items }) {
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: '#C2B59B',
+                  background: '#FFFFFF',
                   borderRadius: 999,
                   zIndex: 0,
                 }}
@@ -321,15 +321,15 @@ function Shell({ appAuth, onLogout }) {
         : 'SALES'
   const roleColor =
     {
-      admin: '#C2B59B',
-      manager: 'rgba(125,211,252,0.9)',
-      sales: 'rgba(125,211,252,0.9)',
-    }[appAuth?.role] || 'rgba(125,211,252,0.9)'
+      admin: '#FFFFFF',
+      manager: 'rgba(255, 255, 255,0.9)',
+      sales: 'rgba(255, 255, 255,0.9)',
+    }[appAuth?.role] || 'rgba(255, 255, 255,0.9)'
 
   const topbarStyle = {
     height: isMobile ? 52 : 56,
     width: '100%',
-    background: 'rgba(12,12,14,0.65)',
+    background: 'rgba(10,10,10,0.65)',
     borderBottom: '0.5px solid rgba(255,255,255,0.06)',
     backdropFilter: 'blur(24px) saturate(180%)',
     WebkitBackdropFilter: 'blur(24px) saturate(180%)',
@@ -396,7 +396,7 @@ function Shell({ appAuth, onLogout }) {
               style={{
                 fontWeight: 300,
                 fontSize: 15,
-                color: 'rgba(194,181,155,0.6)',
+                color: 'rgba(255, 255, 255,0.6)',
                 letterSpacing: '-0.3px',
               }}
             >

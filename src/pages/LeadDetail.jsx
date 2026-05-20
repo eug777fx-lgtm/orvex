@@ -35,7 +35,7 @@ const STATUS_STYLES = {
 }
 
 const cardStyle = {
-  background: 'rgba(17,17,20,0.65)',
+  background: 'rgba(17, 17, 17,0.65)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   padding: '1.5rem',
@@ -548,7 +548,7 @@ function ActivityLogCard({
             />
           </div>
           {error && (
-            <div style={{ fontSize: 12, color: '#ff8888' }}>{error}</div>
+            <div style={{ fontSize: 12, color: '#FF4444' }}>{error}</div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
@@ -704,7 +704,7 @@ function NotesCard({ leadId, initialNotes, onSaved }) {
         placeholder="Write notes, context, next steps..."
       />
       {error && (
-        <div style={{ fontSize: 12, color: '#ff8888', marginTop: 8 }}>{error}</div>
+        <div style={{ fontSize: 12, color: '#FF4444', marginTop: 8 }}>{error}</div>
       )}
     </div>
   )
@@ -856,7 +856,7 @@ function TasksPanel({ leadId, tasks, onChanged, formOpen, onOpenForm, onCloseFor
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
           />
-          {error && <div style={{ fontSize: 12, color: '#ff8888' }}>{error}</div>}
+          {error && <div style={{ fontSize: 12, color: '#FF4444' }}>{error}</div>}
           <button
             type="submit"
             disabled={submitting}
@@ -1143,7 +1143,7 @@ function RecommendedPackagesPanel({ recommendations, onViewAll }) {
   )
 }
 
-const BEIGE = '#C2B59B'
+const BEIGE = '#FFFFFF'
 
 function formatMoney(n) {
   const v = Number(n) || 0
@@ -1226,8 +1226,8 @@ function SubmitDealPanel({ lead, rep, onSubmitted }) {
         onClick={() => setOpen(true)}
         style={{
           width: '100%',
-          background: 'rgba(194,181,155,0.14)',
-          border: '0.5px solid rgba(194,181,155,0.5)',
+          background: 'rgba(255, 255, 255,0.14)',
+          border: '0.5px solid rgba(255, 255, 255,0.5)',
           color: BEIGE,
           fontWeight: 600,
           borderRadius: 10,
@@ -1371,8 +1371,8 @@ function SubmitDealPanel({ lead, rep, onSubmitted }) {
 
                 <div
                   style={{
-                    background: 'rgba(194,181,155,0.1)',
-                    border: '0.5px solid rgba(194,181,155,0.3)',
+                    background: 'rgba(255, 255, 255,0.1)',
+                    border: '0.5px solid rgba(255, 255, 255,0.3)',
                     borderRadius: 12,
                     padding: '14px 16px',
                     textAlign: 'center',
@@ -1385,7 +1385,7 @@ function SubmitDealPanel({ lead, rep, onSubmitted }) {
                 </div>
 
                 {error && (
-                  <div style={{ fontSize: 12, color: '#ff8888' }}>{error}</div>
+                  <div style={{ fontSize: 12, color: '#FF4444' }}>{error}</div>
                 )}
 
                 <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
@@ -1706,9 +1706,9 @@ export default function LeadDetail() {
             onClick={() => setDeleteOpen(true)}
             style={{
               ...ghostButtonStyle,
-              color: '#ff8888',
-              borderColor: 'rgba(255,80,80,0.3)',
-              background: 'rgba(255,80,80,0.06)',
+              color: '#FF4444',
+              borderColor: 'rgba(255, 68, 68,0.3)',
+              background: 'rgba(255, 68, 68,0.06)',
             }}
           >
             <Trash2 size={12} />

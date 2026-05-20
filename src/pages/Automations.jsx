@@ -87,8 +87,8 @@ const TEMPLATES = [
 ]
 
 const card = {
-  background: 'rgba(194,181,155,0.03)',
-  border: '0.5px solid rgba(194,181,155,0.08)',
+  background: 'rgba(255, 255, 255,0.03)',
+  border: '0.5px solid rgba(255, 255, 255,0.08)',
   borderRadius: 14,
   padding: 20,
 }
@@ -236,12 +236,12 @@ export default function Automations() {
                     width: 38,
                     height: 38,
                     borderRadius: 10,
-                    background: 'rgba(194,181,155,0.12)',
-                    border: '0.5px solid rgba(194,181,155,0.2)',
+                    background: 'rgba(255, 255, 255,0.12)',
+                    border: '0.5px solid rgba(255, 255, 255,0.2)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#C2B59B',
+                    color: '#FFFFFF',
                     flexShrink: 0,
                   }}
                 >
@@ -288,7 +288,7 @@ export default function Automations() {
                       {step}
                     </span>
                     {i < t.flow.length - 1 && (
-                      <span style={{ color: 'rgba(194,181,155,0.5)', fontSize: 11 }}>→</span>
+                      <span style={{ color: 'rgba(255, 255, 255,0.5)', fontSize: 11 }}>→</span>
                     )}
                   </span>
                 ))}
@@ -304,9 +304,9 @@ export default function Automations() {
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  color: '#C2B59B',
-                  background: 'rgba(194,181,155,0.08)',
-                  border: '0.5px solid rgba(194,181,155,0.22)',
+                  color: '#FFFFFF',
+                  background: 'rgba(255, 255, 255,0.08)',
+                  border: '0.5px solid rgba(255, 255, 255,0.22)',
                 }}
               >
                 Deploy for Client
@@ -380,7 +380,7 @@ export default function Automations() {
                       border: 'none',
                       cursor: 'pointer',
                       background: active
-                        ? 'rgba(74,222,128,0.6)'
+                        ? 'rgba(255, 255, 255,0.6)'
                         : 'rgba(255,255,255,0.12)',
                       position: 'relative',
                       transition: 'background 0.15s ease',
@@ -423,8 +423,8 @@ export default function Automations() {
 
         <div
           style={{
-            background: 'rgba(125,211,252,0.04)',
-            border: '0.5px solid rgba(125,211,252,0.15)',
+            background: 'rgba(255, 255, 255,0.04)',
+            border: '0.5px solid rgba(255, 255, 255,0.15)',
             borderRadius: 14,
             padding: 24,
             display: 'flex',
@@ -438,12 +438,12 @@ export default function Automations() {
                 width: 42,
                 height: 42,
                 borderRadius: 11,
-                background: 'rgba(125,211,252,0.12)',
-                border: '0.5px solid rgba(125,211,252,0.25)',
+                background: 'rgba(255, 255, 255,0.12)',
+                border: '0.5px solid rgba(255, 255, 255,0.25)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#7DD3FC',
+                color: '#FFFFFF',
               }}
             >
               <PhoneCall size={20} />
@@ -471,7 +471,7 @@ export default function Automations() {
                 key={f}
                 style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13 }}
               >
-                <Check size={14} style={{ color: '#7DD3FC', flexShrink: 0 }} />
+                <Check size={14} style={{ color: '#FFFFFF', flexShrink: 0 }} />
                 <span style={{ color: 'rgba(255,255,255,0.7)' }}>{f}</span>
               </div>
             ))}
@@ -482,9 +482,9 @@ export default function Automations() {
               style={{
                 fontSize: 12.5,
                 fontWeight: 600,
-                color: '#7DD3FC',
-                background: 'rgba(125,211,252,0.1)',
-                border: '0.5px solid rgba(125,211,252,0.25)',
+                color: '#FFFFFF',
+                background: 'rgba(255, 255, 255,0.1)',
+                border: '0.5px solid rgba(255, 255, 255,0.25)',
                 borderRadius: 999,
                 padding: '6px 14px',
               }}
@@ -500,8 +500,8 @@ export default function Automations() {
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
-                color: '#0B0B0D',
-                background: '#7DD3FC',
+                color: '#000000',
+                background: '#FFFFFF',
                 border: 'none',
               }}
             >
@@ -547,8 +547,8 @@ export default function Automations() {
               bottom: 28,
               left: '50%',
               transform: 'translateX(-50%)',
-              background: '#16161A',
-              border: '0.5px solid rgba(194,181,155,0.2)',
+              background: '#1A1A1A',
+              border: '0.5px solid rgba(255, 255, 255,0.2)',
               color: '#fff',
               fontSize: 13,
               fontWeight: 500,
@@ -574,7 +574,7 @@ const iconBtn = {
   background: 'transparent',
   border: '0.5px solid rgba(255,255,255,0.1)',
   borderRadius: 8,
-  color: 'rgba(255,120,120,0.7)',
+  color: 'rgba(255, 68, 68,0.7)',
   cursor: 'pointer',
   flexShrink: 0,
 }
@@ -602,7 +602,7 @@ function ModalShell({ title, children, onClose }) {
         animate={{ scale: 1, y: 0 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#111113',
+          background: '#111111',
           border: '0.5px solid rgba(255,255,255,0.1)',
           borderRadius: 16,
           padding: 24,
@@ -640,7 +640,7 @@ const saveBtnStyle = (color) => ({
   width: '100%',
   marginTop: 18,
   background: color,
-  color: '#0B0B0D',
+  color: '#000000',
   border: 'none',
   borderRadius: 12,
   padding: 13,
@@ -727,7 +727,7 @@ function DeployModal({ template, client, onClose, onSaved }) {
         type="button"
         onClick={save}
         disabled={saving}
-        style={saveBtnStyle('#C2B59B')}
+        style={saveBtnStyle('#FFFFFF')}
       >
         {saving && <Loader2 size={15} className="spin" />}
         Save Automation
@@ -793,7 +793,7 @@ function VoiceModal({ client, onClose, onSaved }) {
         type="button"
         onClick={submit}
         disabled={saving}
-        style={saveBtnStyle('#7DD3FC')}
+        style={saveBtnStyle('#FFFFFF')}
       >
         {saving && <Loader2 size={15} className="spin" />}
         Submit Request

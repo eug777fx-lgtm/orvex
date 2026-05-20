@@ -39,7 +39,7 @@ import {
 } from 'lucide-react'
 
 // ===== Design tokens =====
-const CARD_BG = 'rgba(17,17,20,0.8)'
+const CARD_BG = 'rgba(17, 17, 17,0.8)'
 const CARD_BORDER = '0.5px solid rgba(255,255,255,0.08)'
 const SOFT_BORDER = '0.5px solid rgba(255,255,255,0.07)'
 const TEXT_MUTED = 'rgba(255,255,255,0.5)'
@@ -92,7 +92,7 @@ const AGENTS = [
   {
     key: 'video_editor',
     name: 'Editor',
-    color: '#C2B59B',
+    color: '#FFFFFF',
     icon: Film,
     role: 'Assembly · Color grade · Final cut',
     pos: { left: '38%', top: '58%' },
@@ -110,7 +110,7 @@ const AGENTS = [
   {
     key: 'video_producer',
     name: 'Producer',
-    color: '#f59e0b',
+    color: '#AAAAAA',
     icon: Camera,
     role: 'Multi-scene assembly · Complete stories · Final cut',
     pos: { left: '52%', top: '58%' },
@@ -296,7 +296,7 @@ function reviewItemType(item) {
 }
 
 // ===== n8n-style Pipeline View (replaces the animated AgentOffice) =====
-const SECTION_BG_PV = '#0e0e10'
+const SECTION_BG_PV = '#0A0A0A'
 const PIPE_STAGES = [
   {
     key: 'strategy',
@@ -320,22 +320,22 @@ const PIPE_STAGES = [
   },
 ]
 const PIPE_AGENT_COLOR = {
-  strategy: '#a78bfa',
-  writer: '#22d3ee',
-  video_director: '#fbbf24',
-  video_editor: '#C2B59B',
-  video_producer: '#f59e0b',
-  distribution: '#4ade80',
-  analytics: '#f87171',
-  repurpose: '#60a5fa',
+  strategy: '#AAAAAA',
+  writer: '#FFFFFF',
+  video_director: '#AAAAAA',
+  video_editor: '#FFFFFF',
+  video_producer: '#AAAAAA',
+  distribution: '#FFFFFF',
+  analytics: '#FF4444',
+  repurpose: '#AAAAAA',
 }
 
 function PipeNode({ stage, state, lastRun, onClick }) {
   const colors = {
     idle: { bg: 'rgba(255,255,255,0.04)', bd: 'rgba(255,255,255,0.1)', fg: 'rgba(255,255,255,0.4)' },
-    running: { bg: 'rgba(251,191,36,0.1)', bd: 'rgba(251,191,36,0.4)', fg: '#fbbf24' },
-    complete: { bg: 'rgba(74,222,128,0.1)', bd: 'rgba(74,222,128,0.4)', fg: '#4ade80' },
-    error: { bg: 'rgba(248,113,113,0.1)', bd: 'rgba(248,113,113,0.4)', fg: '#f87171' },
+    running: { bg: 'rgba(170, 170, 170,0.1)', bd: 'rgba(170, 170, 170,0.4)', fg: '#AAAAAA' },
+    complete: { bg: 'rgba(255, 255, 255,0.1)', bd: 'rgba(255, 255, 255,0.4)', fg: '#FFFFFF' },
+    error: { bg: 'rgba(255, 68, 68,0.1)', bd: 'rgba(255, 68, 68,0.4)', fg: '#FF4444' },
   }
   const c = colors[state] || colors.idle
   return (
@@ -504,8 +504,8 @@ function PipelineView({ brand, stats, showToast, onRefresh }) {
       {!hasPackages && (
         <div
           style={{
-            background: 'rgba(194,181,155,0.04)',
-            border: '0.5px solid rgba(194,181,155,0.1)',
+            background: 'rgba(255, 255, 255,0.04)',
+            border: '0.5px solid rgba(255, 255, 255,0.1)',
             borderRadius: 12,
             padding: '16px 20px',
           }}
@@ -526,9 +526,9 @@ function PipelineView({ brand, stats, showToast, onRefresh }) {
                   width: 22,
                   height: 22,
                   borderRadius: '50%',
-                  background: 'rgba(194,181,155,0.15)',
-                  border: '0.5px solid rgba(194,181,155,0.4)',
-                  color: '#C2B59B',
+                  background: 'rgba(255, 255, 255,0.15)',
+                  border: '0.5px solid rgba(255, 255, 255,0.4)',
+                  color: '#FFFFFF',
                   fontSize: 11,
                   fontWeight: 600,
                   display: 'flex',
@@ -551,8 +551,8 @@ function PipelineView({ brand, stats, showToast, onRefresh }) {
       {/* SECTION 1 — pipeline status bar */}
       <div
         style={{
-          background: 'rgba(194,181,155,0.03)',
-          border: '0.5px solid rgba(194,181,155,0.08)',
+          background: 'rgba(255, 255, 255,0.03)',
+          border: '0.5px solid rgba(255, 255, 255,0.08)',
           borderRadius: 16,
           padding: '20px 24px',
           display: 'flex',
@@ -605,8 +605,8 @@ function PipelineView({ brand, stats, showToast, onRefresh }) {
             onClick={runAll}
             disabled={!brand || !!running}
             style={{
-              background: '#C2B59B',
-              color: '#0B0B0D',
+              background: '#FFFFFF',
+              color: '#000000',
               fontWeight: 600,
               border: 'none',
               borderRadius: 10,
@@ -627,7 +627,7 @@ function PipelineView({ brand, stats, showToast, onRefresh }) {
                 disabled={!brand || !!running}
                 style={{
                   border: '0.5px solid rgba(255,255,255,0.15)',
-                  color: running === api ? '#fbbf24' : 'rgba(255,255,255,0.7)',
+                  color: running === api ? '#AAAAAA' : 'rgba(255,255,255,0.7)',
                   background: 'transparent',
                   borderRadius: 8,
                   padding: '7px 12px',
@@ -656,7 +656,7 @@ function PipelineView({ brand, stats, showToast, onRefresh }) {
           <motion.span
             animate={{ opacity: [1, 0.3, 1] }}
             transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80' }}
+            style={{ width: 7, height: 7, borderRadius: '50%', background: '#FFFFFF' }}
           />
           <span style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>Live Activity</span>
         </div>
@@ -1175,7 +1175,7 @@ function BottomDrawer({ open, onToggle, activeTab, onTabChange, reviewCount, isM
           right: 0,
           zIndex: 49,
           height: drawerHeight,
-          background: 'rgba(10,10,12,0.98)',
+          background: 'rgba(10, 10, 10,0.98)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           borderTop: '0.5px solid rgba(255,255,255,0.08)',
@@ -1195,7 +1195,7 @@ function BottomDrawer({ open, onToggle, activeTab, onTabChange, reviewCount, isM
           right: 0,
           zIndex: 50,
           height: 48,
-          background: 'rgba(10,10,12,0.95)',
+          background: 'rgba(10, 10, 10,0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderTop: '0.5px solid rgba(255,255,255,0.08)',
@@ -1297,7 +1297,7 @@ function Toast({ toast, drawerOpen }) {
             zIndex: 1000,
             padding: '10px 18px',
             borderRadius: 999,
-            background: 'rgba(20,20,24,0.92)',
+            background: 'rgba(20, 20, 20,0.92)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
             border:
@@ -1353,8 +1353,8 @@ function SectionTabs({ active, onChange, notifyContent }) {
               gap: 6,
               padding: '8px 20px',
               borderRadius: 10,
-              background: isActive ? 'rgba(194,181,155,0.12)' : 'transparent',
-              color: isActive ? '#F5F5F2' : 'rgba(242,237,228,0.45)',
+              background: isActive ? 'rgba(255, 255, 255,0.12)' : 'transparent',
+              color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255,0.45)',
               fontSize: 13,
               fontWeight: 500,
               border: 'none',
@@ -1375,8 +1375,8 @@ function SectionTabs({ active, onChange, notifyContent }) {
                   width: 6,
                   height: 6,
                   borderRadius: '50%',
-                  background: '#f87171',
-                  boxShadow: '0 0 6px rgba(248,113,113,0.7)',
+                  background: '#FF4444',
+                  boxShadow: '0 0 6px rgba(255, 68, 68,0.7)',
                 }}
               />
             )}
@@ -1460,11 +1460,11 @@ function PageHeader({ now, loading, activeSection, onSectionChange, notifyConten
 // ===== Brand Selector =====
 const BRAND_PRESET_COLORS = [
   '#ffffff',
-  '#a78bfa',
-  '#22d3ee',
-  '#4ade80',
-  '#fbbf24',
-  '#f87171',
+  '#AAAAAA',
+  '#FFFFFF',
+  '#FFFFFF',
+  '#AAAAAA',
+  '#FF4444',
 ]
 const BRAND_PLATFORMS = ['instagram', 'facebook']
 
@@ -1493,12 +1493,12 @@ function BrandChip({ brand, active, isClient, onSelect, onUploadLogo, uploading 
         gap: 6,
         padding: '5px 8px 5px 5px',
         borderRadius: 999,
-        background: active ? 'rgba(194,181,155,0.08)' : 'transparent',
+        background: active ? 'rgba(255, 255, 255,0.08)' : 'transparent',
         border: active
-          ? '0.5px solid rgba(194,181,155,0.4)'
+          ? '0.5px solid rgba(255, 255, 255,0.4)'
           : isClient
-          ? '0.5px dashed rgba(194,181,155,0.18)'
-          : '0.5px solid rgba(194,181,155,0.1)',
+          ? '0.5px dashed rgba(255, 255, 255,0.18)'
+          : '0.5px solid rgba(255, 255, 255,0.1)',
         cursor: 'pointer',
         whiteSpace: 'nowrap',
         flexShrink: 0,
@@ -1998,7 +1998,7 @@ function StatsRow({ stats, loading }) {
                     alignItems: 'center',
                     gap: 3,
                     fontSize: 10,
-                    color: '#4ade80',
+                    color: '#FFFFFF',
                     fontWeight: 600,
                   }}
                 >
@@ -2042,21 +2042,21 @@ function StatsRow({ stats, loading }) {
 
 // ===== Agent Office =====
 const HUD_COLORS = {
-  strategy: { glow: 'rgba(139,92,246,0.08)', accent: '#a78bfa', soft: 'rgba(139,92,246,0.5)' },
-  writer: { glow: 'rgba(6,182,212,0.08)', accent: '#22d3ee', soft: 'rgba(6,182,212,0.5)' },
-  video: { glow: 'rgba(251,191,36,0.08)', accent: '#fbbf24', soft: 'rgba(251,191,36,0.5)' },
+  strategy: { glow: 'rgba(170, 170, 170,0.08)', accent: '#AAAAAA', soft: 'rgba(170, 170, 170,0.5)' },
+  writer: { glow: 'rgba(255,255,255,0.08)', accent: '#FFFFFF', soft: 'rgba(255,255,255,0.5)' },
+  video: { glow: 'rgba(170, 170, 170,0.08)', accent: '#AAAAAA', soft: 'rgba(170, 170, 170,0.5)' },
   video_editor: {
-    glow: 'rgba(194,181,155,0.1)',
-    accent: '#C2B59B',
-    soft: 'rgba(194,181,155,0.55)',
+    glow: 'rgba(255, 255, 255,0.1)',
+    accent: '#FFFFFF',
+    soft: 'rgba(255, 255, 255,0.55)',
   },
   video_producer: {
-    glow: 'rgba(245,158,11,0.1)',
-    accent: '#f59e0b',
-    soft: 'rgba(245,158,11,0.55)',
+    glow: 'rgba(170, 170, 170,0.1)',
+    accent: '#AAAAAA',
+    soft: 'rgba(170, 170, 170,0.55)',
   },
-  distribution: { glow: 'rgba(74,222,128,0.08)', accent: '#4ade80', soft: 'rgba(74,222,128,0.5)' },
-  analytics: { glow: 'rgba(248,113,113,0.08)', accent: '#f87171', soft: 'rgba(248,113,113,0.5)' },
+  distribution: { glow: 'rgba(255, 255, 255,0.08)', accent: '#FFFFFF', soft: 'rgba(255, 255, 255,0.5)' },
+  analytics: { glow: 'rgba(255, 68, 68,0.08)', accent: '#FF4444', soft: 'rgba(255, 68, 68,0.5)' },
 }
 
 const DESK_POSITIONS = {
@@ -2134,8 +2134,8 @@ function ActivityPulse() {
         width: 7,
         height: 7,
         borderRadius: '50%',
-        background: '#10b981',
-        boxShadow: '0 0 10px rgba(16,185,129,0.7)',
+        background: '#AAAAAA',
+        boxShadow: '0 0 10px rgba(170, 170, 170,0.7)',
         flexShrink: 0,
       }}
     />
@@ -2335,7 +2335,7 @@ function AgentCharacter({ agent, position, mode, screenIndex }) {
           top: -22,
           left: '50%',
           transform: 'translateX(-50%)',
-          background: 'rgba(20,20,28,0.95)',
+          background: 'rgba(20, 20, 20,0.95)',
           border: alwaysShowBubble
             ? `0.5px solid ${colors.soft || 'rgba(255,255,255,0.1)'}`
             : '0.5px solid rgba(255,255,255,0.1)',
@@ -2666,7 +2666,7 @@ function ProcessQueueLink() {
         border: 'none',
         padding: 0,
         fontSize: 11,
-        color: 'rgba(194,181,155,0.5)',
+        color: 'rgba(255, 255, 255,0.5)',
         cursor: state === 'running' ? 'default' : 'pointer',
         whiteSpace: 'nowrap',
       }}
@@ -2691,7 +2691,7 @@ function NoMemoryOverlay({ onSetUpMemory }) {
       style={{
         position: 'absolute',
         inset: 0,
-        background: 'rgba(10,10,12,0.7)',
+        background: 'rgba(10, 10, 10,0.7)',
         backdropFilter: 'blur(6px)',
         WebkitBackdropFilter: 'blur(6px)',
         display: 'flex',
@@ -2875,9 +2875,9 @@ function ProducerModal({ brand, onClose, showToast, onRefresh }) {
   const mark = { pending: '○', active: '●', complete: '✓', failed: '✗' }
   const markColor = {
     pending: 'rgba(255,255,255,0.3)',
-    active: '#f59e0b',
-    complete: '#4ade80',
-    failed: '#f87171',
+    active: '#AAAAAA',
+    complete: '#FFFFFF',
+    failed: '#FF4444',
   }
 
   return (
@@ -2903,8 +2903,8 @@ function ProducerModal({ brand, onClose, showToast, onRefresh }) {
         exit={{ scale: 0.96, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#0a0a0c',
-          border: '0.5px solid rgba(245,158,11,0.25)',
+          background: '#0A0A0A',
+          border: '0.5px solid rgba(170, 170, 170,0.25)',
           borderRadius: 16,
           padding: 22,
           width: 460,
@@ -2950,7 +2950,7 @@ function ProducerModal({ brand, onClose, showToast, onRefresh }) {
               style={{
                 width: '100%',
                 background: 'rgba(0,0,0,0.4)',
-                border: '0.5px solid rgba(245,158,11,0.25)',
+                border: '0.5px solid rgba(170, 170, 170,0.25)',
                 borderRadius: 8,
                 color: '#fff',
                 fontSize: 13,
@@ -2984,8 +2984,8 @@ function ProducerModal({ brand, onClose, showToast, onRefresh }) {
               onClick={produce}
               disabled={!selected}
               style={{
-                background: '#f59e0b',
-                color: '#0B0B0D',
+                background: '#AAAAAA',
+                color: '#000000',
                 fontWeight: 700,
                 border: 'none',
                 borderRadius: 10,
@@ -3033,7 +3033,7 @@ function ProducerModal({ brand, onClose, showToast, onRefresh }) {
               style={{
                 marginTop: 6,
                 fontSize: 12,
-                color: result === 'failed' ? '#f87171' : '#f59e0b',
+                color: result === 'failed' ? '#FF4444' : '#AAAAAA',
               }}
             >
               {progressMsg}
@@ -3044,9 +3044,9 @@ function ProducerModal({ brand, onClose, showToast, onRefresh }) {
                 onClick={onClose}
                 style={{
                   marginTop: 8,
-                  background: 'rgba(74,222,128,0.15)',
-                  border: '0.5px solid rgba(74,222,128,0.4)',
-                  color: '#4ade80',
+                  background: 'rgba(255, 255, 255,0.15)',
+                  border: '0.5px solid rgba(255, 255, 255,0.4)',
+                  color: '#FFFFFF',
                   borderRadius: 10,
                   padding: '10px 16px',
                   fontSize: 13,
@@ -3220,9 +3220,9 @@ function AgentOffice({
               fontSize: 10,
               padding: '2px 8px',
               borderRadius: 999,
-              background: 'rgba(16,185,129,0.1)',
-              border: '0.5px solid rgba(16,185,129,0.3)',
-              color: '#10b981',
+              background: 'rgba(170, 170, 170,0.1)',
+              border: '0.5px solid rgba(170, 170, 170,0.3)',
+              color: '#AAAAAA',
               letterSpacing: '0.06em',
               fontWeight: 600,
             }}
@@ -3253,7 +3253,7 @@ function AgentOffice({
       {/* Floor */}
       <div
         style={{
-          background: '#0a0a0c',
+          background: '#0A0A0A',
           position: 'relative',
           minHeight: 420,
           width: '100%',
@@ -3279,12 +3279,12 @@ function AgentOffice({
         >
           <defs>
             <linearGradient id="flow-video-editor" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="rgba(251,191,36,0.32)" />
-              <stop offset="100%" stopColor="rgba(194,181,155,0.32)" />
+              <stop offset="0%" stopColor="rgba(170, 170, 170,0.32)" />
+              <stop offset="100%" stopColor="rgba(255, 255, 255,0.32)" />
             </linearGradient>
             <linearGradient id="flow-editor-distribution" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="rgba(194,181,155,0.32)" />
-              <stop offset="100%" stopColor="rgba(74,222,128,0.32)" />
+              <stop offset="0%" stopColor="rgba(255, 255, 255,0.32)" />
+              <stop offset="100%" stopColor="rgba(255, 255, 255,0.32)" />
             </linearGradient>
           </defs>
           <line
@@ -3492,8 +3492,8 @@ function agentDisplayName(type) {
 }
 
 const PLATFORM_COLORS = {
-  instagram: '#a78bfa',
-  facebook: '#4ade80',
+  instagram: '#AAAAAA',
+  facebook: '#FFFFFF',
 }
 
 function platformColor(p) {
@@ -3622,7 +3622,7 @@ function ScheduleStrip({ brand, version }) {
                   style={{
                     width: `${total === 0 ? 0 : (published / total) * 100}%`,
                     height: '100%',
-                    background: 'rgba(74,222,128,0.7)',
+                    background: 'rgba(255, 255, 255,0.7)',
                   }}
                 />
               </div>
@@ -3702,15 +3702,15 @@ function ScheduleStrip({ brand, version }) {
                   borderRadius: 10,
                   background:
                     isActive && !isPublished
-                      ? 'rgba(74,222,128,0.04)'
+                      ? 'rgba(255, 255, 255,0.04)'
                       : 'rgba(255,255,255,0.02)',
                   border:
                     isActive && !isPublished
-                      ? '0.5px solid rgba(74,222,128,0.4)'
+                      ? '0.5px solid rgba(255, 255, 255,0.4)'
                       : '0.5px solid rgba(255,255,255,0.06)',
                   boxShadow:
                     isActive && !isPublished
-                      ? '0 0 12px rgba(74,222,128,0.12)'
+                      ? '0 0 12px rgba(255, 255, 255,0.12)'
                       : 'none',
                   opacity: isPublished ? 0.5 : 1,
                   flexShrink: 0,
@@ -3733,8 +3733,8 @@ function ScheduleStrip({ brand, version }) {
                       width: 6,
                       height: 6,
                       borderRadius: '50%',
-                      background: '#4ade80',
-                      boxShadow: '0 0 8px rgba(74,222,128,0.7)',
+                      background: '#FFFFFF',
+                      boxShadow: '0 0 8px rgba(255, 255, 255,0.7)',
                     }}
                   />
                 )}
@@ -3744,11 +3744,11 @@ function ScheduleStrip({ brand, version }) {
                       fontSize: 10.5,
                       color:
                         isPublished
-                          ? 'rgba(74,222,128,0.9)'
+                          ? 'rgba(255, 255, 255,0.9)'
                           : isPending
-                          ? '#fbbf24'
+                          ? '#AAAAAA'
                           : isActive
-                          ? '#4ade80'
+                          ? '#FFFFFF'
                           : TEXT_MUTED,
                       fontFamily: MONO,
                       fontVariantNumeric: 'tabular-nums',
@@ -3762,7 +3762,7 @@ function ScheduleStrip({ brand, version }) {
                     <span
                       style={{
                         fontSize: 9.5,
-                        color: 'rgba(74,222,128,0.9)',
+                        color: 'rgba(255, 255, 255,0.9)',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 3,
@@ -3776,7 +3776,7 @@ function ScheduleStrip({ brand, version }) {
                     <span
                       style={{
                         fontSize: 9.5,
-                        color: '#fbbf24',
+                        color: '#AAAAAA',
                         letterSpacing: '0.04em',
                       }}
                     >
@@ -4177,8 +4177,8 @@ function ContentGapsCard({ brand, memory, onRefresh, showToast }) {
   return (
     <div
       style={{
-        background: 'rgba(194,181,155,0.08)',
-        border: '0.5px solid rgba(194,181,155,0.25)',
+        background: 'rgba(255, 255, 255,0.08)',
+        border: '0.5px solid rgba(255, 255, 255,0.25)',
         borderRadius: 10,
         padding: 12,
         marginBottom: 12,
@@ -4188,7 +4188,7 @@ function ContentGapsCard({ brand, memory, onRefresh, showToast }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <TrendingUp size={13} color="#C2B59B" />
+        <TrendingUp size={13} color="#FFFFFF" />
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: '#fff' }}>
             Content Gaps
@@ -4213,7 +4213,7 @@ function ContentGapsCard({ brand, memory, onRefresh, showToast }) {
                 padding: '6px 10px',
                 borderRadius: 8,
                 background: 'rgba(0,0,0,0.25)',
-                border: '0.5px solid rgba(194,181,155,0.15)',
+                border: '0.5px solid rgba(255, 255, 255,0.15)',
               }}
             >
               <div style={{ minWidth: 0, flex: 1 }}>
@@ -4270,7 +4270,7 @@ function ContentGapsCard({ brand, memory, onRefresh, showToast }) {
           fontSize: 12,
           padding: 10,
           borderRadius: 8,
-          border: '0.5px solid rgba(194,181,155,0.25)',
+          border: '0.5px solid rgba(255, 255, 255,0.25)',
           background: 'rgba(0,0,0,0.3)',
           color: '#fff',
           resize: 'vertical',
@@ -4288,8 +4288,8 @@ function ContentGapsCard({ brand, memory, onRefresh, showToast }) {
             fontSize: 11,
             padding: '6px 14px',
             borderRadius: 8,
-            border: '0.5px solid rgba(194,181,155,0.5)',
-            background: 'rgba(194,181,155,0.15)',
+            border: '0.5px solid rgba(255, 255, 255,0.5)',
+            background: 'rgba(255, 255, 255,0.15)',
             color: '#fff',
             fontWeight: 600,
             cursor: saving || !value.trim() ? 'not-allowed' : 'pointer',
@@ -4906,7 +4906,7 @@ const VIDEO_TEMPLATES = [
       logoUrl: null,
       brandName: 'LIMITLESS',
       primaryColor: '#ffffff',
-      secondaryColor: '#a78bfa',
+      secondaryColor: '#AAAAAA',
       headline: 'The smarter way to trade',
       features: ['Track every trade', 'Spot your patterns', 'Improve your edge'],
       ctaText: 'Start free today',
@@ -4924,7 +4924,7 @@ const VIDEO_TEMPLATES = [
     defaultProps: {
       logoUrl: null,
       brandName: 'AWATEC',
-      primaryColor: '#4ade80',
+      primaryColor: '#FFFFFF',
       secondaryColor: '#ffffff',
       problem: 'Hidden leaks are costing you money',
       solution: 'Professional leak detection in Aruba',
@@ -5105,9 +5105,9 @@ function VideoTemplates({ brand, showToast }) {
                     fontSize: 9.5,
                     padding: '2px 7px',
                     borderRadius: 999,
-                    background: 'rgba(74,222,128,0.1)',
-                    border: '0.5px solid rgba(74,222,128,0.3)',
-                    color: '#4ade80',
+                    background: 'rgba(255, 255, 255,0.1)',
+                    border: '0.5px solid rgba(255, 255, 255,0.3)',
+                    color: '#FFFFFF',
                     letterSpacing: '0.04em',
                   }}
                 >
@@ -5288,9 +5288,9 @@ function FullVideoProduction({ brand, showToast }) {
             fontSize: 9.5,
             padding: '2px 7px',
             borderRadius: 999,
-            background: 'rgba(245,158,11,0.1)',
-            border: '0.5px solid rgba(245,158,11,0.3)',
-            color: '#f59e0b',
+            background: 'rgba(170, 170, 170,0.1)',
+            border: '0.5px solid rgba(170, 170, 170,0.3)',
+            color: '#AAAAAA',
             letterSpacing: '0.04em',
           }}
         >
@@ -5321,9 +5321,9 @@ function FullVideoProduction({ brand, showToast }) {
           const isActive = activeStep === step.key
           const dotChar = isComplete ? '✓' : isActive ? '●' : '○'
           const color = isComplete
-            ? '#4ade80'
+            ? '#FFFFFF'
             : isActive
-            ? '#f59e0b'
+            ? '#AAAAAA'
             : 'rgba(255,255,255,0.35)'
           return (
             <div
@@ -5335,10 +5335,10 @@ function FullVideoProduction({ brand, showToast }) {
                 padding: '6px 10px',
                 borderRadius: 10,
                 background: isActive
-                  ? 'rgba(245,158,11,0.07)'
+                  ? 'rgba(170, 170, 170,0.07)'
                   : 'rgba(255,255,255,0.03)',
                 border: isActive
-                  ? '0.5px solid rgba(245,158,11,0.35)'
+                  ? '0.5px solid rgba(170, 170, 170,0.35)'
                   : '0.5px solid rgba(255,255,255,0.07)',
                 flex: '1 1 140px',
                 minWidth: 140,
@@ -5401,9 +5401,9 @@ function FullVideoProduction({ brand, showToast }) {
           fontSize: 12,
           padding: '10px 14px',
           borderRadius: 10,
-          background: running ? 'rgba(245,158,11,0.15)' : '#f59e0b',
-          border: '0.5px solid rgba(245,158,11,0.6)',
-          color: running ? '#f59e0b' : '#0B0B0D',
+          background: running ? 'rgba(170, 170, 170,0.15)' : '#AAAAAA',
+          border: '0.5px solid rgba(170, 170, 170,0.6)',
+          color: running ? '#AAAAAA' : '#000000',
           fontWeight: 700,
           cursor: !brand?.id || running ? 'default' : 'pointer',
           letterSpacing: '0.02em',
@@ -5420,7 +5420,7 @@ function FullVideoProduction({ brand, showToast }) {
           style={{
             marginTop: 8,
             fontSize: 10.5,
-            color: '#f87171',
+            color: '#FF4444',
           }}
         >
           {error}
@@ -5470,7 +5470,7 @@ function VideoPreviewModal({ template, brand, onClose }) {
         transition={{ duration: 0.2 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#0a0a0c',
+          background: '#0A0A0A',
           border: '0.5px solid rgba(255,255,255,0.1)',
           borderRadius: 16,
           padding: 16,
@@ -5988,7 +5988,7 @@ function ContentHub({
             ),
             subtext: (pkg.cta_text || '').slice(0, 80),
             brandName: selectedBrand.name,
-            primaryColor: selectedBrand.primary_color || '#c084fc',
+            primaryColor: selectedBrand.primary_color || '#AAAAAA',
             secondaryColor: selectedBrand.secondary_color || '#ffffff',
             logoUrl: selectedBrand.logo_url || null,
           },
@@ -6295,10 +6295,10 @@ function ContentHub({
                   padding: '6px 12px',
                   borderRadius: 8,
                   background: postAll
-                    ? 'rgba(194,181,155,0.15)'
-                    : 'rgba(194,181,155,0.12)',
-                  border: '0.5px solid rgba(194,181,155,0.5)',
-                  color: '#C2B59B',
+                    ? 'rgba(255, 255, 255,0.15)'
+                    : 'rgba(255, 255, 255,0.12)',
+                  border: '0.5px solid rgba(255, 255, 255,0.5)',
+                  color: '#FFFFFF',
                   cursor: !brand || postAll ? 'default' : 'pointer',
                   whiteSpace: 'nowrap',
                   opacity: !brand ? 0.5 : 1,
@@ -6580,8 +6580,8 @@ function PipelineList({ pipelines, brand, onStart, onAdvance, starting }) {
         disabled={!brand || starting}
         style={{
           alignSelf: 'flex-start',
-          background: '#C2B59B',
-          color: '#0B0B0D',
+          background: '#FFFFFF',
+          color: '#000000',
           border: 'none',
           borderRadius: 8,
           padding: '7px 16px',
@@ -6600,9 +6600,9 @@ function PipelineList({ pipelines, brand, onStart, onAdvance, starting }) {
             textAlign: 'center',
             color: TEXT_MUTED,
             fontSize: 12,
-            background: 'rgba(194,181,155,0.03)',
+            background: 'rgba(255, 255, 255,0.03)',
             borderRadius: 10,
-            border: '0.5px dashed rgba(194,181,155,0.1)',
+            border: '0.5px dashed rgba(255, 255, 255,0.1)',
           }}
         >
           No pipelines yet — click Generate Video Pipeline to start
@@ -6620,7 +6620,7 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
   const stage = pipeline.stage || 'script'
   const stageIdx = PIPELINE_STAGES.indexOf(stage)
   const created = pipeline.created_at ? new Date(pipeline.created_at) : null
-  const brandColor = brand?.primary_color || brand?.color || '#C2B59B'
+  const brandColor = brand?.primary_color || brand?.color || '#FFFFFF'
   const nextStage = {
     script: 'audio',
     audio: 'visuals',
@@ -6629,8 +6629,8 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
   return (
     <div
       style={{
-        background: 'rgba(194,181,155,0.03)',
-        border: '0.5px solid rgba(194,181,155,0.1)',
+        background: 'rgba(255, 255, 255,0.03)',
+        border: '0.5px solid rgba(255, 255, 255,0.1)',
         borderRadius: 12,
         padding: 12,
         display: 'flex',
@@ -6648,7 +6648,7 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
             boxShadow: `0 0 6px ${brandColor}80`,
           }}
         />
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#F5F5F2' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#FFFFFF' }}>
           {brand?.name || 'Brand'}
         </span>
         <span
@@ -6667,9 +6667,9 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
               fontSize: 9.5,
               padding: '2px 7px',
               borderRadius: 999,
-              background: 'rgba(251,191,36,0.12)',
-              border: '0.5px solid rgba(251,191,36,0.4)',
-              color: '#fbbf24',
+              background: 'rgba(170, 170, 170,0.12)',
+              border: '0.5px solid rgba(170, 170, 170,0.4)',
+              color: '#AAAAAA',
               fontWeight: 600,
               letterSpacing: '0.04em',
               marginLeft: 'auto',
@@ -6699,10 +6699,10 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
           const isDone = i < stageIdx
           const isActive = i === stageIdx
           const dotColor = isDone
-            ? '#C2B59B'
+            ? '#FFFFFF'
             : isActive
-            ? '#fbbf24'
-            : 'rgba(194,181,155,0.18)'
+            ? '#AAAAAA'
+            : 'rgba(255, 255, 255,0.18)'
           return (
             <Fragment key={s}>
               <div
@@ -6729,7 +6729,7 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
                 <span
                   style={{
                     fontSize: 9,
-                    color: isActive ? '#fbbf24' : isDone ? '#C2B59B' : TEXT_FAINT,
+                    color: isActive ? '#AAAAAA' : isDone ? '#FFFFFF' : TEXT_FAINT,
                     textTransform: 'capitalize',
                     fontWeight: 500,
                   }}
@@ -6742,7 +6742,7 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
                   style={{
                     flex: 1,
                     height: 1,
-                    background: i < stageIdx ? '#C2B59B' : 'rgba(194,181,155,0.15)',
+                    background: i < stageIdx ? '#FFFFFF' : 'rgba(255, 255, 255,0.15)',
                     marginBottom: 14,
                   }}
                 />
@@ -6752,7 +6752,7 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
         })}
       </div>
       {pipeline.script_data?.title && (
-        <div style={{ fontSize: 13, color: '#F5F5F2', fontWeight: 500 }}>
+        <div style={{ fontSize: 13, color: '#FFFFFF', fontWeight: 500 }}>
           {pipeline.script_data.title}
         </div>
       )}
@@ -6762,9 +6762,9 @@ function PipelineCard({ pipeline, brand, onAdvance }) {
           onClick={() => onAdvance(pipeline.id, nextStage)}
           style={{
             alignSelf: 'flex-start',
-            background: 'rgba(194,181,155,0.1)',
-            border: '0.5px solid rgba(194,181,155,0.4)',
-            color: '#C2B59B',
+            background: 'rgba(255, 255, 255,0.1)',
+            border: '0.5px solid rgba(255, 255, 255,0.4)',
+            color: '#FFFFFF',
             borderRadius: 7,
             padding: '5px 12px',
             fontSize: 11,
@@ -6848,7 +6848,7 @@ function RenderProgressBar({ pct }) {
         right: 0,
         bottom: 0,
         height: 3,
-        background: 'rgba(194,181,155,0.1)',
+        background: 'rgba(255, 255, 255,0.1)',
         overflow: 'hidden',
       }}
     >
@@ -6856,7 +6856,7 @@ function RenderProgressBar({ pct }) {
         <div
           style={{
             height: '100%',
-            background: '#C2B59B',
+            background: '#FFFFFF',
             width: `${Math.max(2, pct)}%`,
             transition: 'width 0.5s ease',
           }}
@@ -6868,7 +6868,7 @@ function RenderProgressBar({ pct }) {
           style={{
             width: '40%',
             height: '100%',
-            background: 'rgba(194,181,155,0.8)',
+            background: 'rgba(255, 255, 255,0.8)',
           }}
         />
       )}
@@ -6936,12 +6936,12 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
       : null
   const renderPct = rawProgress != null ? Math.round(rawProgress * 100) : null
   const statusBadge = hasVisual
-    ? { label: 'Ready', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' }
+    ? { label: 'Ready', color: '#FFFFFF', bg: 'rgba(255, 255, 255,0.12)' }
     : isRendering
     ? {
         label: renderPct != null ? `Rendering ${renderPct}%` : 'Rendering…',
-        color: '#fbbf24',
-        bg: 'rgba(251,191,36,0.12)',
+        color: '#AAAAAA',
+        bg: 'rgba(170, 170, 170,0.12)',
       }
     : {
         label: 'Needs visual',
@@ -6953,7 +6953,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
   // visual and isn't actively rendering.
   const showTextOnly = needsVisual
   const cardBorder = doneFlash
-    ? '1px solid rgba(74,222,128,0.8)'
+    ? '1px solid rgba(255, 255, 255,0.8)'
     : '0.5px solid rgba(255,255,255,0.07)'
   const canPostNow = pkg.status === 'approved' && !!pkg.visual_url
   const platformAccent = platformColor(pkg.platform)
@@ -7038,9 +7038,9 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                 fontSize: 9,
                 padding: '2px 7px',
                 borderRadius: 999,
-                background: 'rgba(194,181,155,0.18)',
-                border: '0.5px solid rgba(194,181,155,0.5)',
-                color: '#C2B59B',
+                background: 'rgba(255, 255, 255,0.18)',
+                border: '0.5px solid rgba(255, 255, 255,0.5)',
+                color: '#FFFFFF',
                 fontWeight: 600,
                 letterSpacing: '0.04em',
               }}
@@ -7052,7 +7052,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
         </div>
         <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {isFullProduction && (prodScenes > 0 || prodDuration > 0) && (
-            <div style={{ fontSize: 10, color: '#C2B59B' }}>
+            <div style={{ fontSize: 10, color: '#FFFFFF' }}>
               {prodScenes} scene{prodScenes === 1 ? '' : 's'}
               {prodDuration ? ` · ${prodDuration} seconds` : ''}
             </div>
@@ -7078,9 +7078,9 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                 fontSize: 10,
                 padding: '4px 8px',
                 borderRadius: 6,
-                background: 'rgba(251,191,36,0.12)',
-                border: '0.5px solid rgba(251,191,36,0.4)',
-                color: '#fbbf24',
+                background: 'rgba(170, 170, 170,0.12)',
+                border: '0.5px solid rgba(170, 170, 170,0.4)',
+                color: '#AAAAAA',
                 fontWeight: 600,
                 cursor: isRendering ? 'not-allowed' : 'pointer',
                 opacity: isRendering ? 0.7 : 1,
@@ -7099,8 +7099,8 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                       width: 10,
                       height: 10,
                       borderRadius: '50%',
-                      border: '2px solid rgba(251,191,36,0.3)',
-                      borderTopColor: '#fbbf24',
+                      border: '2px solid rgba(170, 170, 170,0.3)',
+                      borderTopColor: '#AAAAAA',
                       display: 'inline-block',
                     }}
                   />
@@ -7121,9 +7121,9 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                 fontSize: 10.5,
                 padding: '5px 10px',
                 borderRadius: 6,
-                background: 'rgba(74,222,128,0.12)',
-                border: '0.5px solid rgba(74,222,128,0.4)',
-                color: '#4ade80',
+                background: 'rgba(255, 255, 255,0.12)',
+                border: '0.5px solid rgba(255, 255, 255,0.4)',
+                color: '#FFFFFF',
                 fontWeight: 600,
                 cursor: 'pointer',
               }}
@@ -7172,9 +7172,9 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                 fontSize: 10.5,
                 padding: '5px 10px',
                 borderRadius: 6,
-                background: 'rgba(194,181,155,0.15)',
-                border: '0.5px solid rgba(194,181,155,0.5)',
-                color: '#C2B59B',
+                background: 'rgba(255, 255, 255,0.15)',
+                border: '0.5px solid rgba(255, 255, 255,0.5)',
+                color: '#FFFFFF',
                 fontWeight: 600,
                 cursor: 'pointer',
               }}
@@ -7260,9 +7260,9 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
               fontSize: 13,
               padding: '10px 14px',
               borderRadius: 8,
-              background: 'rgba(194,181,155,0.14)',
-              border: '0.5px solid rgba(194,181,155,0.5)',
-              color: '#C2B59B',
+              background: 'rgba(255, 255, 255,0.14)',
+              border: '0.5px solid rgba(255, 255, 255,0.5)',
+              color: '#FFFFFF',
               fontWeight: 600,
               cursor: isRendering ? 'not-allowed' : 'pointer',
               opacity: isRendering ? 0.7 : 1,
@@ -7281,8 +7281,8 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                     width: 13,
                     height: 13,
                     borderRadius: '50%',
-                    border: '2px solid rgba(194,181,155,0.3)',
-                    borderTopColor: '#C2B59B',
+                    border: '2px solid rgba(255, 255, 255,0.3)',
+                    borderTopColor: '#FFFFFF',
                     display: 'inline-block',
                   }}
                 />
@@ -7347,9 +7347,9 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                 fontSize: 9.5,
                 padding: '2px 8px',
                 borderRadius: 999,
-                background: 'rgba(194,181,155,0.18)',
-                border: '0.5px solid rgba(194,181,155,0.5)',
-                color: '#C2B59B',
+                background: 'rgba(255, 255, 255,0.18)',
+                border: '0.5px solid rgba(255, 255, 255,0.5)',
+                color: '#FFFFFF',
                 fontWeight: 600,
                 letterSpacing: '0.04em',
               }}
@@ -7358,7 +7358,7 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
             </span>
           )}
           {isFullProduction && (prodScenes > 0 || prodDuration > 0) && (
-            <span style={{ fontSize: 10, color: '#C2B59B' }}>
+            <span style={{ fontSize: 10, color: '#FFFFFF' }}>
               {prodScenes} scene{prodScenes === 1 ? '' : 's'}
               {prodDuration ? ` · ${prodDuration} seconds` : ''}
             </span>
@@ -7446,9 +7446,9 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                 gap: 4,
                 padding: '6px 12px',
                 borderRadius: 7,
-                background: 'rgba(74,222,128,0.12)',
-                border: '0.5px solid rgba(74,222,128,0.4)',
-                color: '#4ade80',
+                background: 'rgba(255, 255, 255,0.12)',
+                border: '0.5px solid rgba(255, 255, 255,0.4)',
+                color: '#FFFFFF',
                 fontSize: 11.5,
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -7485,9 +7485,9 @@ function PackageCard({ pkg, brand, onApprove, onReject, onGenerateVisual, onPost
                   gap: 4,
                   padding: '6px 12px',
                   borderRadius: 7,
-                  background: 'rgba(194,181,155,0.15)',
-                  border: '0.5px solid rgba(194,181,155,0.5)',
-                  color: '#C2B59B',
+                  background: 'rgba(255, 255, 255,0.15)',
+                  border: '0.5px solid rgba(255, 255, 255,0.5)',
+                  color: '#FFFFFF',
                   fontSize: 11.5,
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -7549,10 +7549,10 @@ function QueueTabs({ counts, active, onChange }) {
               padding: '5px 14px',
               borderRadius: 999,
               background: isActive
-                ? 'rgba(194,181,155,0.1)'
-                : 'rgba(194,181,155,0.04)',
-              border: '0.5px solid rgba(194,181,155,0.1)',
-              color: isActive ? '#F5F5F2' : 'rgba(242,237,228,0.55)',
+                ? 'rgba(255, 255, 255,0.1)'
+                : 'rgba(255, 255, 255,0.04)',
+              border: '0.5px solid rgba(255, 255, 255,0.1)',
+              color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255,0.55)',
               cursor: 'pointer',
               fontWeight: 500,
               letterSpacing: '0.01em',
@@ -7642,13 +7642,13 @@ function PlatformFilterBar({ value, onChange }) {
 }
 
 const SCRIPT_TYPE_COLORS = {
-  hook: '#a78bfa',
-  caption: '#22d3ee',
-  script: '#4ade80',
-  cta: '#fbbf24',
-  voiceover: '#f87171',
-  instagram: '#a78bfa',
-  facebook: '#4ade80',
+  hook: '#AAAAAA',
+  caption: '#FFFFFF',
+  script: '#FFFFFF',
+  cta: '#AAAAAA',
+  voiceover: '#FF4444',
+  instagram: '#AAAAAA',
+  facebook: '#FFFFFF',
   repurpose: '#ffffff',
 }
 
@@ -7805,9 +7805,9 @@ function ScriptItem({ it, brand, onApprove, onReject, onRepurpose }) {
             gap: 4,
             padding: '5px 9px',
             borderRadius: 7,
-            background: 'rgba(74,222,128,0.12)',
-            border: '0.5px solid rgba(74,222,128,0.4)',
-            color: '#4ade80',
+            background: 'rgba(255, 255, 255,0.12)',
+            border: '0.5px solid rgba(255, 255, 255,0.4)',
+            color: '#FFFFFF',
             fontSize: 11,
             fontWeight: 600,
             cursor: 'pointer',
@@ -8073,9 +8073,9 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
                 fontSize: 9.5,
                 padding: '2px 7px',
                 borderRadius: 999,
-                background: 'rgba(194,181,155,0.1)',
-                border: '0.5px solid rgba(194,181,155,0.3)',
-                color: '#C2B59B',
+                background: 'rgba(255, 255, 255,0.1)',
+                border: '0.5px solid rgba(255, 255, 255,0.3)',
+                color: '#FFFFFF',
                 fontWeight: 600,
                 letterSpacing: '0.04em',
               }}
@@ -8112,30 +8112,30 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
             padding: '2px 8px',
             borderRadius: 999,
             background: isStoryboard
-              ? 'rgba(194,181,155,0.12)'
+              ? 'rgba(255, 255, 255,0.12)'
               : isBrief
-              ? 'rgba(251,191,36,0.15)'
+              ? 'rgba(170, 170, 170,0.15)'
               : isRendering
-              ? 'rgba(251,191,36,0.15)'
+              ? 'rgba(170, 170, 170,0.15)'
               : url
-              ? 'rgba(74,222,128,0.15)'
-              : 'rgba(248,113,113,0.15)',
+              ? 'rgba(255, 255, 255,0.15)'
+              : 'rgba(255, 68, 68,0.15)',
             border: `0.5px solid ${
               isStoryboard
-                ? 'rgba(194,181,155,0.35)'
+                ? 'rgba(255, 255, 255,0.35)'
                 : isBrief || isRendering
-                ? 'rgba(251,191,36,0.4)'
+                ? 'rgba(170, 170, 170,0.4)'
                 : url
-                ? 'rgba(74,222,128,0.4)'
-                : 'rgba(248,113,113,0.4)'
+                ? 'rgba(255, 255, 255,0.4)'
+                : 'rgba(255, 68, 68,0.4)'
             }`,
             color: isStoryboard
-              ? '#C2B59B'
+              ? '#FFFFFF'
               : isBrief || isRendering
-              ? '#fbbf24'
+              ? '#AAAAAA'
               : url
-              ? '#4ade80'
-              : '#f87171',
+              ? '#FFFFFF'
+              : '#FF4444',
             fontWeight: 600,
             letterSpacing: '0.04em',
             display: 'inline-flex',
@@ -8151,7 +8151,7 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
                 width: 5,
                 height: 5,
                 borderRadius: '50%',
-                background: '#fbbf24',
+                background: '#AAAAAA',
               }}
             />
           )}
@@ -8210,9 +8210,9 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
               fontSize: 11,
               padding: '5px 10px',
               borderRadius: 7,
-              background: 'rgba(194,181,155,0.12)',
-              border: '0.5px solid rgba(194,181,155,0.4)',
-              color: '#C2B59B',
+              background: 'rgba(255, 255, 255,0.12)',
+              border: '0.5px solid rgba(255, 255, 255,0.4)',
+              color: '#FFFFFF',
               fontWeight: 600,
               cursor: generating ? 'wait' : 'pointer',
               opacity: generating ? 0.6 : 1,
@@ -8230,9 +8230,9 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
               fontSize: 11,
               padding: '5px 10px',
               borderRadius: 7,
-              background: 'rgba(251,191,36,0.12)',
-              border: '0.5px solid rgba(251,191,36,0.4)',
-              color: '#fbbf24',
+              background: 'rgba(170, 170, 170,0.12)',
+              border: '0.5px solid rgba(170, 170, 170,0.4)',
+              color: '#AAAAAA',
               fontWeight: 600,
               cursor: generating ? 'wait' : 'pointer',
               opacity: generating ? 0.6 : 1,
@@ -8268,9 +8268,9 @@ function VideoCard({ it, brand, onApprove, onReject, onPreview }) {
             fontSize: 11,
             padding: '5px 10px',
             borderRadius: 7,
-            background: 'rgba(74,222,128,0.12)',
-            border: '0.5px solid rgba(74,222,128,0.4)',
-            color: '#4ade80',
+            background: 'rgba(255, 255, 255,0.12)',
+            border: '0.5px solid rgba(255, 255, 255,0.4)',
+            color: '#FFFFFF',
             fontWeight: 600,
             cursor: 'pointer',
           }}
@@ -8433,7 +8433,7 @@ function StaticAdsQueue({ items, brand, onApprove, onReject }) {
                     fontSize: 10.5,
                     padding: '4px 8px',
                     borderRadius: 6,
-                    background: 'rgba(74,222,128,0.85)',
+                    background: 'rgba(255, 255, 255,0.85)',
                     color: '#000',
                     border: 'none',
                     fontWeight: 600,
@@ -8535,8 +8535,8 @@ const WORKFLOW_STAGES = [
     key: 'generate',
     title: 'Generate',
     icon: Sparkles,
-    tint: 'rgba(96,165,250,0.12)',
-    accent: '#60a5fa',
+    tint: 'rgba(170, 170, 170,0.12)',
+    accent: '#AAAAAA',
     items: [
       'Strategy Agent runs at 7AM',
       'Writer Agent creates copy',
@@ -8549,8 +8549,8 @@ const WORKFLOW_STAGES = [
     key: 'review',
     title: 'Review',
     icon: Eye,
-    tint: 'rgba(251,191,36,0.12)',
-    accent: '#fbbf24',
+    tint: 'rgba(170, 170, 170,0.12)',
+    accent: '#AAAAAA',
     items: [
       'Scripts & Copy queue',
       'Videos queue',
@@ -8563,8 +8563,8 @@ const WORKFLOW_STAGES = [
     key: 'schedule',
     title: 'Schedule',
     icon: CalendarDays,
-    tint: 'rgba(167,139,250,0.12)',
-    accent: '#a78bfa',
+    tint: 'rgba(170, 170, 170,0.12)',
+    accent: '#AAAAAA',
     items: [
       'Auto-scheduled on approval',
       'Platform assigned by type',
@@ -8577,8 +8577,8 @@ const WORKFLOW_STAGES = [
     key: 'publish',
     title: 'Publish',
     icon: Send,
-    tint: 'rgba(74,222,128,0.12)',
-    accent: '#4ade80',
+    tint: 'rgba(255, 255, 255,0.12)',
+    accent: '#FFFFFF',
     items: [
       'Make.com triggers at scheduled time',
       'Posts to Instagram and Facebook',
@@ -8590,8 +8590,8 @@ const WORKFLOW_STAGES = [
     key: 'learn',
     title: 'Learn',
     icon: TrendingUp,
-    tint: 'rgba(248,113,113,0.12)',
-    accent: '#f87171',
+    tint: 'rgba(255, 68, 68,0.12)',
+    accent: '#FF4444',
     items: [
       'Analytics Agent scores posts',
       'Engagement data pulled',

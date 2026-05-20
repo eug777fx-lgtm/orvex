@@ -386,9 +386,9 @@ export default function Workflow() {
       {error && (
         <div
           style={{
-            background: 'rgba(255,80,80,0.08)',
-            border: '1px solid rgba(255,80,80,0.3)',
-            color: '#ff8888',
+            background: 'rgba(255, 68, 68,0.08)',
+            border: '1px solid rgba(255, 68, 68,0.3)',
+            color: '#FF4444',
             padding: '10px 14px',
             borderRadius: 12,
             fontSize: 13,
@@ -661,7 +661,7 @@ function ProjectCard({
       whileHover={{ y: -2, borderColor: 'rgba(255,255,255,0.16)' }}
       transition={{ duration: 0.15 }}
       style={{
-        background: '#1a1a1e',
+        background: '#1A1A1A',
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 12,
         padding: '0.875rem',
@@ -730,7 +730,7 @@ function ProjectCard({
             right: 8,
             zIndex: 10,
             minWidth: 140,
-            background: '#0e0e10',
+            background: '#0A0A0A',
             border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: 10,
             boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
@@ -754,7 +754,7 @@ function ProjectCard({
               setMenuOpen(false)
               onDelete()
             }}
-            style={{ ...menuItemStyle, color: '#ff8888' }}
+            style={{ ...menuItemStyle, color: '#FF4444' }}
           >
             <Trash2 size={12} />
             Delete
@@ -999,7 +999,7 @@ const overlayStyle = {
 }
 
 const modalStyle = {
-  background: '#0d0d0f',
+  background: '#0A0A0A',
   border: '1px solid rgba(255,255,255,0.1)',
   borderRadius: 18,
   padding: '1.75rem',
@@ -1354,9 +1354,9 @@ function ProjectModal({ open, editing, onClose, onSaved }) {
               {error && (
                 <div
                   style={{
-                    background: 'rgba(255, 80, 80, 0.08)',
-                    border: '1px solid rgba(255, 80, 80, 0.3)',
-                    color: '#ff8888',
+                    background: 'rgba(255, 68, 68, 0.08)',
+                    border: '1px solid rgba(255, 68, 68, 0.3)',
+                    color: '#FF4444',
                     padding: '8px 12px',
                     borderRadius: 10,
                     fontSize: 12,
@@ -1409,7 +1409,7 @@ function SelectField({ value, onChange, options }) {
       }}
     >
       {options.map((o) => (
-        <option key={o.key} value={o.key} style={{ background: '#0d0d0f' }}>
+        <option key={o.key} value={o.key} style={{ background: '#0A0A0A' }}>
           {o.label}
         </option>
       ))}

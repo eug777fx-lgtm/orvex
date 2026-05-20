@@ -132,9 +132,9 @@ const ghostButtonStyle = {
 const errorStyle = {
   marginTop: 12,
   padding: '10px 12px',
-  background: 'rgba(255, 80, 80, 0.08)',
-  border: '1px solid rgba(255, 80, 80, 0.3)',
-  color: '#ff8888',
+  background: 'rgba(255, 68, 68, 0.08)',
+  border: '1px solid rgba(255, 68, 68, 0.3)',
+  color: '#FF4444',
   borderRadius: 10,
   fontSize: 12,
 }

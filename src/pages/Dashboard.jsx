@@ -1014,7 +1014,7 @@ export default function Dashboard() {
           <StatCard
             label="COMMISSION EARNED"
             value={
-              <span style={{ color: '#C2B59B' }}>
+              <span style={{ color: '#FFFFFF' }}>
                 $
                 {commissionEarned.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
@@ -1037,8 +1037,8 @@ export default function Dashboard() {
             justifyContent: 'space-between',
             gap: 16,
             flexWrap: 'wrap',
-            background: 'rgba(194,181,155,0.04)',
-            border: '0.5px solid rgba(194,181,155,0.12)',
+            background: 'rgba(255, 255, 255,0.04)',
+            border: '0.5px solid rgba(255, 255, 255,0.12)',
             borderRadius: 16,
             padding: '18px 22px',
           }}
@@ -1054,7 +1054,7 @@ export default function Dashboard() {
                 marginTop: 6,
               }}
             >
-              <span style={{ color: '#C2B59B', fontWeight: 600 }}>
+              <span style={{ color: '#FFFFFF', fontWeight: 600 }}>
                 {unassignedCount}
               </span>{' '}
               unassigned {unassignedCount === 1 ? 'lead' : 'leads'}
@@ -1076,8 +1076,8 @@ export default function Dashboard() {
               gap: 7,
               fontSize: 13,
               fontWeight: 600,
-              color: '#0B0B0D',
-              background: '#C2B59B',
+              color: '#000000',
+              background: '#FFFFFF',
               border: 'none',
               borderRadius: 10,
               padding: '10px 18px',
@@ -1514,7 +1514,7 @@ function SalesPortalCard() {
   return (
     <div
       style={{
-        background: '#111113',
+        background: '#111111',
         border: '0.5px solid rgba(255,255,255,0.06)',
         borderRadius: 12,
         padding: 20,

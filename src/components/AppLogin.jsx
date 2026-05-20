@@ -55,7 +55,7 @@ export default function AppLogin({ onAuth }) {
     width: '100%', padding: '11px 14px', borderRadius: 8,
     background: 'rgba(255,255,255,0.05)',
     border: '0.5px solid rgba(255,255,255,0.1)',
-    color: '#F5F5F2', fontSize: 14, outline: 'none',
+    color: '#FFFFFF', fontSize: 14, outline: 'none',
     marginBottom: 12, boxSizing: 'border-box'
   }
   const btn = {
@@ -67,7 +67,7 @@ export default function AppLogin({ onAuth }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0B0B0D', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div style={{ minHeight: '100vh', background: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 380 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
@@ -77,16 +77,16 @@ export default function AppLogin({ onAuth }) {
               style={{ width: 36, height: 36, objectFit: 'contain' }}
               onError={e => e.target.style.display='none'}
             />
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#F5F5F2', letterSpacing: '-0.5px' }}>
-              Lithos<span style={{ fontWeight: 300, color: 'rgba(194,181,155,0.6)' }}>Labs</span>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.5px' }}>
+              Lithos<span style={{ fontWeight: 300, color: 'rgba(255, 255, 255,0.6)' }}>Labs</span>
             </div>
           </div>
-          <div style={{ fontSize: 13, color: 'rgba(242,237,228,0.4)' }}>
+          <div style={{ fontSize: 13, color: 'rgba(255, 255, 255,0.4)' }}>
             {mode === 'login' ? 'Sign in to your dashboard' : 'Create your account'}
           </div>
         </div>
 
-        <div style={{ background: '#111113', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 28 }}>
+        <div style={{ background: '#111111', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 28 }}>
           {mode === 'register' && (
             <input style={inp} placeholder="Full name" value={name} onChange={e => setName(e.target.value)} />
           )}
@@ -96,7 +96,7 @@ export default function AppLogin({ onAuth }) {
           {mode === 'register' && (
             <input style={inp} placeholder="Invite code" value={inviteCode} onChange={e => setInviteCode(e.target.value)} />
           )}
-          {error && <div style={{ fontSize: 12, color: 'rgba(248,113,113,0.8)', marginBottom: 8 }}>{error}</div>}
+          {error && <div style={{ fontSize: 12, color: 'rgba(255, 68, 68,0.8)', marginBottom: 8 }}>{error}</div>}
           <button style={btn} onClick={mode === 'login' ? handleLogin : handleRegister}>
             {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
           </button>

@@ -54,7 +54,7 @@ function GlobalDemoStyles({ accent }) {
   return (
     <style>{`
       .demo-root {
-        background: #08080a;
+        background: #000000;
         color: #ffffff;
         font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
         min-height: 100vh;
@@ -62,7 +62,7 @@ function GlobalDemoStyles({ accent }) {
       .demo-accent { color: ${accent}; }
       .demo-accent-bg { background: ${accent}; }
       .demo-glass {
-        background: rgba(17,17,20,0.7);
+        background: rgba(17, 17, 17,0.7);
         border: 0.5px solid rgba(255,255,255,0.1);
         backdrop-filter: blur(14px) saturate(160%);
         -webkit-backdrop-filter: blur(14px) saturate(160%);
@@ -100,7 +100,7 @@ function WebsiteNav({ businessName, accent }) {
         top: 0,
         zIndex: 50,
         height: 64,
-        background: 'rgba(8,8,10,0.7)',
+        background: 'rgba(8,8,8,0.7)',
         backdropFilter: 'blur(18px) saturate(180%)',
         WebkitBackdropFilter: 'blur(18px) saturate(180%)',
         borderBottom: '0.5px solid rgba(255,255,255,0.06)',
@@ -817,7 +817,7 @@ function WebsiteFooter({ config }) {
       style={{
         padding: '40px 24px 60px',
         borderTop: '0.5px solid rgba(255,255,255,0.06)',
-        background: 'rgba(8,8,10,0.4)',
+        background: 'rgba(8,8,8,0.4)',
       }}
     >
       <div
@@ -919,7 +919,7 @@ function DashboardPreview({ config, accent }) {
   const chartWeeks = ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4']
 
   const cardStyle = {
-    background: 'rgba(17,17,20,0.7)',
+    background: 'rgba(17, 17, 17,0.7)',
     border: '0.5px solid rgba(255,255,255,0.08)',
     borderRadius: 14,
     padding: 18,
@@ -951,7 +951,7 @@ function DashboardPreview({ config, accent }) {
       >
         <aside
           style={{
-            background: 'rgba(8,8,10,0.6)',
+            background: 'rgba(8,8,8,0.6)',
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
             borderRight: '0.5px solid rgba(255,255,255,0.06)',
@@ -1302,7 +1302,7 @@ function GenericNav({ Icon, businessName, accent, ctaText }) {
         top: 0,
         zIndex: 50,
         height: 64,
-        background: 'rgba(8,8,10,0.7)',
+        background: 'rgba(8,8,8,0.7)',
         backdropFilter: 'blur(18px) saturate(180%)',
         WebkitBackdropFilter: 'blur(18px) saturate(180%)',
         borderBottom: '0.5px solid rgba(255,255,255,0.06)',
@@ -1342,7 +1342,7 @@ function GenericFooter({ config }) {
       style={{
         padding: '40px 24px 60px',
         borderTop: '0.5px solid rgba(255,255,255,0.06)',
-        background: 'rgba(8,8,10,0.4)',
+        background: 'rgba(8,8,8,0.4)',
       }}
     >
       <div
@@ -1739,7 +1739,7 @@ function GenericContact({ accent, heading, subhead, cta, fields = ['name', 'phon
 
 function GenericDashboard({ Icon, businessName, accent, sidebarItems, stats, sections, watermarkText = 'DEMO PREVIEW' }) {
   const cardCss = {
-    background: 'rgba(17,17,20,0.7)',
+    background: 'rgba(17, 17, 17,0.7)',
     border: '0.5px solid rgba(255,255,255,0.08)',
     borderRadius: 14,
     padding: 18,
@@ -1770,7 +1770,7 @@ function GenericDashboard({ Icon, businessName, accent, sidebarItems, stats, sec
       >
         <aside
           style={{
-            background: 'rgba(8,8,10,0.6)',
+            background: 'rgba(8,8,8,0.6)',
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
             borderRight: '0.5px solid rgba(255,255,255,0.06)',
@@ -2009,10 +2009,10 @@ function PlumberWebsite({ config, accent }) {
               gap: 8,
               padding: '6px 14px',
               borderRadius: 999,
-              background: 'rgba(255,80,80,0.1)',
-              border: '0.5px solid rgba(255,80,80,0.3)',
+              background: 'rgba(255, 68, 68,0.1)',
+              border: '0.5px solid rgba(255, 68, 68,0.3)',
               fontSize: 12,
-              color: 'rgba(255,200,200,0.95)',
+              color: 'rgba(255, 68, 68,0.95)',
               letterSpacing: '0.04em',
               marginBottom: 28,
             }}
@@ -2022,8 +2022,8 @@ function PlumberWebsite({ config, accent }) {
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
-                background: '#ff7777',
-                boxShadow: '0 0 8px #ff7777',
+                background: '#FF4444',
+                boxShadow: '0 0 8px #FF4444',
                 animation: 'demoOrb 2s ease-in-out infinite',
               }}
             />
@@ -2358,7 +2358,7 @@ function RealEstateWebsite({ config, accent }) {
                   <div
                     style={{
                       height: 180,
-                      background: `linear-gradient(135deg, ${accent}33 0%, rgba(20,20,28,0.9) 100%)`,
+                      background: `linear-gradient(135deg, ${accent}33 0%, rgba(20, 20, 20,0.9) 100%)`,
                       position: 'relative',
                       display: 'flex',
                       alignItems: 'flex-end',
@@ -2602,7 +2602,7 @@ function MedSpaWebsite({ config, accent }) {
           style={{
             position: 'absolute',
             inset: 0,
-            background: `radial-gradient(ellipse at 50% 30%, ${accent}1c 0%, transparent 60%), radial-gradient(ellipse at 80% 70%, rgba(255,200,180,0.04) 0%, transparent 60%)`,
+            background: `radial-gradient(ellipse at 50% 30%, ${accent}1c 0%, transparent 60%), radial-gradient(ellipse at 80% 70%, rgba(255, 255, 255,0.04) 0%, transparent 60%)`,
             pointerEvents: 'none',
           }}
         />
@@ -2704,7 +2704,7 @@ function MedSpaWebsite({ config, accent }) {
                   alignItems: 'flex-end',
                   padding: 18,
                   position: 'relative',
-                  background: `linear-gradient(135deg, ${accent}22 0%, rgba(20,20,28,0.95) 100%)`,
+                  background: `linear-gradient(135deg, ${accent}22 0%, rgba(20, 20, 20,0.95) 100%)`,
                 }}
               >
                 <span
@@ -3273,7 +3273,7 @@ function RoofingWebsite({ config, accent }) {
                   style={{
                     borderRadius: 16,
                     aspectRatio: '4 / 3',
-                    background: `linear-gradient(135deg, ${accent}33 0%, rgba(20,20,28,0.95) 100%)`,
+                    background: `linear-gradient(135deg, ${accent}33 0%, rgba(20, 20, 20,0.95) 100%)`,
                     display: 'flex',
                     alignItems: 'flex-end',
                     padding: 14,
@@ -3508,7 +3508,7 @@ export default function PublicDemo() {
       <div
         style={{
           minHeight: '100vh',
-          background: '#08080a',
+          background: '#000000',
           color: '#fff',
           display: 'flex',
           alignItems: 'center',
@@ -3528,7 +3528,7 @@ export default function PublicDemo() {
       <div
         style={{
           minHeight: '100vh',
-          background: '#08080a',
+          background: '#000000',
           color: '#fff',
           display: 'flex',
           alignItems: 'center',
@@ -3563,7 +3563,7 @@ export default function PublicDemo() {
                 left: 12,
                 right: 12,
                 zIndex: 200,
-                background: 'rgba(8,8,10,0.92)',
+                background: 'rgba(8,8,8,0.92)',
                 backdropFilter: 'blur(20px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(20px) saturate(180%)',
                 border: '0.5px solid rgba(255,255,255,0.1)',
@@ -3579,7 +3579,7 @@ export default function PublicDemo() {
                 left: '50%',
                 transform: 'translateX(-50%)',
                 zIndex: 200,
-                background: 'rgba(8,8,10,0.85)',
+                background: 'rgba(8,8,8,0.85)',
                 backdropFilter: 'blur(20px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(20px) saturate(180%)',
                 border: '0.5px solid rgba(255,255,255,0.1)',
@@ -3670,9 +3670,9 @@ export default function PublicDemo() {
                 pointerEvents: 'none',
               }}
             >
-              Theme: <b style={{ color: '#9be7ff' }}>{finalTheme}</b> · Template:{' '}
-              <b style={{ color: '#9be7ff' }}>{tplKey}</b> · Config theme:{' '}
-              <b style={{ color: '#9be7ff' }}>{String(config?.theme ?? '—')}</b>
+              Theme: <b style={{ color: '#AAAAAA' }}>{finalTheme}</b> · Template:{' '}
+              <b style={{ color: '#AAAAAA' }}>{tplKey}</b> · Config theme:{' '}
+              <b style={{ color: '#AAAAAA' }}>{String(config?.theme ?? '—')}</b>
             </div>
             <Component config={config} accent={accent} />
           </>
@@ -3682,7 +3682,7 @@ export default function PublicDemo() {
       <div
         style={{
           padding: '14px 16px',
-          background: 'rgba(8,8,10,0.85)',
+          background: 'rgba(8,8,8,0.85)',
           backdropFilter: 'blur(14px)',
           WebkitBackdropFilter: 'blur(14px)',
           borderTop: '0.5px solid rgba(255,255,255,0.06)',
@@ -3693,7 +3693,7 @@ export default function PublicDemo() {
           zIndex: 10,
         }}
       >
-        Built with <span style={{ color: '#ff6b8b' }}>♥</span> by{' '}
+        Built with <span style={{ color: '#FF4444' }}>♥</span> by{' '}
         <span style={{ color: '#ffffff', fontWeight: 600 }}>Lithos Labs</span> · Want this for your business?{' '}
         <a
           href="https://wa.me/2971234567"

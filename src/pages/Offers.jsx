@@ -20,7 +20,7 @@ const pageSubStyle = {
 }
 
 const cardStyle = {
-  background: 'rgba(17,17,20,0.7)',
+  background: 'rgba(17, 17, 17,0.7)',
   border: '0.5px solid rgba(255,255,255,0.08)',
   borderRadius: 16,
   padding: '1.75rem',
