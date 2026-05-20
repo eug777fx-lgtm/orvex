@@ -2353,6 +2353,73 @@ export default async function handler(req, res) {
         const result = await handleProcessProductions(sql)
         return res.status(200).json(result)
       }
+      if (action === 'daily_report') {
+        const today = new Date().toISOString().split('T')[0]
+
+        // Today's deals (deal_value column doesn't exist in live DB —
+        // mapped to proposed_price; see prospector-deals-schema-mismatch memo).
+        const dealsResult = await sql.query(
+          `SELECT
+             COUNT(*)                          AS total_deals,
+             COALESCE(SUM(proposed_price), 0)  AS total_value,
+             COALESCE(SUM(commission_amount), 0) AS total_commission
+             FROM deals
+            WHERE DATE(created_at) = $1`,
+          [today],
+        )
+
+        // Today's leads
+        const leadsResult = await sql.query(
+          `SELECT COUNT(*) AS total_leads
+             FROM sales_leads
+            WHERE DATE(created_at) = $1`,
+          [today],
+        )
+
+        // Per-rep breakdown — scalar subqueries (not LEFT JOINs) so deals
+        // and leads don't cross-product. Role is 'sales' in this app, not 'rep'.
+        const repsResult = await sql.query(
+          `SELECT
+             sr.name,
+             (SELECT COUNT(*) FROM deals
+                WHERE rep_id = sr.id AND DATE(created_at) = $1) AS deals,
+             (SELECT COALESCE(SUM(proposed_price), 0) FROM deals
+                WHERE rep_id = sr.id AND DATE(created_at) = $1) AS revenue,
+             (SELECT COUNT(*) FROM sales_leads
+                WHERE rep_id = sr.id AND DATE(created_at) = $1) AS leads
+             FROM sales_reps sr
+            WHERE sr.role = 'sales'
+            ORDER BY revenue DESC`,
+          [today],
+        )
+
+        const deals = (dealsResult.rows || dealsResult)[0] || {}
+        const leads = (leadsResult.rows || leadsResult)[0] || {}
+        const reps = repsResult.rows || repsResult || []
+
+        const repLines = reps
+          .map(
+            (r) =>
+              `  ${r.name}: ${r.deals} deals ($${Number(r.revenue).toLocaleString()}) | ${r.leads} leads`,
+          )
+          .join('\n')
+
+        const report = `LITHOS LABS DAILY SALES REPORT - ${today}
+=====================================
+SUMMARY
+  New Leads Today: ${leads.total_leads}
+  Deals Submitted: ${deals.total_deals}
+  Total Revenue: $${Number(deals.total_value).toLocaleString()}
+  Total Commission: $${Number(deals.total_commission).toLocaleString()}
+
+REP BREAKDOWN
+${repLines || '  No activity today'}
+
+=====================================
+View dashboard: https://lithos-labs.vercel.app`
+
+        return res.json({ success: true, report, date: today })
+      }
       const salesGet = await handleSales(sql, {
         method: 'GET',
         action,
