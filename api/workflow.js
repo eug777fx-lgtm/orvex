@@ -1658,7 +1658,12 @@ async function handleSales(sql, { method, action, query, body }) {
       return { handled: true, payload: { success: true } }
     }
     if (action === 'submit_deal') {
-      const {
+      // `let` (not const) so we can reassign rep_id below when the hardcoded
+      // CEO bypass in rep_login (line ~1440) hands us the string 'admin'
+      // instead of a real UUID. The deals.rep_id column is uuid, so the
+      // INSERT errors with "invalid input syntax for type uuid: admin"
+      // unless we resolve to a real sales_reps row first.
+      let {
         rep_id,
         lead_id,
         service_name,
@@ -1666,6 +1671,22 @@ async function handleSales(sql, { method, action, query, body }) {
         commission_rate,
         payment_proof_url,
       } = body
+
+      if (!rep_id || rep_id === 'admin' || String(rep_id).length < 10) {
+        const adminRep = firstOf(
+          await sql.query("SELECT id FROM sales_reps WHERE role='admin' LIMIT 1"),
+        )
+        rep_id = adminRep?.id || null
+        if (!rep_id) {
+          return {
+            handled: true,
+            payload: {
+              success: false,
+              error: 'No admin rep in sales_reps to attribute this deal to',
+            },
+          }
+        }
+      }
 
       // The unified app's lead detail panel works off the `leads` table, while
       // deals.lead_id references sales_leads. Bridge the two so a deal closed
