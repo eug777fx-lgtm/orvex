@@ -1686,20 +1686,28 @@ async function handleSales(sql, { method, action, query, body }) {
 
       const dealId = (insertResult.rows || insertResult)[0]?.id
 
-      // Fire the deal-approval webhook (non-blocking).
+      // Awaited (temporarily) so the Vercel function log captures the Make
+      // response — fire-and-forget was hiding the actual failure. Revert
+      // to non-blocking once the integration is confirmed working.
       if (process.env.MAKE_WEBHOOK_DEAL_APPROVAL) {
-        fetch(process.env.MAKE_WEBHOOK_DEAL_APPROVAL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            rep_name: 'Sales Rep',
-            company_name: company_name || 'Unknown',
-            service_name: service_name || '',
-            deal_value: deal_value || 0,
-            commission_amount,
-            timestamp: new Date().toISOString(),
-          }),
-        }).catch((e) => console.log('Deal webhook error:', e.message))
+        try {
+          const webhookRes = await fetch(process.env.MAKE_WEBHOOK_DEAL_APPROVAL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rep_name: 'Sales Rep',
+              company_name: company_name || 'Unknown',
+              service_name: service_name || '',
+              deal_value: deal_value || 0,
+              commission_amount,
+              timestamp: new Date().toISOString(),
+            }),
+          })
+          const webhookText = await webhookRes.text()
+          console.log('Deal webhook result:', webhookRes.status, webhookText)
+        } catch (e) {
+          console.error('Deal webhook error:', e.message)
+        }
       }
 
       return { handled: true, payload: { success: true, deal_id: dealId } }
