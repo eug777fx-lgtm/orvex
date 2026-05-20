@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import db from '@/lib/db'
+import { workflowApi } from '../lib/auth'
 
 const STAGES = [
   { value: 'lead', label: 'Lead' },
@@ -224,26 +225,34 @@ export default function CreateDealModal({ open, lead, onClose, onCreated }) {
       return
     }
 
-    if (!db) {
-      setError(
-        'Database not connected. Please add VITE_DATABASE_URL to your .env file and restart the dev server.',
-      )
+    const auth = JSON.parse(localStorage.getItem('lithos_auth') || '{}')
+    if (!auth?.id) {
+      setError('Not logged in.')
       return
     }
 
-    const proposedPrice = price === '' ? null : Number(price)
-    const offerValue = offerId === '' ? null : offerId
+    // Route through /api/workflow so MAKE_WEBHOOK_DEAL_APPROVAL fires.
+    // Note: submit_deal accepts commission_rate (a percentage) and computes
+    // commission_amount server-side; it does not read commission_amount.
+    // The legacy modal fields (offer_id, stage, notes) are no longer
+    // persisted — Pipeline.jsx cards may degrade for deals created here.
+    const selectedOffer = offers.find((o) => String(o.id) === String(offerId))
+    const serviceName = selectedOffer?.name || 'Custom service'
 
     setSubmitting(true)
     try {
-      const rows = await db.query(
-        `INSERT INTO deals (lead_id, offer_id, proposed_price, stage, notes)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id`,
-        [lead.id, offerValue, proposedPrice, stage, notes.trim() || null],
-      )
-      const dealId = rows?.[0]?.id ?? null
-      onCreated?.({ id: dealId })
+      const result = await workflowApi('submit_deal', {
+        method: 'POST',
+        body: {
+          rep_id: auth.id,
+          lead_id: lead.id,
+          service_name: serviceName,
+          deal_value: Number(price) || 0,
+          commission_rate: 10,
+        },
+      })
+      if (!result?.success) throw new Error(result?.error || 'Failed to create deal.')
+      onCreated?.({ id: result.deal_id })
     } catch (err) {
       console.error(err)
       setError(err?.message || 'Failed to create deal.')
