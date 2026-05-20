@@ -181,27 +181,17 @@ export default function Team() {
 
   async function deleteRep() {
     if (!deleteConfirm) return
-    // Diagnostic logging — remove once the delete flow is verified working.
-    console.log(
-      'deleteRep called with rep_id:',
-      deleteConfirm?.id,
-      'auth:',
-      JSON.parse(localStorage.getItem('lithos_auth') || '{}'),
-    )
-    console.log('rep object:', deleteConfirm)
     setDeleting(true)
     try {
       const data = await workflowApi('delete_rep', {
         method: 'POST',
         body: { rep_id: deleteConfirm.id },
       })
-      console.log('delete_rep response:', data)
       if (!data?.success) throw new Error(data?.error || 'failed')
       setReps((list) => list.filter((r) => r.id !== deleteConfirm.id))
       showToast('Account deleted')
       setDeleteConfirm(null)
     } catch (err) {
-      console.error('deleteRep error:', err)
       showToast('Could not delete: ' + (err?.message || 'unknown error'))
     } finally {
       setDeleting(false)

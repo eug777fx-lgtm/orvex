@@ -1686,46 +1686,40 @@ async function handleSales(sql, { method, action, query, body }) {
 
       const dealId = (insertResult.rows || insertResult)[0]?.id
 
-      // Awaited (temporarily) so the Vercel function log captures the Make
-      // response — fire-and-forget was hiding the actual failure. Revert
-      // to non-blocking once the integration is confirmed working.
+      // Fire the deal-approval webhook (non-blocking — submit_deal returns
+      // immediately; webhook errors are logged but never surface to the user).
       if (process.env.MAKE_WEBHOOK_DEAL_APPROVAL) {
-        try {
-          const webhookRes = await fetch(process.env.MAKE_WEBHOOK_DEAL_APPROVAL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              rep_name: 'Sales Rep',
-              company_name: company_name || 'Unknown',
-              service_name: service_name || '',
-              deal_value: deal_value || 0,
-              commission_amount,
-              timestamp: new Date().toISOString(),
-            }),
-          })
-          const webhookText = await webhookRes.text()
-          console.log('Deal webhook result:', webhookRes.status, webhookText)
-        } catch (e) {
-          console.error('Deal webhook error:', e.message)
-        }
+        fetch(process.env.MAKE_WEBHOOK_DEAL_APPROVAL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rep_name: 'Sales Rep',
+            company_name: company_name || 'Unknown',
+            service_name: service_name || '',
+            deal_value: deal_value || 0,
+            commission_amount,
+            timestamp: new Date().toISOString(),
+          }),
+        }).catch((e) => console.log('Deal webhook error:', e.message))
       }
 
       return { handled: true, payload: { success: true, deal_id: dealId } }
     }
     if (action === 'approve_deal') {
-      const { deal_id, admin_id, approved, admin_notes } = body
+      // Live DB deals table is the legacy prospector schema — it has no
+      // service_name, approved_by, approved_at, or admin_notes columns. We
+      // only update `status` here and skip persisting admin_notes / admin_id;
+      // the rep notification message still includes admin_notes from the
+      // request body even though it isn't stored.
+      const { deal_id, approved, admin_notes } = body
       const deal = firstOf(
-        await sql.query('SELECT rep_id, service_name FROM deals WHERE id=$1', [
-          deal_id,
-        ]),
+        await sql.query('SELECT rep_id FROM deals WHERE id=$1', [deal_id]),
       )
       if (approved) {
-        await sql.query(
-          `UPDATE deals SET status='approved', approved_by=$1, approved_at=now() WHERE id=$2`,
-          [admin_id, deal_id],
-        )
-        // Ensure the commission is materialised so it shows on the rep
-        // dashboard once approved (no-op when it's a generated column).
+        await sql.query(`UPDATE deals SET status='approved' WHERE id=$1`, [deal_id])
+        // Try to backfill commission_amount in case submit_deal didn't write
+        // it (older rows). The try/catch covers schema variants where this
+        // expression isn't valid.
         try {
           await sql.query(
             `UPDATE deals
@@ -1734,13 +1728,10 @@ async function handleSales(sql, { method, action, query, body }) {
             [deal_id],
           )
         } catch {
-          /* generated column — value already computed */
+          /* deal_value / commission_rate columns absent in live DB — non-fatal */
         }
       } else {
-        await sql.query(
-          `UPDATE deals SET status='rejected', admin_notes=$1 WHERE id=$2`,
-          [admin_notes || null, deal_id],
-        )
+        await sql.query(`UPDATE deals SET status='rejected' WHERE id=$1`, [deal_id])
       }
       // Always notify the rep of the approve/reject decision.
       if (deal?.rep_id) {
@@ -1751,10 +1742,8 @@ async function handleSales(sql, { method, action, query, body }) {
             deal.rep_id,
             approved ? 'Deal approved' : 'Deal rejected',
             approved
-              ? `Your deal for ${deal.service_name} was approved`
-              : `Your deal for ${deal.service_name} was rejected${
-                  admin_notes ? ': ' + admin_notes : ''
-                }`,
+              ? 'Your deal was approved'
+              : `Your deal was rejected${admin_notes ? ': ' + admin_notes : ''}`,
           ],
         )
       }
