@@ -448,17 +448,40 @@ export async function setupMarketingDB() {
     await db.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS services_catalog_name_unique ON services_catalog(name)`,
     )
+    // Lithos Labs professional service catalog — the 12 services reps sell.
+    // ON CONFLICT (name) DO UPDATE refreshes existing rows so this file is the
+    // single source of truth for service metadata.
     await db.query(`
       INSERT INTO services_catalog (name, description, category, price_min, price_max, commission_rate) VALUES
-      ('CRM Setup', 'Full CRM setup with pipeline, lead tracking and automations', 'CRM', 500, 2000, 15),
-      ('AI Marketing System', 'Complete AI content generation and brand automation system', 'AI', 1500, 5000, 15),
-      ('Website Development', 'Custom website with modern design and CMS', 'Web', 800, 3000, 10),
-      ('Lead Generation System', 'Automated lead capture, nurturing and qualification', 'Growth', 500, 2000, 15),
-      ('Full Business Operating System', 'CRM + AI Marketing + Website + Automations package', 'Package', 3000, 10000, 20),
-      ('Brand Identity', 'Logo, visual system, brand strategy and style guide', 'Brand', 300, 1500, 10),
-      ('Monthly Retainer - Starter', 'Basic monthly maintenance and content management', 'Retainer', 500, 500, 10),
-      ('Monthly Retainer - Growth', 'Full AI marketing + CRM management monthly', 'Retainer', 1500, 1500, 15)
-      ON CONFLICT DO NOTHING
+      ('Starter Website',         'Clean, conversion-focused 5-page website for solo entrepreneurs and trades.', 'Web Development', 800, 1200, 10),
+      ('Growth Website',          'Full business website with bookings, blog, and WhatsApp automation.',        'Web Development', 1800, 2800, 10),
+      ('Premium Website',         'Website + payment integration + CRM hooks + custom dashboard.',              'Web Development', 3500, 5500, 10),
+      ('Enterprise System',       'Fully custom website + CRM + AI systems + automations, integrated.',         'Full System',     8000, 25000, 10),
+      ('Basic CRM Setup',         'Configure existing CRM with pipelines, stages, and basic automations.',      'CRM',             800, 1500, 12),
+      ('Custom CRM Build',        'Fully custom CRM application built for the client''s exact workflow.',        'CRM',             2500, 8000, 12),
+      ('WhatsApp AI Management',  'AI handling all incoming WhatsApp messages intelligently 24/7.',             'AI Services',     500, 1000, 15),
+      ('AI Voice Receptionist',   'AI answers every inbound call, books appointments, handles FAQs.',           'AI Services',     800, 1500, 15),
+      ('Full Workflow Automation','Complete operational workflow mapped and automated end-to-end.',             'Automation',      1500, 3000, 12),
+      ('Care Retainer',           'Monthly: security updates, uptime monitoring, 1 content update, email support.', 'Monthly Retainer', 99, 99, 20),
+      ('Management Retainer',     'Monthly: CRM management, WhatsApp AI monitoring, 4 hrs changes, video support.', 'Monthly Retainer', 350, 350, 20),
+      ('Full System Retainer',    'Monthly: full system + marketing management, dedicated team, strategy calls.',   'Monthly Retainer', 950, 950, 20)
+      ON CONFLICT (name) DO UPDATE SET
+        description = EXCLUDED.description,
+        category = EXCLUDED.category,
+        price_min = EXCLUDED.price_min,
+        price_max = EXCLUDED.price_max,
+        commission_rate = EXCLUDED.commission_rate
+    `)
+    // Retire any legacy rows that aren't in the new catalog so the Submit Deal
+    // dropdown only shows current services.
+    await db.query(`
+      UPDATE services_catalog SET is_active = false
+       WHERE name NOT IN (
+         'Starter Website','Growth Website','Premium Website','Enterprise System',
+         'Basic CRM Setup','Custom CRM Build','WhatsApp AI Management',
+         'AI Voice Receptionist','Full Workflow Automation',
+         'Care Retainer','Management Retainer','Full System Retainer'
+       )
     `)
   } catch (e) {
     console.log('Migration skip:', e.message)

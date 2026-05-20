@@ -44,82 +44,105 @@ const DOC_TYPES = [
   { key: 'Onboarding Checklist', icon: ListChecks },
 ]
 
-// ---- Estimate calculator catalog ----
-const CATALOG = [
-  {
-    key: 'websites',
-    label: 'Websites',
-    tiers: [
-      { id: 'web-starter', name: 'Starter Website', price: 600 },
-      { id: 'web-business', name: 'Business Website', price: 1000 },
-      { id: 'web-premium', name: 'Premium Website System', price: 1800 },
-    ],
-    addons: [
-      { id: 'web-booking', name: 'Booking System', price: 150 },
-      { id: 'web-dashboard', name: 'Custom Dashboard', price: 400 },
-      { id: 'web-payment', name: 'Payment Integration', price: 350 },
-      { id: 'web-anim', name: 'Animations', price: 150 },
-      { id: 'web-blog', name: 'Blog System', price: 100 },
-      { id: 'web-portal', name: 'Member Portal', price: 500 },
-      { id: 'web-ai', name: 'AI Integration', price: 800 },
-      { id: 'web-pages', name: 'Extra Pages (per page)', price: 80, qty: true },
-    ],
-  },
-  {
-    key: 'crm',
-    label: 'CRM',
-    tiers: [
-      { id: 'crm-basic', name: 'Basic CRM Setup', price: 700 },
-      { id: 'crm-adv', name: 'Advanced CRM System', price: 1200 },
-      { id: 'crm-ent', name: 'Enterprise CRM', price: 2000 },
-    ],
-    addons: [
-      { id: 'crm-flows', name: 'WhatsApp/Email Flows', price: 200 },
-      { id: 'crm-ai', name: 'AI Workflows', price: 400 },
-      { id: 'crm-analytics', name: 'Analytics Dashboard', price: 200 },
-      { id: 'crm-api', name: 'API Integrations', price: 300 },
-    ],
-  },
-  {
-    key: 'ai',
-    label: 'AI Services',
-    tiers: [
-      { id: 'ai-chatbot-basic', name: 'Basic Website Chatbot', price: 500 },
-      { id: 'ai-chatbot-adv', name: 'Advanced AI Chatbot', price: 900 },
-      { id: 'ai-wa-std', name: 'WhatsApp AI Standard', price: 600 },
-      { id: 'ai-wa-adv', name: 'WhatsApp AI Advanced', price: 1200 },
-      { id: 'ai-voice-starter', name: 'Starter Voice Agent', price: 800 },
-      { id: 'ai-receptionist', name: 'Advanced AI Receptionist', price: 1800 },
-    ],
-    addons: [],
-  },
-  {
-    key: 'automation',
-    label: 'Automation',
-    tiers: [
-      { id: 'auto-basic', name: 'Basic Automation System', price: 650 },
-      { id: 'auto-adv', name: 'Advanced Automation', price: 1400 },
-    ],
-    addons: [],
-  },
-  {
-    key: 'leadgen',
-    label: 'Lead Generation',
-    tiers: [
-      { id: 'lead-basic', name: 'Basic Lead System', price: 600 },
-      { id: 'lead-adv', name: 'Advanced Lead System', price: 1500 },
-    ],
-    addons: [],
-  },
-]
+// ---- Estimate calculator catalog (Lithos Labs professional service architecture) ----
+const CATALOG = {
+  packages: [
+    {
+      id: 'starter',
+      name: 'Starter',
+      subtitle: 'The Professional Launchpad',
+      description: 'A clean, conversion-focused website built from scratch for your brand.',
+      price_min: 800, price_max: 1200,
+      ideal_for: 'Freelancers, solo entrepreneurs, new small businesses, trades professionals',
+      includes: ['Up to 5 pages', 'Responsive design', 'Contact form', 'SEO foundation', 'Google Analytics', 'WhatsApp button', '1 revision round'],
+      delivery_days: 10,
+    },
+    {
+      id: 'growth',
+      name: 'Growth',
+      subtitle: 'The Business Engine',
+      description: 'A full business website built to generate leads, take bookings, and run content marketing automatically.',
+      price_min: 1800, price_max: 2800,
+      ideal_for: 'Established small businesses ready to automate lead generation',
+      includes: ['Up to 10 pages', 'Everything in Starter', 'Custom animations', 'Blog & content system', 'Online booking system', 'WhatsApp automation', 'Google Business optimization', '2 revision rounds'],
+      delivery_days: 18,
+    },
+    {
+      id: 'premium',
+      name: 'Premium',
+      subtitle: 'The Complete Digital System',
+      description: 'Not just a website — a complete digital business system integrated with your entire operation.',
+      price_min: 3500, price_max: 5500,
+      ideal_for: 'Multi-service businesses that need website + CRM + automations in one system',
+      includes: ['Unlimited pages', 'Everything in Growth', 'Payment integration', 'Member portal', 'Custom business dashboard', 'CRM integration', 'Advanced automations', 'Dedicated onboarding session', '3 revision rounds'],
+      delivery_days: 30,
+    },
+    {
+      id: 'enterprise',
+      name: 'Enterprise',
+      subtitle: 'The Full Operating System',
+      description: 'A fully custom digital infrastructure — website, CRM, AI systems, automations — all integrated and managed.',
+      price_min: 8000, price_max: 25000,
+      ideal_for: 'Multi-location businesses, agencies, companies that want to fully automate operations',
+      includes: ['Everything in Premium', 'AI voice receptionist', 'AI chat system', 'Advanced workflow automation', 'Custom internal tools', 'White-label options', 'Priority dedicated support', 'Quarterly strategy sessions'],
+      delivery_days: 60,
+    },
+  ],
+  addons: [
+    // Website
+    { id: 'booking', name: 'Online Booking System', category: 'Website', description: 'Integrated calendar with automated confirmations and WhatsApp reminders.', price: 500, type: 'fixed' },
+    { id: 'payment', name: 'Payment Integration', category: 'Website', description: 'Stripe/PayPal checkout for one-time or recurring payments.', price: 600, type: 'fixed' },
+    { id: 'blog', name: 'Blog & Content System', category: 'Website', description: 'Full CMS with SEO-optimized post structure and admin editor.', price: 400, type: 'fixed' },
+    { id: 'portal', name: 'Member Portal', category: 'Website', description: 'Login-protected area with user accounts and content access control.', price: 900, type: 'fixed' },
+    { id: 'animations', name: 'Custom Animations', category: 'Website', description: 'Scroll-triggered animations, micro-interactions, and motion design.', price: 500, type: 'fixed' },
+    { id: 'extra_page', name: 'Extra Page', category: 'Website', description: 'Additional website page beyond package limit.', price: 200, type: 'per_unit', unit: 'page' },
+    { id: 'multilang', name: 'Multi-Language Support', category: 'Website', description: 'Full website translated into a second language (e.g. English + Papiamento).', price: 600, type: 'fixed' },
+    { id: 'live_chat', name: 'Live Chat Widget', category: 'Website', description: 'Real-time chat button connected to WhatsApp or chat platform.', price: 250, type: 'fixed' },
+    { id: 'speed', name: 'Speed Optimization', category: 'Website', description: 'Advanced performance tuning to achieve 95+ PageSpeed score.', price: 400, type: 'fixed' },
+    { id: 'landing_page', name: 'Landing Page Build', category: 'Website', description: 'High-converting single-page campaign landing page.', price: 800, type: 'fixed' },
+    // Automation
+    { id: 'missed_call', name: 'Missed Call Text-Back', category: 'Automation', description: 'Auto-WhatsApp to every missed caller within 30 seconds.', price: 300, type: 'fixed' },
+    { id: 'appt_reminder', name: 'Appointment Reminders', category: 'Automation', description: 'Automated WhatsApp reminders at 24h and 2h before booking.', price: 300, type: 'fixed' },
+    { id: 'followup_seq', name: 'Follow-Up Sequence', category: 'Automation', description: 'Multi-step automated follow-up (Day 1, 3, 7, 14, 30).', price: 500, type: 'fixed' },
+    { id: 'lead_capture', name: 'Lead Capture Automation', category: 'Automation', description: 'Form submission → CRM + instant team notification + welcome message.', price: 400, type: 'fixed' },
+    { id: 'review_req', name: 'Review Request Automation', category: 'Automation', description: 'Post-service WhatsApp requesting Google/Facebook review.', price: 350, type: 'fixed' },
+    { id: 'client_onboard', name: 'Client Onboarding Automation', category: 'Automation', description: 'New client → welcome sequence + document collection + CRM entry.', price: 600, type: 'fixed' },
+    { id: 'invoice_reminder', name: 'Invoice & Payment Reminder', category: 'Automation', description: 'Automated follow-up for unpaid invoices via WhatsApp/email.', price: 400, type: 'fixed' },
+    { id: 'daily_report', name: 'Daily Business Report', category: 'Automation', description: 'Automated daily email with key metrics, deals, and team activity.', price: 350, type: 'fixed' },
+    { id: 'full_workflow', name: 'Full Workflow Automation', category: 'Automation', description: 'Complete operational workflow mapped and automated end-to-end.', price: 1500, type: 'fixed' },
+    // AI
+    { id: 'ai_chat', name: 'AI Website Chat', category: 'AI', description: '24/7 AI assistant on website trained on business knowledge and FAQs.', price: 600, type: 'fixed' },
+    { id: 'whatsapp_ai', name: 'WhatsApp AI Management', category: 'AI', description: 'AI handling all incoming WhatsApp messages intelligently 24/7.', price: 500, type: 'fixed' },
+    { id: 'voice_ai', name: 'AI Voice Receptionist', category: 'AI', description: 'AI answers every inbound call, books appointments, handles FAQs.', price: 800, type: 'fixed' },
+    { id: 'lead_qualifier', name: 'AI Lead Qualifier', category: 'AI', description: 'AI that scores and qualifies leads before passing to sales team.', price: 700, type: 'fixed' },
+    { id: 'ai_content', name: 'AI Content Generator', category: 'AI', description: 'AI trained on brand voice to generate posts, emails, and blogs.', price: 500, type: 'fixed' },
+    { id: 'ai_outbound', name: 'AI Outbound Caller', category: 'AI', description: 'AI that makes outbound follow-up calls to leads automatically.', price: 900, type: 'fixed' },
+    { id: 'ai_leads', name: 'AI Lead Generation System', category: 'AI', description: "Automated outbound that researches prospects and sends personalized sequences.", price: 1000, type: 'fixed' },
+    // CRM
+    { id: 'crm_basic', name: 'Basic CRM Setup', category: 'CRM', description: 'Configure existing CRM with pipelines, stages, and basic automations.', price: 800, type: 'fixed' },
+    { id: 'crm_custom', name: 'Custom CRM Build', category: 'CRM', description: "Fully custom CRM application built for the client's exact workflow.", price: 2500, type: 'fixed' },
+    { id: 'dashboard', name: 'Business Dashboard', category: 'CRM', description: 'Real-time KPI dashboard connected to all business data sources.', price: 1500, type: 'fixed' },
+    { id: 'team_mgmt', name: 'Team Management System', category: 'CRM', description: 'Staff scheduling, task assignment, and performance tracking.', price: 1200, type: 'fixed' },
+    { id: 'client_portal', name: 'Client Portal', category: 'CRM', description: 'Login-protected portal where clients track projects and invoices.', price: 800, type: 'fixed' },
+    // Marketing
+    { id: 'local_seo', name: 'Local SEO Setup', category: 'Marketing', description: 'Google Business optimization, citations, and local ranking strategy.', price: 500, type: 'fixed' },
+    { id: 'meta_ads', name: 'Meta Ads Setup', category: 'Marketing', description: 'Full Facebook/Instagram ad campaign setup and creative.', price: 600, type: 'fixed' },
+    { id: 'email_mktg', name: 'Email Marketing Setup', category: 'Marketing', description: 'Email platform setup, template design, and first campaign.', price: 400, type: 'fixed' },
+    { id: 'social_setup', name: 'Social Media Setup', category: 'Marketing', description: 'Profile optimization, brand kit, content templates for 3 platforms.', price: 500, type: 'fixed' },
+    { id: 'reputation', name: 'Reputation Management Setup', category: 'Marketing', description: 'Automated monitoring and response for Google/Facebook reviews.', price: 400, type: 'fixed' },
+  ],
+  retainers: [
+    { id: 'care', name: 'Care', price: 99, description: 'Monthly security updates, uptime monitoring, 1 content update, performance report, email support.', best_for: 'Starter websites needing basic maintenance' },
+    { id: 'growth_r', name: 'Growth', price: 199, description: 'Everything in Care + 3 content updates, Google Analytics review, SEO monitoring, 2 hours changes, priority support.', best_for: 'Active businesses publishing content' },
+    { id: 'management', name: 'Management', price: 350, description: 'Everything in Growth + CRM management, WhatsApp AI monitoring, weekly report, 4 hours changes, video call support.', best_for: 'Clients with CRM, automations, or AI systems' },
+    { id: 'system', name: 'System', price: 600, description: 'Full monthly management of website, CRM, automations, and AI. Weekly reporting, unlimited small updates, dedicated Slack, monthly strategy call.', best_for: 'Enterprise clients with full digital operations' },
+    { id: 'marketing_r', name: 'Marketing', price: 500, description: 'Growth retainer + weekly social content (3 platforms), monthly email campaign, ad performance review, SEO optimization.', best_for: 'Businesses investing in active digital marketing' },
+    { id: 'full_system', name: 'Full System', price: 950, description: 'Complete package: system management + marketing management. One invoice, one team, zero gaps. Quarterly strategy sessions.', best_for: 'Businesses fully outsourcing digital operations' },
+  ],
+}
 
-const RETAINERS = [
-  { id: 'ret-maint', name: 'Maintenance + Support', price: 200 },
-  { id: 'ret-chatbot', name: 'AI Chatbot Management', price: 250 },
-  { id: 'ret-wa', name: 'WhatsApp AI Management', price: 250 },
-  { id: 'ret-marketing', name: 'Full Marketing Management', price: 500 },
-  { id: 'ret-system', name: 'Full System Management', price: 800 },
-]
+// Categories in the order they should render in the addon section.
+const ADDON_CATEGORIES = ['Website', 'Automation', 'AI', 'CRM', 'Marketing']
 
 const BANKING_KEY = 'lithos_banking_info'
 const INVOICE_COUNT_KEY = 'lithos_invoice_count'
@@ -1050,71 +1073,98 @@ function BankingCard({ banking, onSave }) {
 }
 
 // ---------- Estimates & Invoices tab ----------
-function buildLineItems(tiers, addons, pagesQty) {
+// Build invoice/proposal line items from calculator selections. Shape matches
+// what InvoicePreview / invoiceText expect: { id, name, price, group, addon? }.
+function buildLineItems(packageId, selectedAddons, addonQuantities) {
   const items = []
-  for (const cat of CATALOG) {
-    const tierId = tiers[cat.key]
-    if (tierId) {
-      const t = cat.tiers.find((x) => x.id === tierId)
-      if (t) items.push({ id: t.id, name: t.name, price: t.price, group: cat.label })
+  if (packageId) {
+    const pkg = CATALOG.packages.find((p) => p.id === packageId)
+    if (pkg) {
+      items.push({
+        id: pkg.id,
+        name: `${pkg.name} Package`,
+        price: pkg.price_min,
+        group: 'Package',
+      })
     }
-    for (const a of cat.addons) {
-      if (addons[a.id]) {
-        if (a.qty) {
-          const q = Math.max(1, Number(pagesQty) || 1)
-          items.push({
-            id: a.id,
-            name: `${a.name.replace(' (per page)', '')} × ${q}`,
-            price: a.price * q,
-            group: cat.label,
-            addon: true,
-          })
-        } else {
-          items.push({ id: a.id, name: a.name, price: a.price, group: cat.label, addon: true })
-        }
-      }
+  }
+  for (const a of CATALOG.addons) {
+    if (!selectedAddons[a.id]) continue
+    if (a.type === 'per_unit') {
+      const qty = Math.max(1, Number(addonQuantities[a.id]) || 1)
+      items.push({
+        id: a.id,
+        name: `${a.name} × ${qty}`,
+        price: a.price * qty,
+        group: a.category,
+        addon: true,
+      })
+    } else {
+      items.push({
+        id: a.id,
+        name: a.name,
+        price: a.price,
+        group: a.category,
+        addon: true,
+      })
     }
   }
   return items
 }
 
 function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
-  const [tiers, setTiers] = useState({})
-  const [addons, setAddons] = useState({})
-  const [pagesQty, setPagesQty] = useState(1)
-  const [retainers, setRetainers] = useState({})
-  const [openCats, setOpenCats] = useState({ websites: true })
+  const [selectedPackage, setSelectedPackage] = useState(null)
+  const [selectedAddons, setSelectedAddons] = useState({})
+  const [addonQuantities, setAddonQuantities] = useState({})
+  const [selectedRetainer, setSelectedRetainer] = useState(null)
+  const [openCategories, setOpenCategories] = useState({ Website: true })
   const [invoice, setInvoice] = useState(null)
   const [proposal, setProposal] = useState(null)
 
+  const pkg = useMemo(
+    () => CATALOG.packages.find((p) => p.id === selectedPackage) || null,
+    [selectedPackage],
+  )
   const lineItems = useMemo(
-    () => buildLineItems(tiers, addons, pagesQty),
-    [tiers, addons, pagesQty],
+    () => buildLineItems(selectedPackage, selectedAddons, addonQuantities),
+    [selectedPackage, selectedAddons, addonQuantities],
   )
   const subtotal = useMemo(
     () => lineItems.reduce((s, i) => s + i.price, 0),
     [lineItems],
   )
-  const retainerItems = useMemo(
-    () => RETAINERS.filter((r) => retainers[r.id]),
-    [retainers],
+  const retainer = useMemo(
+    () => CATALOG.retainers.find((r) => r.id === selectedRetainer) || null,
+    [selectedRetainer],
   )
-  const monthly = useMemo(
-    () => retainerItems.reduce((s, r) => s + r.price, 0),
-    [retainerItems],
-  )
+  const retainerItems = useMemo(() => (retainer ? [retainer] : []), [retainer])
+  const monthly = retainer?.price || 0
 
-  function toggleTier(catKey, tierId) {
-    setTiers((t) => ({ ...t, [catKey]: t[catKey] === tierId ? undefined : tierId }))
+  // Group addons by category (cached so it's not recomputed on every render).
+  const addonsByCategory = useMemo(() => {
+    const grouped = {}
+    for (const cat of ADDON_CATEGORIES) grouped[cat] = []
+    for (const a of CATALOG.addons) {
+      if (!grouped[a.category]) grouped[a.category] = []
+      grouped[a.category].push(a)
+    }
+    return grouped
+  }, [])
+
+  function pickPackage(id) {
+    setSelectedPackage((cur) => (cur === id ? null : id))
   }
   function toggleAddon(id) {
-    setAddons((a) => ({ ...a, [id]: !a[id] }))
+    setSelectedAddons((a) => ({ ...a, [id]: !a[id] }))
   }
-  function toggleRetainer(id) {
-    setRetainers((r) => ({ ...r, [id]: !r[id] }))
+  function setAddonQty(id, qty) {
+    setAddonQuantities((q) => ({ ...q, [id]: Math.max(1, Number(qty) || 1) }))
   }
-  function toggleCat(key) {
-    setOpenCats((o) => ({ ...o, [key]: !o[key] }))
+  function pickRetainer(id) {
+    setSelectedRetainer((cur) => (cur === id ? null : id))
+  }
+  function toggleCategory(cat) {
+    setOpenCategories((o) => ({ ...o, [cat]: !o[cat] }))
   }
 
   function clientInfo() {
@@ -1205,13 +1255,22 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* LEFT 60% — selector */}
-        <div style={{ ...card, flex: '1 1 58%', minWidth: 320, padding: 18 }}>
+        <div
+          style={{
+            ...card,
+            flex: '1 1 58%',
+            minWidth: 320,
+            padding: 22,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 22,
+          }}
+        >
           <h3
             style={{
               fontSize: 14,
               fontWeight: 600,
               color: '#fff',
-              marginBottom: 14,
               display: 'flex',
               alignItems: 'center',
               gap: 8,
@@ -1220,152 +1279,124 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
             <Calculator size={14} /> Estimate Calculator
           </h3>
 
-          {CATALOG.map((cat) => {
-            const isOpen = !!openCats[cat.key]
-            return (
-              <div
-                key={cat.key}
-                style={{
-                  border: '0.5px solid rgba(255,255,255,0.07)',
-                  borderRadius: 10,
-                  marginBottom: 10,
-                  overflow: 'hidden',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleCat(cat.key)}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 14px',
-                    background: 'rgba(255,255,255,0.02)',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
-                    {cat.label}
-                  </span>
-                  <ChevronDown
-                    size={15}
-                    style={{
-                      color: 'rgba(255,255,255,0.4)',
-                      transform: isOpen ? 'rotate(180deg)' : 'none',
-                      transition: 'transform 0.18s',
-                    }}
-                  />
-                </button>
-                {isOpen && (
-                  <div style={{ padding: '6px 14px 14px' }}>
-                    {cat.tiers.map((t) => {
-                      const active = tiers[cat.key] === t.id
-                      return (
-                        <SelectRow
-                          key={t.id}
-                          type="radio"
-                          active={active}
-                          label={t.name}
-                          price={t.price}
-                          onClick={() => toggleTier(cat.key, t.id)}
-                        />
-                      )
-                    })}
-                    {cat.addons.length > 0 && (
-                      <div
-                        style={{
-                          fontSize: 10.5,
-                          fontWeight: 600,
-                          letterSpacing: '0.4px',
-                          color: 'rgba(255,255,255,0.3)',
-                          textTransform: 'uppercase',
-                          margin: '12px 0 6px',
-                        }}
-                      >
-                        Add-ons
-                      </div>
-                    )}
-                    {cat.addons.map((a) => {
-                      const active = !!addons[a.id]
-                      return (
-                        <div key={a.id}>
-                          <SelectRow
-                            type="check"
-                            active={active}
-                            label={a.name}
-                            price={a.price}
-                            onClick={() => toggleAddon(a.id)}
-                          />
-                          {a.qty && active && (
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '4px 0 8px 30px',
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: 12,
-                                  color: 'rgba(255,255,255,0.5)',
-                                }}
-                              >
-                                Pages:
-                              </span>
-                              <input
-                                type="number"
-                                min={1}
-                                value={pagesQty}
-                                onChange={(e) =>
-                                  setPagesQty(Math.max(1, Number(e.target.value) || 1))
-                                }
-                                style={{ ...inputStyle, width: 80, padding: '6px 8px' }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-
-          {/* Monthly retainer */}
-          <div
-            style={{
-              border: '0.5px solid rgba(194,181,155,0.15)',
-              borderRadius: 10,
-              marginTop: 4,
-              padding: '12px 14px',
-            }}
-          >
+          {/* Packages */}
+          <section>
+            <SectionLabel>Packages — pick one</SectionLabel>
             <div
               style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#C2B59B',
-                marginBottom: 8,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gap: 10,
+                marginTop: 8,
               }}
             >
-              Monthly Retainer (optional)
+              {CATALOG.packages.map((p) => (
+                <PackageCard
+                  key={p.id}
+                  pkg={p}
+                  active={selectedPackage === p.id}
+                  onClick={() => pickPackage(p.id)}
+                />
+              ))}
             </div>
-            {RETAINERS.map((r) => (
-              <SelectRow
-                key={r.id}
-                type="check"
-                active={!!retainers[r.id]}
-                label={r.name}
-                price={r.price}
-                suffix="/mo"
-                onClick={() => toggleRetainer(r.id)}
-              />
-            ))}
-          </div>
+          </section>
+
+          {/* Add-Ons grouped by category */}
+          <section>
+            <SectionLabel>Add-Ons</SectionLabel>
+            {ADDON_CATEGORIES.map((cat) => {
+              const items = addonsByCategory[cat] || []
+              if (items.length === 0) return null
+              const isOpen = !!openCategories[cat]
+              const selectedInCat = items.filter((a) => selectedAddons[a.id]).length
+              return (
+                <div
+                  key={cat}
+                  style={{
+                    border: '0.5px solid rgba(255,255,255,0.07)',
+                    borderRadius: 10,
+                    marginTop: 8,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(cat)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '11px 14px',
+                      background: 'rgba(255,255,255,0.02)',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#fff',
+                        display: 'inline-flex',
+                        gap: 8,
+                        alignItems: 'baseline',
+                      }}
+                    >
+                      {cat}
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                        {items.length} options{selectedInCat ? ` · ${selectedInCat} selected` : ''}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      size={15}
+                      style={{
+                        color: 'rgba(255,255,255,0.4)',
+                        transform: isOpen ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.18s',
+                      }}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div style={{ padding: '6px 4px 10px' }}>
+                      {items.map((a) => (
+                        <AddonRow
+                          key={a.id}
+                          addon={a}
+                          active={!!selectedAddons[a.id]}
+                          qty={addonQuantities[a.id] || 1}
+                          onToggle={() => toggleAddon(a.id)}
+                          onQty={(q) => setAddonQty(a.id, q)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </section>
+
+          {/* Retainers */}
+          <section>
+            <SectionLabel>Monthly retainer — pick one (optional)</SectionLabel>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gap: 10,
+                marginTop: 8,
+              }}
+            >
+              {CATALOG.retainers.map((r) => (
+                <RetainerCard
+                  key={r.id}
+                  retainer={r}
+                  active={selectedRetainer === r.id}
+                  onClick={() => pickRetainer(r.id)}
+                />
+              ))}
+            </div>
+          </section>
         </div>
 
         {/* RIGHT 40% — breakdown */}
@@ -1390,7 +1421,7 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
             Price Breakdown
           </h3>
 
-          {lineItems.length === 0 && retainerItems.length === 0 ? (
+          {lineItems.length === 0 && !retainer ? (
             <div
               style={{
                 fontSize: 12.5,
@@ -1399,35 +1430,97 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                 textAlign: 'center',
               }}
             >
-              Select services to see the estimate
+              Select a package, add-ons, or retainer to see the estimate
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-              {lineItems.map((i) => (
+              {pkg && (
                 <div
-                  key={i.id}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    fontSize: 12.5,
-                    color: i.addon
-                      ? 'rgba(255,255,255,0.55)'
-                      : 'rgba(255,255,255,0.85)',
-                    paddingLeft: i.addon ? 12 : 0,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: 'rgba(255,255,255,0.35)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.6px',
+                    marginBottom: 2,
                   }}
                 >
-                  <span style={{ minWidth: 0 }}>
-                    {i.addon ? '+ ' : ''}
-                    {i.name}
-                  </span>
-                  <span style={{ whiteSpace: 'nowrap' }}>{money(i.price)}</span>
+                  Package
                 </div>
-              ))}
+              )}
+              {lineItems.map((i, idx) => {
+                // First non-addon line ends the "Package" sub-section and starts "Add-Ons".
+                const prev = lineItems[idx - 1]
+                const showAddonHeader = i.addon && (!prev || !prev.addon)
+                return (
+                  <div key={i.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                    {showAddonHeader && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: 'rgba(255,255,255,0.35)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.6px',
+                          margin: '10px 0 2px',
+                        }}
+                      >
+                        Add-Ons
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        fontSize: 12.5,
+                        color: i.addon
+                          ? 'rgba(255,255,255,0.6)'
+                          : 'rgba(255,255,255,0.9)',
+                        paddingLeft: i.addon ? 12 : 0,
+                      }}
+                    >
+                      <span style={{ minWidth: 0 }}>
+                        {i.addon ? '+ ' : ''}
+                        {i.name}
+                      </span>
+                      <span style={{ whiteSpace: 'nowrap' }}>{money(i.price)}</span>
+                    </div>
+                  </div>
+                )
+              })}
+              {retainer && (
+                <>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: 'rgba(194,181,155,0.6)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.6px',
+                      margin: '10px 0 2px',
+                    }}
+                  >
+                    Monthly Retainer
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      fontSize: 12.5,
+                      color: '#C2B59B',
+                    }}
+                  >
+                    <span>{retainer.name}</span>
+                    <span style={{ whiteSpace: 'nowrap' }}>{money(retainer.price)}/mo</span>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
-          {(lineItems.length > 0 || retainerItems.length > 0) && (
+          {(lineItems.length > 0 || retainer) && (
             <>
               <div
                 style={{
@@ -1439,44 +1532,46 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: 13,
-                  color: 'rgba(255,255,255,0.7)',
+                  alignItems: 'baseline',
                 }}
               >
-                <span>Subtotal</span>
-                <span>{money(subtotal)}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                  One-time total
+                </span>
+                <span style={{ fontSize: 22, fontWeight: 700, color: '#C2B59B' }}>
+                  {money(subtotal)}
+                </span>
               </div>
               {monthly > 0 && (
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    fontSize: 13,
-                    color: '#C2B59B',
-                    marginTop: 8,
+                    alignItems: 'baseline',
+                    marginTop: 6,
                   }}
                 >
-                  <span>Monthly</span>
-                  <span>{money(monthly)}/mo</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                    Monthly recurring
+                  </span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#C2B59B' }}>
+                    {money(monthly)}/mo
+                  </span>
                 </div>
               )}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                  marginTop: 16,
-                  paddingTop: 16,
-                  borderTop: '0.5px solid rgba(194,181,155,0.2)',
-                }}
-              >
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
-                  Total
-                </span>
-                <span style={{ fontSize: 30, fontWeight: 700, color: '#C2B59B' }}>
-                  {money(subtotal)}
-                </span>
-              </div>
+              {pkg && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: 'rgba(255,255,255,0.4)',
+                    marginTop: 10,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Package range: {money(pkg.price_min)} – {money(pkg.price_max)}. Estimate
+                  uses the lower bound; final scope may shift the total within this range.
+                </div>
+              )}
 
               <button
                 type="button"
@@ -1494,7 +1589,7 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                   cursor: 'pointer',
                 }}
               >
-                Generate Invoice
+                Generate Estimate / Invoice
               </button>
               <button
                 type="button"
@@ -1584,6 +1679,255 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
         />
       )}
     </div>
+  )
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: '0.6px',
+        color: 'rgba(255,255,255,0.45)',
+        textTransform: 'uppercase',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function PackageCard({ pkg, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        textAlign: 'left',
+        cursor: 'pointer',
+        background: active ? 'rgba(194,181,155,0.08)' : 'rgba(255,255,255,0.02)',
+        border: active
+          ? '0.5px solid rgba(194,181,155,0.5)'
+          : '0.5px solid rgba(255,255,255,0.08)',
+        borderRadius: 12,
+        padding: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        color: '#fff',
+        transition: 'background 120ms, border-color 120ms',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 700 }}>{pkg.name}</span>
+        {active && (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: '#0B0B0D',
+              background: '#C2B59B',
+              borderRadius: 6,
+              padding: '2px 7px',
+            }}
+          >
+            Selected
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 11.5, color: 'rgba(194,181,155,0.85)' }}>{pkg.subtitle}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: '#C2B59B' }}>
+        {money(pkg.price_min)} – {money(pkg.price_max)}
+      </div>
+      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
+        {pkg.description}
+      </div>
+      <div
+        style={{
+          fontSize: 10.5,
+          color: 'rgba(255,255,255,0.4)',
+          marginTop: 2,
+          lineHeight: 1.45,
+        }}
+      >
+        <strong style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Ideal for:</strong>{' '}
+        {pkg.ideal_for}
+      </div>
+      <ul
+        style={{
+          listStyle: 'none',
+          padding: 0,
+          margin: '4px 0 0',
+          fontSize: 11.5,
+          color: 'rgba(255,255,255,0.65)',
+          lineHeight: 1.55,
+        }}
+      >
+        {pkg.includes.map((line, i) => (
+          <li key={i} style={{ display: 'flex', gap: 6 }}>
+            <span style={{ color: '#C2B59B' }}>✓</span>
+            <span>{line}</span>
+          </li>
+        ))}
+      </ul>
+      <div
+        style={{
+          fontSize: 10.5,
+          color: 'rgba(255,255,255,0.35)',
+          marginTop: 4,
+        }}
+      >
+        Delivery: {pkg.delivery_days} days
+      </div>
+    </button>
+  )
+}
+
+function AddonRow({ addon, active, qty, onToggle, onQty }) {
+  const isQty = addon.type === 'per_unit'
+  const displayPrice = isQty ? addon.price * (qty || 1) : addon.price
+  return (
+    <div
+      style={{
+        padding: '8px 10px',
+        borderRadius: 8,
+        background: active ? 'rgba(194,181,155,0.06)' : 'transparent',
+        border: active
+          ? '0.5px solid rgba(194,181,155,0.25)'
+          : '0.5px solid transparent',
+        marginBottom: 4,
+        display: 'flex',
+        gap: 10,
+        alignItems: 'flex-start',
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          width: 16,
+          height: 16,
+          flexShrink: 0,
+          borderRadius: 4,
+          border: active ? '1px solid #C2B59B' : '1px solid rgba(255,255,255,0.25)',
+          background: active ? '#C2B59B' : 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          marginTop: 1,
+        }}
+        aria-label={active ? 'Remove' : 'Add'}
+      >
+        {active && (
+          <span style={{ width: 8, height: 2, background: '#0B0B0D', borderRadius: 1 }} />
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          background: 'transparent',
+          border: 'none',
+          color: 'inherit',
+          padding: 0,
+          textAlign: 'left',
+          cursor: 'pointer',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 10,
+            alignItems: 'baseline',
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: active ? '#fff' : 'rgba(255,255,255,0.8)',
+            }}
+          >
+            {addon.name}
+          </span>
+          <span
+            style={{
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: active ? '#C2B59B' : 'rgba(255,255,255,0.5)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {money(displayPrice)}
+            {isQty && qty > 1 ? ` (${money(addon.price)}/${addon.unit})` : ''}
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: 11.5,
+            color: 'rgba(255,255,255,0.5)',
+            marginTop: 3,
+            lineHeight: 1.4,
+          }}
+        >
+          {addon.description}
+        </div>
+      </button>
+      {isQty && active && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <input
+            type="number"
+            min={1}
+            value={qty}
+            onChange={(e) => onQty(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            style={{ ...inputStyle, width: 56, padding: '4px 6px', textAlign: 'center' }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RetainerCard({ retainer, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        textAlign: 'left',
+        cursor: 'pointer',
+        background: active ? 'rgba(194,181,155,0.08)' : 'rgba(255,255,255,0.02)',
+        border: active
+          ? '0.5px solid rgba(194,181,155,0.5)'
+          : '0.5px solid rgba(255,255,255,0.08)',
+        borderRadius: 12,
+        padding: 14,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        color: '#fff',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ fontSize: 13.5, fontWeight: 700 }}>{retainer.name}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#C2B59B' }}>
+          {money(retainer.price)}/mo
+        </span>
+      </div>
+      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
+        {retainer.description}
+      </div>
+      <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+        <strong style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Best for:</strong>{' '}
+        {retainer.best_for}
+      </div>
+    </button>
   )
 }
 
