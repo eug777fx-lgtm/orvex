@@ -44,105 +44,131 @@ const DOC_TYPES = [
   { key: 'Onboarding Checklist', icon: ListChecks },
 ]
 
-// ---- Estimate calculator catalog (Lithos Labs professional service architecture) ----
+// ---- Estimate calculator catalog (official Lithos Labs pricing, USD + AWG) ----
 const CATALOG = {
   packages: [
     {
-      id: 'starter',
-      name: 'Starter',
-      subtitle: 'The Professional Launchpad',
-      description: 'A clean, conversion-focused website built from scratch for your brand.',
-      price_min: 800, price_max: 1200,
-      ideal_for: 'Freelancers, solo entrepreneurs, new small businesses, trades professionals',
-      includes: ['Up to 5 pages', 'Responsive design', 'Contact form', 'SEO foundation', 'Google Analytics', 'WhatsApp button', '1 revision round'],
-      delivery_days: 10,
+      id: 'landing',
+      name: 'Landing Page',
+      subtitle: 'Fast, focused, and built to convert.',
+      description:
+        'A single high-converting page designed to turn visitors into leads or customers. Perfect for campaigns, product launches, or businesses that need a professional online presence fast.',
+      price_usd: 500,
+      price_awg: 900,
+      ideal_for: 'New businesses, campaigns, product launches, freelancers',
+      includes: [
+        'Single-page design',
+        'Mobile responsive design',
+        'Contact form',
+        'Basic SEO setup',
+        'Social media integration',
+        'WhatsApp button',
+        'Google Analytics',
+        'Delivered in 7 days',
+      ],
+      delivery_days: 7,
     },
     {
-      id: 'growth',
-      name: 'Growth',
-      subtitle: 'The Business Engine',
-      description: 'A full business website built to generate leads, take bookings, and run content marketing automatically.',
-      price_min: 1800, price_max: 2800,
-      ideal_for: 'Established small businesses ready to automate lead generation',
-      includes: ['Up to 10 pages', 'Everything in Starter', 'Custom animations', 'Blog & content system', 'Online booking system', 'WhatsApp automation', 'Google Business optimization', '2 revision rounds'],
-      delivery_days: 18,
+      id: 'business',
+      name: 'Business Website',
+      subtitle: 'Your complete digital presence, built professionally.',
+      description:
+        'A full multi-page website that represents your business, builds credibility, and generates leads. Includes everything a modern business needs to compete online.',
+      price_usd: 700,
+      price_awg: 1250,
+      ideal_for: 'Established small businesses, service providers, local companies',
+      includes: [
+        'Up to 5 pages',
+        'Mobile responsive design',
+        'Contact form',
+        'Basic SEO setup',
+        'Social media integration',
+        'WhatsApp button',
+        'Google Analytics',
+        'About, Services, Contact pages',
+        'Delivered in 14 days',
+      ],
+      delivery_days: 14,
     },
     {
       id: 'premium',
-      name: 'Premium',
-      subtitle: 'The Complete Digital System',
-      description: 'Not just a website — a complete digital business system integrated with your entire operation.',
-      price_min: 3500, price_max: 5500,
-      ideal_for: 'Multi-service businesses that need website + CRM + automations in one system',
-      includes: ['Unlimited pages', 'Everything in Growth', 'Payment integration', 'Member portal', 'Custom business dashboard', 'CRM integration', 'Advanced automations', 'Dedicated onboarding session', '3 revision rounds'],
-      delivery_days: 30,
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      subtitle: 'The Full Operating System',
-      description: 'A fully custom digital infrastructure — website, CRM, AI systems, automations — all integrated and managed.',
-      price_min: 8000, price_max: 25000,
-      ideal_for: 'Multi-location businesses, agencies, companies that want to fully automate operations',
-      includes: ['Everything in Premium', 'AI voice receptionist', 'AI chat system', 'Advanced workflow automation', 'Custom internal tools', 'White-label options', 'Priority dedicated support', 'Quarterly strategy sessions'],
-      delivery_days: 60,
+      name: 'Premium Custom Website',
+      subtitle: 'A fully custom digital system built for growth.',
+      description:
+        'A premium, fully custom-built website with advanced features, custom animations, and deep integrations. Built for businesses that want to stand out and scale.',
+      price_usd: 1200,
+      price_awg: 2150,
+      ideal_for: 'Growing businesses, brands targeting premium clients, multi-service companies',
+      includes: [
+        'Up to 10 pages',
+        'Mobile responsive design',
+        'Custom animations & micro-interactions',
+        'Advanced contact forms',
+        'Full SEO setup',
+        'Social media integration',
+        'Google Analytics + Search Console',
+        'WhatsApp integration',
+        'Blog or news section',
+        'Speed optimization (90+ PageSpeed)',
+        'Delivered in 21 days',
+      ],
+      delivery_days: 21,
     },
   ],
   addons: [
-    // Website
-    { id: 'booking', name: 'Online Booking System', category: 'Website', description: 'Integrated calendar with automated confirmations and WhatsApp reminders.', price: 500, type: 'fixed' },
-    { id: 'payment', name: 'Payment Integration', category: 'Website', description: 'Stripe/PayPal checkout for one-time or recurring payments.', price: 600, type: 'fixed' },
-    { id: 'blog', name: 'Blog & Content System', category: 'Website', description: 'Full CMS with SEO-optimized post structure and admin editor.', price: 400, type: 'fixed' },
-    { id: 'portal', name: 'Member Portal', category: 'Website', description: 'Login-protected area with user accounts and content access control.', price: 900, type: 'fixed' },
-    { id: 'animations', name: 'Custom Animations', category: 'Website', description: 'Scroll-triggered animations, micro-interactions, and motion design.', price: 500, type: 'fixed' },
-    { id: 'extra_page', name: 'Extra Page', category: 'Website', description: 'Additional website page beyond package limit.', price: 200, type: 'per_unit', unit: 'page' },
-    { id: 'multilang', name: 'Multi-Language Support', category: 'Website', description: 'Full website translated into a second language (e.g. English + Papiamento).', price: 600, type: 'fixed' },
-    { id: 'live_chat', name: 'Live Chat Widget', category: 'Website', description: 'Real-time chat button connected to WhatsApp or chat platform.', price: 250, type: 'fixed' },
-    { id: 'speed', name: 'Speed Optimization', category: 'Website', description: 'Advanced performance tuning to achieve 95+ PageSpeed score.', price: 400, type: 'fixed' },
-    { id: 'landing_page', name: 'Landing Page Build', category: 'Website', description: 'High-converting single-page campaign landing page.', price: 800, type: 'fixed' },
-    // Automation
-    { id: 'missed_call', name: 'Missed Call Text-Back', category: 'Automation', description: 'Auto-WhatsApp to every missed caller within 30 seconds.', price: 300, type: 'fixed' },
-    { id: 'appt_reminder', name: 'Appointment Reminders', category: 'Automation', description: 'Automated WhatsApp reminders at 24h and 2h before booking.', price: 300, type: 'fixed' },
-    { id: 'followup_seq', name: 'Follow-Up Sequence', category: 'Automation', description: 'Multi-step automated follow-up (Day 1, 3, 7, 14, 30).', price: 500, type: 'fixed' },
-    { id: 'lead_capture', name: 'Lead Capture Automation', category: 'Automation', description: 'Form submission → CRM + instant team notification + welcome message.', price: 400, type: 'fixed' },
-    { id: 'review_req', name: 'Review Request Automation', category: 'Automation', description: 'Post-service WhatsApp requesting Google/Facebook review.', price: 350, type: 'fixed' },
-    { id: 'client_onboard', name: 'Client Onboarding Automation', category: 'Automation', description: 'New client → welcome sequence + document collection + CRM entry.', price: 600, type: 'fixed' },
-    { id: 'invoice_reminder', name: 'Invoice & Payment Reminder', category: 'Automation', description: 'Automated follow-up for unpaid invoices via WhatsApp/email.', price: 400, type: 'fixed' },
-    { id: 'daily_report', name: 'Daily Business Report', category: 'Automation', description: 'Automated daily email with key metrics, deals, and team activity.', price: 350, type: 'fixed' },
-    { id: 'full_workflow', name: 'Full Workflow Automation', category: 'Automation', description: 'Complete operational workflow mapped and automated end-to-end.', price: 1500, type: 'fixed' },
-    // AI
-    { id: 'ai_chat', name: 'AI Website Chat', category: 'AI', description: '24/7 AI assistant on website trained on business knowledge and FAQs.', price: 600, type: 'fixed' },
-    { id: 'whatsapp_ai', name: 'WhatsApp AI Management', category: 'AI', description: 'AI handling all incoming WhatsApp messages intelligently 24/7.', price: 500, type: 'fixed' },
-    { id: 'voice_ai', name: 'AI Voice Receptionist', category: 'AI', description: 'AI answers every inbound call, books appointments, handles FAQs.', price: 800, type: 'fixed' },
-    { id: 'lead_qualifier', name: 'AI Lead Qualifier', category: 'AI', description: 'AI that scores and qualifies leads before passing to sales team.', price: 700, type: 'fixed' },
-    { id: 'ai_content', name: 'AI Content Generator', category: 'AI', description: 'AI trained on brand voice to generate posts, emails, and blogs.', price: 500, type: 'fixed' },
-    { id: 'ai_outbound', name: 'AI Outbound Caller', category: 'AI', description: 'AI that makes outbound follow-up calls to leads automatically.', price: 900, type: 'fixed' },
-    { id: 'ai_leads', name: 'AI Lead Generation System', category: 'AI', description: "Automated outbound that researches prospects and sends personalized sequences.", price: 1000, type: 'fixed' },
-    // CRM
-    { id: 'crm_basic', name: 'Basic CRM Setup', category: 'CRM', description: 'Configure existing CRM with pipelines, stages, and basic automations.', price: 800, type: 'fixed' },
-    { id: 'crm_custom', name: 'Custom CRM Build', category: 'CRM', description: "Fully custom CRM application built for the client's exact workflow.", price: 2500, type: 'fixed' },
-    { id: 'dashboard', name: 'Business Dashboard', category: 'CRM', description: 'Real-time KPI dashboard connected to all business data sources.', price: 1500, type: 'fixed' },
-    { id: 'team_mgmt', name: 'Team Management System', category: 'CRM', description: 'Staff scheduling, task assignment, and performance tracking.', price: 1200, type: 'fixed' },
-    { id: 'client_portal', name: 'Client Portal', category: 'CRM', description: 'Login-protected portal where clients track projects and invoices.', price: 800, type: 'fixed' },
-    // Marketing
-    { id: 'local_seo', name: 'Local SEO Setup', category: 'Marketing', description: 'Google Business optimization, citations, and local ranking strategy.', price: 500, type: 'fixed' },
-    { id: 'meta_ads', name: 'Meta Ads Setup', category: 'Marketing', description: 'Full Facebook/Instagram ad campaign setup and creative.', price: 600, type: 'fixed' },
-    { id: 'email_mktg', name: 'Email Marketing Setup', category: 'Marketing', description: 'Email platform setup, template design, and first campaign.', price: 400, type: 'fixed' },
-    { id: 'social_setup', name: 'Social Media Setup', category: 'Marketing', description: 'Profile optimization, brand kit, content templates for 3 platforms.', price: 500, type: 'fixed' },
-    { id: 'reputation', name: 'Reputation Management Setup', category: 'Marketing', description: 'Automated monitoring and response for Google/Facebook reviews.', price: 400, type: 'fixed' },
+    {
+      id: 'booking',
+      name: 'Booking System',
+      category: 'Add-On Services',
+      description:
+        'Let customers book appointments, services, or consultations directly on your website. Includes automated confirmation emails and WhatsApp reminders. No more back-and-forth scheduling.',
+      price_usd: 300,
+      price_awg: 540,
+      type: 'fixed',
+      billing: 'one-time',
+    },
+    {
+      id: 'automation',
+      name: 'Automation System',
+      category: 'Add-On Services',
+      description:
+        'Automate your business workflows — missed call text-back, lead follow-up sequences, appointment reminders, review requests, and more. Powered by Make.com. Set it up once, runs forever.',
+      price_usd: 300,
+      price_awg: 540,
+      type: 'fixed',
+      billing: 'monthly',
+    },
+    {
+      id: 'crm',
+      name: 'CRM Setup & Integrations',
+      category: 'Add-On Services',
+      description:
+        'A complete CRM system to manage your leads, clients, deals, and team in one place. Custom-built for your business workflow. Includes pipeline setup, automation triggers, and team access.',
+      price_usd: 1000,
+      price_awg: 1800,
+      type: 'fixed',
+      billing: 'one-time',
+    },
   ],
   retainers: [
-    { id: 'care', name: 'Care', price: 99, description: 'Monthly security updates, uptime monitoring, 1 content update, performance report, email support.', best_for: 'Starter websites needing basic maintenance' },
-    { id: 'growth_r', name: 'Growth', price: 199, description: 'Everything in Care + 3 content updates, Google Analytics review, SEO monitoring, 2 hours changes, priority support.', best_for: 'Active businesses publishing content' },
-    { id: 'management', name: 'Management', price: 350, description: 'Everything in Growth + CRM management, WhatsApp AI monitoring, weekly report, 4 hours changes, video call support.', best_for: 'Clients with CRM, automations, or AI systems' },
-    { id: 'system', name: 'System', price: 600, description: 'Full monthly management of website, CRM, automations, and AI. Weekly reporting, unlimited small updates, dedicated Slack, monthly strategy call.', best_for: 'Enterprise clients with full digital operations' },
-    { id: 'marketing_r', name: 'Marketing', price: 500, description: 'Growth retainer + weekly social content (3 platforms), monthly email campaign, ad performance review, SEO optimization.', best_for: 'Businesses investing in active digital marketing' },
-    { id: 'full_system', name: 'Full System', price: 950, description: 'Complete package: system management + marketing management. One invoice, one team, zero gaps. Quarterly strategy sessions.', best_for: 'Businesses fully outsourcing digital operations' },
+    {
+      id: 'maintenance',
+      name: 'Monthly Maintenance & Support',
+      description:
+        'Ongoing support, updates, monitoring, and everything needed to keep your website and systems running smoothly every month. Pricing depends on the size and complexity of your project — discussed and agreed before starting.',
+      price_note: 'Custom — based on project size',
+      price_usd: null,
+      price_awg: null,
+    },
   ],
 }
 
-// Categories in the order they should render in the addon section.
-const ADDON_CATEGORIES = ['Website', 'Automation', 'AI', 'CRM', 'Marketing']
+// Single category in the new architecture — kept for backwards-compatible
+// grouping logic in the calculator UI.
+const ADDON_CATEGORIES = ['Add-On Services']
+
+// AWG formatter (Aruban florin) — `money` continues to format USD.
+const awg = (n) => 'AWG ' + (Number(n) || 0).toLocaleString()
 
 const BANKING_KEY = 'lithos_banking_info'
 const INVOICE_COUNT_KEY = 'lithos_invoice_count'
@@ -1073,9 +1099,12 @@ function BankingCard({ banking, onSave }) {
 }
 
 // ---------- Estimates & Invoices tab ----------
-// Build invoice/proposal line items from calculator selections. Shape matches
-// what InvoicePreview / invoiceText expect: { id, name, price, group, addon? }.
-function buildLineItems(packageId, selectedAddons, addonQuantities) {
+// Build invoice/proposal line items from calculator selections. Each item:
+// { id, name, price (USD), awg, group, addon?, billing? }. Monthly addons go
+// in `items` like the rest but with `billing: 'monthly'` so the summary can
+// separate one-time vs recurring totals. InvoicePreview / invoiceText only
+// rely on { id, name, price, group, addon } so older code keeps working.
+function buildLineItems(packageId, selectedAddons) {
   const items = []
   if (packageId) {
     const pkg = CATALOG.packages.find((p) => p.id === packageId)
@@ -1083,31 +1112,24 @@ function buildLineItems(packageId, selectedAddons, addonQuantities) {
       items.push({
         id: pkg.id,
         name: `${pkg.name} Package`,
-        price: pkg.price_min,
+        price: pkg.price_usd,
+        awg: pkg.price_awg,
         group: 'Package',
+        billing: 'one-time',
       })
     }
   }
   for (const a of CATALOG.addons) {
     if (!selectedAddons[a.id]) continue
-    if (a.type === 'per_unit') {
-      const qty = Math.max(1, Number(addonQuantities[a.id]) || 1)
-      items.push({
-        id: a.id,
-        name: `${a.name} × ${qty}`,
-        price: a.price * qty,
-        group: a.category,
-        addon: true,
-      })
-    } else {
-      items.push({
-        id: a.id,
-        name: a.name,
-        price: a.price,
-        group: a.category,
-        addon: true,
-      })
-    }
+    items.push({
+      id: a.id,
+      name: a.name,
+      price: a.price_usd,
+      awg: a.price_awg,
+      group: a.category,
+      addon: true,
+      billing: a.billing || 'one-time',
+    })
   }
   return items
 }
@@ -1115,9 +1137,7 @@ function buildLineItems(packageId, selectedAddons, addonQuantities) {
 function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
   const [selectedPackage, setSelectedPackage] = useState(null)
   const [selectedAddons, setSelectedAddons] = useState({})
-  const [addonQuantities, setAddonQuantities] = useState({})
   const [selectedRetainer, setSelectedRetainer] = useState(null)
-  const [openCategories, setOpenCategories] = useState({ Website: true })
   const [invoice, setInvoice] = useState(null)
   const [proposal, setProposal] = useState(null)
 
@@ -1126,30 +1146,40 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
     [selectedPackage],
   )
   const lineItems = useMemo(
-    () => buildLineItems(selectedPackage, selectedAddons, addonQuantities),
-    [selectedPackage, selectedAddons, addonQuantities],
+    () => buildLineItems(selectedPackage, selectedAddons),
+    [selectedPackage, selectedAddons],
+  )
+  // Separate one-time vs monthly so totals split cleanly. Retainer (if priced)
+  // counts toward monthly too; the current one is null-priced ("Custom").
+  const oneTimeItems = useMemo(
+    () => lineItems.filter((i) => (i.billing || 'one-time') === 'one-time'),
+    [lineItems],
+  )
+  const monthlyItems = useMemo(
+    () => lineItems.filter((i) => i.billing === 'monthly'),
+    [lineItems],
   )
   const subtotal = useMemo(
-    () => lineItems.reduce((s, i) => s + i.price, 0),
-    [lineItems],
+    () => oneTimeItems.reduce((s, i) => s + (i.price || 0), 0),
+    [oneTimeItems],
+  )
+  const subtotalAwg = useMemo(
+    () => oneTimeItems.reduce((s, i) => s + (i.awg || 0), 0),
+    [oneTimeItems],
+  )
+  const monthly = useMemo(
+    () => monthlyItems.reduce((s, i) => s + (i.price || 0), 0),
+    [monthlyItems],
+  )
+  const monthlyAwg = useMemo(
+    () => monthlyItems.reduce((s, i) => s + (i.awg || 0), 0),
+    [monthlyItems],
   )
   const retainer = useMemo(
     () => CATALOG.retainers.find((r) => r.id === selectedRetainer) || null,
     [selectedRetainer],
   )
   const retainerItems = useMemo(() => (retainer ? [retainer] : []), [retainer])
-  const monthly = retainer?.price || 0
-
-  // Group addons by category (cached so it's not recomputed on every render).
-  const addonsByCategory = useMemo(() => {
-    const grouped = {}
-    for (const cat of ADDON_CATEGORIES) grouped[cat] = []
-    for (const a of CATALOG.addons) {
-      if (!grouped[a.category]) grouped[a.category] = []
-      grouped[a.category].push(a)
-    }
-    return grouped
-  }, [])
 
   function pickPackage(id) {
     setSelectedPackage((cur) => (cur === id ? null : id))
@@ -1157,14 +1187,8 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
   function toggleAddon(id) {
     setSelectedAddons((a) => ({ ...a, [id]: !a[id] }))
   }
-  function setAddonQty(id, qty) {
-    setAddonQuantities((q) => ({ ...q, [id]: Math.max(1, Number(qty) || 1) }))
-  }
   function pickRetainer(id) {
     setSelectedRetainer((cur) => (cur === id ? null : id))
-  }
-  function toggleCategory(cat) {
-    setOpenCategories((o) => ({ ...o, [cat]: !o[cat] }))
   }
 
   function clientInfo() {
@@ -1301,79 +1325,19 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
             </div>
           </section>
 
-          {/* Add-Ons grouped by category */}
+          {/* Add-Ons — flat list (single category in the current catalog) */}
           <section>
-            <SectionLabel>Add-Ons</SectionLabel>
-            {ADDON_CATEGORIES.map((cat) => {
-              const items = addonsByCategory[cat] || []
-              if (items.length === 0) return null
-              const isOpen = !!openCategories[cat]
-              const selectedInCat = items.filter((a) => selectedAddons[a.id]).length
-              return (
-                <div
-                  key={cat}
-                  style={{
-                    border: '0.5px solid rgba(255,255,255,0.07)',
-                    borderRadius: 10,
-                    marginTop: 8,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleCategory(cat)}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '11px 14px',
-                      background: 'rgba(255,255,255,0.02)',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: '#fff',
-                        display: 'inline-flex',
-                        gap: 8,
-                        alignItems: 'baseline',
-                      }}
-                    >
-                      {cat}
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-                        {items.length} options{selectedInCat ? ` · ${selectedInCat} selected` : ''}
-                      </span>
-                    </span>
-                    <ChevronDown
-                      size={15}
-                      style={{
-                        color: 'rgba(255,255,255,0.4)',
-                        transform: isOpen ? 'rotate(180deg)' : 'none',
-                        transition: 'transform 0.18s',
-                      }}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div style={{ padding: '6px 4px 10px' }}>
-                      {items.map((a) => (
-                        <AddonRow
-                          key={a.id}
-                          addon={a}
-                          active={!!selectedAddons[a.id]}
-                          qty={addonQuantities[a.id] || 1}
-                          onToggle={() => toggleAddon(a.id)}
-                          onQty={(q) => setAddonQty(a.id, q)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+            <SectionLabel>Add-On Services</SectionLabel>
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {CATALOG.addons.map((a) => (
+                <AddonRow
+                  key={a.id}
+                  addon={a}
+                  active={!!selectedAddons[a.id]}
+                  onToggle={() => toggleAddon(a.id)}
+                />
+              ))}
+            </div>
           </section>
 
           {/* Retainers */}
@@ -1434,75 +1398,21 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-              {pkg && (
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: 'rgba(255,255,255,0.35)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.6px',
-                    marginBottom: 2,
-                  }}
-                >
-                  Package
-                </div>
+              {oneTimeItems.length > 0 && (
+                <SummaryGroupHeader>One-Time</SummaryGroupHeader>
               )}
-              {lineItems.map((i, idx) => {
-                // First non-addon line ends the "Package" sub-section and starts "Add-Ons".
-                const prev = lineItems[idx - 1]
-                const showAddonHeader = i.addon && (!prev || !prev.addon)
-                return (
-                  <div key={i.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                    {showAddonHeader && (
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: 'rgba(255,255,255,0.35)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.6px',
-                          margin: '10px 0 2px',
-                        }}
-                      >
-                        Add-Ons
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        gap: 12,
-                        fontSize: 12.5,
-                        color: i.addon
-                          ? 'rgba(255,255,255,0.6)'
-                          : 'rgba(255,255,255,0.9)',
-                        paddingLeft: i.addon ? 12 : 0,
-                      }}
-                    >
-                      <span style={{ minWidth: 0 }}>
-                        {i.addon ? '+ ' : ''}
-                        {i.name}
-                      </span>
-                      <span style={{ whiteSpace: 'nowrap' }}>{money(i.price)}</span>
-                    </div>
-                  </div>
-                )
-              })}
+              {oneTimeItems.map((i) => (
+                <SummaryLine key={i.id} item={i} />
+              ))}
+              {monthlyItems.length > 0 && (
+                <SummaryGroupHeader accent>Monthly</SummaryGroupHeader>
+              )}
+              {monthlyItems.map((i) => (
+                <SummaryLine key={i.id} item={i} monthly />
+              ))}
               {retainer && (
                 <>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: 'rgba(194,181,155,0.6)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.6px',
-                      margin: '10px 0 2px',
-                    }}
-                  >
-                    Monthly Retainer
-                  </div>
+                  <SummaryGroupHeader accent>Monthly Retainer</SummaryGroupHeader>
                   <div
                     style={{
                       display: 'flex',
@@ -1512,8 +1422,11 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                       color: '#C2B59B',
                     }}
                   >
-                    <span>{retainer.name}</span>
-                    <span style={{ whiteSpace: 'nowrap' }}>{money(retainer.price)}/mo</span>
+                    <span style={{ minWidth: 0 }}>{retainer.name}</span>
+                    <span style={{ whiteSpace: 'nowrap', fontStyle: 'italic' }}>Custom</span>
+                  </div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', marginTop: -4 }}>
+                    Discussed per project
                   </div>
                 </>
               )}
@@ -1528,48 +1441,73 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                   margin: '14px 0',
                 }}
               />
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                }}
-              >
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                  One-time total
-                </span>
-                <span style={{ fontSize: 22, fontWeight: 700, color: '#C2B59B' }}>
-                  {money(subtotal)}
-                </span>
-              </div>
+              {subtotal > 0 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                    One-time total
+                  </span>
+                  <span style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: '#C2B59B' }}>
+                      {money(subtotal)}
+                    </span>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: 12,
+                        color: 'rgba(194,181,155,0.6)',
+                        marginTop: 2,
+                      }}
+                    >
+                      {awg(subtotalAwg)}
+                    </span>
+                  </span>
+                </div>
+              )}
               {monthly > 0 && (
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'baseline',
-                    marginTop: 6,
+                    marginTop: 10,
                   }}
                 >
                   <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
                     Monthly recurring
                   </span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: '#C2B59B' }}>
-                    {money(monthly)}/mo
+                  <span style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: '#C2B59B' }}>
+                      {money(monthly)}/mo
+                    </span>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: 11,
+                        color: 'rgba(194,181,155,0.6)',
+                        marginTop: 2,
+                      }}
+                    >
+                      {awg(monthlyAwg)}/mo
+                    </span>
                   </span>
                 </div>
               )}
-              {pkg && (
+              {retainer && (
                 <div
                   style={{
                     fontSize: 11,
-                    color: 'rgba(255,255,255,0.4)',
+                    color: 'rgba(194,181,155,0.7)',
                     marginTop: 10,
                     lineHeight: 1.5,
                   }}
                 >
-                  Package range: {money(pkg.price_min)} – {money(pkg.price_max)}. Estimate
-                  uses the lower bound; final scope may shift the total within this range.
+                  + Monthly maintenance retainer (custom — discussed per project)
                 </div>
               )}
 
@@ -1698,6 +1636,61 @@ function SectionLabel({ children }) {
   )
 }
 
+function SummaryGroupHeader({ children, accent }) {
+  return (
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: '0.6px',
+        color: accent ? 'rgba(194,181,155,0.7)' : 'rgba(255,255,255,0.35)',
+        textTransform: 'uppercase',
+        margin: '6px 0 2px',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function SummaryLine({ item, monthly }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 12,
+          fontSize: 12.5,
+          color: item.addon
+            ? 'rgba(255,255,255,0.7)'
+            : 'rgba(255,255,255,0.92)',
+          paddingLeft: item.addon ? 12 : 0,
+        }}
+      >
+        <span style={{ minWidth: 0 }}>
+          {item.addon ? '+ ' : ''}
+          {item.name}
+        </span>
+        <span style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+          {money(item.price)}{monthly ? '/mo' : ''}
+        </span>
+      </div>
+      {typeof item.awg === 'number' && (
+        <div
+          style={{
+            fontSize: 10.5,
+            color: 'rgba(194,181,155,0.55)',
+            textAlign: 'right',
+          }}
+        >
+          {awg(item.awg)}{monthly ? '/mo' : ''}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PackageCard({ pkg, active, onClick }) {
   return (
     <button
@@ -1719,7 +1712,14 @@ function PackageCard({ pkg, active, onClick }) {
         transition: 'background 120ms, border-color 120ms',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
         <span style={{ fontSize: 14, fontWeight: 700 }}>{pkg.name}</span>
         {active && (
           <span
@@ -1737,8 +1737,13 @@ function PackageCard({ pkg, active, onClick }) {
         )}
       </div>
       <div style={{ fontSize: 11.5, color: 'rgba(194,181,155,0.85)' }}>{pkg.subtitle}</div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: '#C2B59B' }}>
-        {money(pkg.price_min)} – {money(pkg.price_max)}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: '#C2B59B' }}>
+          {money(pkg.price_usd)}
+        </span>
+        <span style={{ fontSize: 11.5, color: 'rgba(194,181,155,0.7)' }}>
+          {awg(pkg.price_awg)}
+        </span>
       </div>
       <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
         {pkg.description}
@@ -1747,7 +1752,6 @@ function PackageCard({ pkg, active, onClick }) {
         style={{
           fontSize: 10.5,
           color: 'rgba(255,255,255,0.4)',
-          marginTop: 2,
           lineHeight: 1.45,
         }}
       >
@@ -1784,27 +1788,25 @@ function PackageCard({ pkg, active, onClick }) {
   )
 }
 
-function AddonRow({ addon, active, qty, onToggle, onQty }) {
-  const isQty = addon.type === 'per_unit'
-  const displayPrice = isQty ? addon.price * (qty || 1) : addon.price
+function AddonRow({ addon, active, onToggle }) {
+  const isMonthly = addon.billing === 'monthly'
   return (
     <div
       style={{
-        padding: '8px 10px',
-        borderRadius: 8,
-        background: active ? 'rgba(194,181,155,0.06)' : 'transparent',
+        padding: '10px 12px',
+        borderRadius: 10,
+        background: active ? 'rgba(194,181,155,0.07)' : 'rgba(255,255,255,0.02)',
         border: active
-          ? '0.5px solid rgba(194,181,155,0.25)'
-          : '0.5px solid transparent',
-        marginBottom: 4,
+          ? '0.5px solid rgba(194,181,155,0.3)'
+          : '0.5px solid rgba(255,255,255,0.06)',
         display: 'flex',
-        gap: 10,
+        gap: 12,
         alignItems: 'flex-start',
+        cursor: 'pointer',
       }}
+      onClick={onToggle}
     >
-      <button
-        type="button"
-        onClick={onToggle}
+      <span
         style={{
           width: 16,
           height: 16,
@@ -1815,86 +1817,92 @@ function AddonRow({ addon, active, qty, onToggle, onQty }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          cursor: 'pointer',
           marginTop: 1,
         }}
-        aria-label={active ? 'Remove' : 'Add'}
+        aria-hidden="true"
       >
         {active && (
           <span style={{ width: 8, height: 2, background: '#0B0B0D', borderRadius: 1 }} />
         )}
-      </button>
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          background: 'transparent',
-          border: 'none',
-          color: 'inherit',
-          padding: 0,
-          textAlign: 'left',
-          cursor: 'pointer',
-        }}
-      >
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             gap: 10,
-            alignItems: 'baseline',
+            alignItems: 'flex-start',
           }}
         >
-          <span
-            style={{
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: active ? '#fff' : 'rgba(255,255,255,0.8)',
-            }}
-          >
-            {addon.name}
+          <span style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: active ? '#fff' : 'rgba(255,255,255,0.85)',
+              }}
+            >
+              {addon.name}
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.4px',
+                textTransform: 'uppercase',
+                color: isMonthly ? 'rgba(194,181,155,0.8)' : 'rgba(255,255,255,0.45)',
+                background: isMonthly
+                  ? 'rgba(194,181,155,0.12)'
+                  : 'rgba(255,255,255,0.06)',
+                border: isMonthly
+                  ? '0.5px solid rgba(194,181,155,0.3)'
+                  : '0.5px solid rgba(255,255,255,0.08)',
+                borderRadius: 999,
+                padding: '2px 8px',
+              }}
+            >
+              {isMonthly ? 'Monthly' : 'One-time'}
+            </span>
           </span>
-          <span
-            style={{
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: active ? '#C2B59B' : 'rgba(255,255,255,0.5)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {money(displayPrice)}
-            {isQty && qty > 1 ? ` (${money(addon.price)}/${addon.unit})` : ''}
+          <span style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: active ? '#C2B59B' : 'rgba(255,255,255,0.6)',
+              }}
+            >
+              {money(addon.price_usd)}{isMonthly ? '/mo' : ''}
+            </span>
+            <span
+              style={{
+                display: 'block',
+                fontSize: 11,
+                color: active ? 'rgba(194,181,155,0.7)' : 'rgba(255,255,255,0.35)',
+                marginTop: 2,
+              }}
+            >
+              {awg(addon.price_awg)}{isMonthly ? '/mo' : ''}
+            </span>
           </span>
         </div>
         <div
           style={{
             fontSize: 11.5,
             color: 'rgba(255,255,255,0.5)',
-            marginTop: 3,
-            lineHeight: 1.4,
+            marginTop: 6,
+            lineHeight: 1.45,
           }}
         >
           {addon.description}
         </div>
-      </button>
-      {isQty && active && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-          <input
-            type="number"
-            min={1}
-            value={qty}
-            onChange={(e) => onQty(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            style={{ ...inputStyle, width: 56, padding: '4px 6px', textAlign: 'center' }}
-          />
-        </div>
-      )}
+      </div>
     </div>
   )
 }
 
 function RetainerCard({ retainer, active, onClick }) {
+  const hasFixedPrice = retainer.price_usd != null
   return (
     <button
       type="button"
@@ -1914,19 +1922,58 @@ function RetainerCard({ retainer, active, onClick }) {
         color: '#fff',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
         <span style={{ fontSize: 13.5, fontWeight: 700 }}>{retainer.name}</span>
-        <span style={{ fontSize: 14, fontWeight: 700, color: '#C2B59B' }}>
-          {money(retainer.price)}/mo
-        </span>
+        {hasFixedPrice ? (
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#C2B59B' }}>
+            {money(retainer.price_usd)}/mo
+          </span>
+        ) : (
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#C2B59B',
+              fontStyle: 'italic',
+            }}
+          >
+            Custom pricing
+          </span>
+        )}
       </div>
+      {hasFixedPrice && retainer.price_awg != null && (
+        <div style={{ fontSize: 11, color: 'rgba(194,181,155,0.6)', marginTop: -2 }}>
+          {awg(retainer.price_awg)}/mo
+        </div>
+      )}
       <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
         {retainer.description}
       </div>
-      <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-        <strong style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Best for:</strong>{' '}
-        {retainer.best_for}
-      </div>
+      {retainer.price_note && !hasFixedPrice && (
+        <div
+          style={{
+            fontSize: 10.5,
+            color: 'rgba(194,181,155,0.65)',
+            marginTop: 2,
+            fontStyle: 'italic',
+          }}
+        >
+          {retainer.price_note}
+        </div>
+      )}
+      {retainer.best_for && (
+        <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+          <strong style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Best for:</strong>{' '}
+          {retainer.best_for}
+        </div>
+      )}
     </button>
   )
 }

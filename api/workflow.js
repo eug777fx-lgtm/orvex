@@ -2248,85 +2248,106 @@ async function handleSales(sql, { method, action, query, body }) {
       return { handled: true, payload: { success: true } }
     }
     if (action === 'seed_offers') {
-      // Server-side refresh of both `offers` (4 packages) and `services_catalog`
-      // (12 services). Idempotent: upserts by name, retires legacy rows by
-      // setting is_active=false. Mirrors the client-side seedOffersIfEmpty().
-      const packages = [
+      // Server-side refresh of both `offers` (6 entries: 3 packages + 3 add-ons)
+      // and `services_catalog` (6 entries) to match the official Lithos Labs
+      // pricing. Idempotent — upserts by name and retires legacy rows.
+      const offers = [
         {
-          name: 'Starter',
+          name: 'Landing Page',
           description:
-            'The Professional Launchpad — a clean, conversion-focused website built from scratch for your brand.',
-          price_min: 800,
-          price_max: 1200,
-          delivery_days: 10,
+            'A single high-converting page designed to turn visitors into leads.',
+          price_min: 500,
+          price_max: 500,
+          delivery_days: 7,
+          included: [
+            'Single-page design',
+            'Mobile responsive',
+            'Contact form',
+            'Basic SEO',
+            'Social media integration',
+            'WhatsApp button',
+            'Google Analytics',
+          ],
+        },
+        {
+          name: 'Business Website',
+          description:
+            'A full multi-page website that builds credibility and generates leads.',
+          price_min: 700,
+          price_max: 700,
+          delivery_days: 14,
           included: [
             'Up to 5 pages',
-            'Responsive design',
+            'Mobile responsive',
             'Contact form',
-            'SEO foundation',
-            'Google Analytics',
+            'Basic SEO',
+            'Social media integration',
             'WhatsApp button',
-            '1 revision round',
+            'Google Analytics',
           ],
         },
         {
-          name: 'Growth',
+          name: 'Premium Custom Website',
           description:
-            'The Business Engine — a full business website built to generate leads, take bookings, and run content marketing automatically.',
-          price_min: 1800,
-          price_max: 2800,
-          delivery_days: 18,
+            'A fully custom-built website with advanced features built for growth.',
+          price_min: 1200,
+          price_max: 1200,
+          delivery_days: 21,
           included: [
             'Up to 10 pages',
-            'Everything in Starter',
             'Custom animations',
-            'Blog & content system',
-            'Online booking system',
-            'WhatsApp automation',
-            'Google Business optimization',
-            '2 revision rounds',
+            'Full SEO setup',
+            'Blog section',
+            'Speed optimization',
+            'Google Analytics + Search Console',
           ],
         },
         {
-          name: 'Premium',
+          name: 'Booking System',
           description:
-            'The Complete Digital System — not just a website but a complete digital business system integrated with your entire operation.',
-          price_min: 3500,
-          price_max: 5500,
-          delivery_days: 30,
+            'Let customers book online with automated confirmations and reminders.',
+          price_min: 300,
+          price_max: 300,
+          delivery_days: 5,
           included: [
-            'Unlimited pages',
-            'Everything in Growth',
-            'Payment integration',
-            'Member portal',
-            'Custom business dashboard',
-            'CRM integration',
-            'Advanced automations',
-            'Dedicated onboarding session',
-            '3 revision rounds',
+            'Online booking calendar',
+            'Automated email confirmations',
+            'WhatsApp reminders',
+            'Admin booking dashboard',
           ],
         },
         {
-          name: 'Enterprise',
+          name: 'Automation System',
           description:
-            'The Full Operating System — fully custom digital infrastructure: website, CRM, AI systems, automations, all integrated and managed.',
-          price_min: 8000,
-          price_max: 25000,
-          delivery_days: 60,
+            'Business workflow automation — follow-ups, reminders, and more.',
+          price_min: 300,
+          price_max: 300,
+          delivery_days: 5,
           included: [
-            'Everything in Premium',
-            'AI voice receptionist',
-            'AI chat system',
-            'Advanced workflow automation',
-            'Custom internal tools',
-            'White-label options',
-            'Priority dedicated support',
-            'Quarterly strategy sessions',
+            'Missed call text-back',
+            'Lead follow-up sequences',
+            'Appointment reminders',
+            'Review request automation',
+          ],
+        },
+        {
+          name: 'CRM Setup & Integrations',
+          description:
+            'Complete CRM to manage leads, clients, deals, and team.',
+          price_min: 1000,
+          price_max: 1000,
+          delivery_days: 14,
+          included: [
+            'Custom CRM setup',
+            'Pipeline configuration',
+            'Automation triggers',
+            'Team access',
+            'Lead tracking',
           ],
         },
       ]
 
-      for (const p of packages) {
+      for (const p of offers) {
         const existing = firstOf(
           await sql.query('SELECT id FROM offers WHERE name = $1', [p.name]),
         )
@@ -2348,22 +2369,19 @@ async function handleSales(sql, { method, action, query, body }) {
       }
       await sql.query(
         `UPDATE offers SET is_active = false
-          WHERE name NOT IN ('Starter','Growth','Premium','Enterprise')`,
+          WHERE name NOT IN (
+            'Landing Page','Business Website','Premium Custom Website',
+            'Booking System','Automation System','CRM Setup & Integrations'
+          )`,
       )
 
       const services = [
-        ['Starter Website', 'Clean, conversion-focused 5-page website for solo entrepreneurs and trades.', 'Web Development', 800, 1200, 10],
-        ['Growth Website', 'Full business website with bookings, blog, and WhatsApp automation.', 'Web Development', 1800, 2800, 10],
-        ['Premium Website', 'Website + payment integration + CRM hooks + custom dashboard.', 'Web Development', 3500, 5500, 10],
-        ['Enterprise System', 'Fully custom website + CRM + AI systems + automations, integrated.', 'Full System', 8000, 25000, 10],
-        ['Basic CRM Setup', 'Configure existing CRM with pipelines, stages, and basic automations.', 'CRM', 800, 1500, 12],
-        ['Custom CRM Build', "Fully custom CRM application built for the client's exact workflow.", 'CRM', 2500, 8000, 12],
-        ['WhatsApp AI Management', 'AI handling all incoming WhatsApp messages intelligently 24/7.', 'AI Services', 500, 1000, 15],
-        ['AI Voice Receptionist', 'AI answers every inbound call, books appointments, handles FAQs.', 'AI Services', 800, 1500, 15],
-        ['Full Workflow Automation', 'Complete operational workflow mapped and automated end-to-end.', 'Automation', 1500, 3000, 12],
-        ['Care Retainer', 'Monthly: security updates, uptime monitoring, 1 content update, email support.', 'Monthly Retainer', 99, 99, 20],
-        ['Management Retainer', 'Monthly: CRM management, WhatsApp AI monitoring, 4 hrs changes, video support.', 'Monthly Retainer', 350, 350, 20],
-        ['Full System Retainer', 'Monthly: full system + marketing management, dedicated team, strategy calls.', 'Monthly Retainer', 950, 950, 20],
+        ['Landing Page',             'A single high-converting page designed to turn visitors into leads.', 'Web Development', 500, 500, 10],
+        ['Business Website',         'A full multi-page website that builds credibility and generates leads.', 'Web Development', 700, 700, 10],
+        ['Premium Custom Website',   'A fully custom-built website with advanced features built for growth.', 'Web Development', 1200, 1200, 10],
+        ['Booking System',           'Let customers book online with automated confirmations and reminders.', 'Add-On',          300, 300, 10],
+        ['Automation System',        'Business workflow automation — follow-ups, reminders, and more.',       'Automation',      300, 300, 15],
+        ['CRM Setup & Integrations', 'Complete CRM to manage leads, clients, deals, and team.',               'CRM',             1000, 1000, 12],
       ]
       for (const [name, description, category, pmin, pmax, rate] of services) {
         await sql.query(
@@ -2382,10 +2400,8 @@ async function handleSales(sql, { method, action, query, body }) {
       await sql.query(
         `UPDATE services_catalog SET is_active = false
           WHERE name NOT IN (
-            'Starter Website','Growth Website','Premium Website','Enterprise System',
-            'Basic CRM Setup','Custom CRM Build','WhatsApp AI Management',
-            'AI Voice Receptionist','Full Workflow Automation',
-            'Care Retainer','Management Retainer','Full System Retainer'
+            'Landing Page','Business Website','Premium Custom Website',
+            'Booking System','Automation System','CRM Setup & Integrations'
           )`,
       )
 

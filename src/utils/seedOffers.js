@@ -1,7 +1,7 @@
 import db from '@/lib/db'
 
 // Bump this string to force re-seed / upsert on next app load.
-const OFFERS_LIBRARY_VERSION = 'v3-lithos-2026'
+const OFFERS_LIBRARY_VERSION = 'v4-lithos-official-2026'
 
 const ALL_INDUSTRIES = [
   'plumber',
@@ -21,97 +21,118 @@ const ALL_INDUSTRIES = [
   'gym',
 ]
 
-// The 4 Lithos Labs packages — also defined in Documents.jsx CATALOG.packages
-// (for the estimate calculator UI). Keep these two lists in sync.
+// Official Lithos Labs offers (3 packages + 3 add-ons). Mirrors the workflow.js
+// seed_offers action and matches Documents.jsx CATALOG. Keep all three in sync.
 const SEED_OFFERS = [
   {
-    name: 'Starter',
+    name: 'Landing Page',
     description:
-      'The Professional Launchpad — a clean, conversion-focused website built from scratch for your brand.',
-    price_min: 800,
-    price_max: 1200,
+      'A single high-converting page designed to turn visitors into leads.',
+    price_min: 500,
+    price_max: 500,
     target_industries: ALL_INDUSTRIES,
     problems_solved: ['no_website'],
-    delivery_days: 10,
+    delivery_days: 7,
+    is_active: true,
+    included: [
+      'Single-page design',
+      'Mobile responsive',
+      'Contact form',
+      'Basic SEO',
+      'Social media integration',
+      'WhatsApp button',
+      'Google Analytics',
+    ],
+  },
+  {
+    name: 'Business Website',
+    description:
+      'A full multi-page website that builds credibility and generates leads.',
+    price_min: 700,
+    price_max: 700,
+    target_industries: ALL_INDUSTRIES,
+    problems_solved: ['no_website', 'poor_website'],
+    delivery_days: 14,
     is_active: true,
     included: [
       'Up to 5 pages',
-      'Responsive design',
+      'Mobile responsive',
       'Contact form',
-      'SEO foundation',
-      'Google Analytics',
+      'Basic SEO',
+      'Social media integration',
       'WhatsApp button',
-      '1 revision round',
+      'Google Analytics',
     ],
   },
   {
-    name: 'Growth',
+    name: 'Premium Custom Website',
     description:
-      'The Business Engine — a full business website built to generate leads, take bookings, and run content marketing automatically.',
-    price_min: 1800,
-    price_max: 2800,
+      'A fully custom-built website with advanced features built for growth.',
+    price_min: 1200,
+    price_max: 1200,
     target_industries: ALL_INDUSTRIES,
-    problems_solved: ['no_website', 'poor_website', 'low_reviews'],
-    delivery_days: 18,
+    problems_solved: ['no_website', 'poor_website'],
+    delivery_days: 21,
     is_active: true,
     included: [
       'Up to 10 pages',
-      'Everything in Starter',
       'Custom animations',
-      'Blog & content system',
-      'Online booking system',
-      'WhatsApp automation',
-      'Google Business optimization',
-      '2 revision rounds',
+      'Full SEO setup',
+      'Blog section',
+      'Speed optimization',
+      'Google Analytics + Search Console',
     ],
   },
   {
-    name: 'Premium',
+    name: 'Booking System',
     description:
-      'The Complete Digital System — not just a website but a complete digital business system integrated with your entire operation.',
-    price_min: 3500,
-    price_max: 5500,
+      'Let customers book online with automated confirmations and reminders.',
+    price_min: 300,
+    price_max: 300,
     target_industries: ALL_INDUSTRIES,
-    problems_solved: ['no_website', 'poor_website', 'no_crm', 'manual_processes'],
-    delivery_days: 30,
+    problems_solved: ['manual_processes'],
+    delivery_days: 5,
     is_active: true,
     included: [
-      'Unlimited pages',
-      'Everything in Growth',
-      'Payment integration',
-      'Member portal',
-      'Custom business dashboard',
-      'CRM integration',
-      'Advanced automations',
-      'Dedicated onboarding session',
-      '3 revision rounds',
+      'Online booking calendar',
+      'Automated email confirmations',
+      'WhatsApp reminders',
+      'Admin booking dashboard',
     ],
   },
   {
-    name: 'Enterprise',
+    name: 'Automation System',
     description:
-      'The Full Operating System — fully custom digital infrastructure: website, CRM, AI systems, automations, all integrated and managed.',
-    price_min: 8000,
-    price_max: 25000,
+      'Business workflow automation — follow-ups, reminders, and more.',
+    price_min: 300,
+    price_max: 300,
     target_industries: ALL_INDUSTRIES,
-    problems_solved: [
-      'no_website',
-      'poor_website',
-      'no_crm',
-      'manual_processes',
-      'low_reviews',
-    ],
-    delivery_days: 60,
+    problems_solved: ['manual_processes'],
+    delivery_days: 5,
     is_active: true,
     included: [
-      'Everything in Premium',
-      'AI voice receptionist',
-      'AI chat system',
-      'Advanced workflow automation',
-      'Custom internal tools',
-      'White-label options',
-      'Priority dedicated support',
-      'Quarterly strategy sessions',
+      'Missed call text-back',
+      'Lead follow-up sequences',
+      'Appointment reminders',
+      'Review request automation',
+    ],
+  },
+  {
+    name: 'CRM Setup & Integrations',
+    description:
+      'Complete CRM to manage leads, clients, deals, and team.',
+    price_min: 1000,
+    price_max: 1000,
+    target_industries: ALL_INDUSTRIES,
+    problems_solved: ['no_crm', 'manual_processes'],
+    delivery_days: 14,
+    is_active: true,
+    included: [
+      'Custom CRM setup',
+      'Pipeline configuration',
+      'Automation triggers',
+      'Team access',
+      'Lead tracking',
     ],
   },
 ]
@@ -162,10 +183,13 @@ async function upsertAll() {
       )
     }
   }
-  // Retire any legacy package rows that aren't in the new 4-package catalog.
+  // Retire any legacy rows that aren't in the new 6-offer catalog.
   await db.query(
     `UPDATE offers SET is_active = false
-      WHERE name NOT IN ('Starter','Growth','Premium','Enterprise')`,
+      WHERE name NOT IN (
+        'Landing Page','Business Website','Premium Custom Website',
+        'Booking System','Automation System','CRM Setup & Integrations'
+      )`,
   )
 }
 
