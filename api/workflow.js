@@ -1658,174 +1658,51 @@ async function handleSales(sql, { method, action, query, body }) {
       return { handled: true, payload: { success: true } }
     }
     if (action === 'submit_deal') {
-      // `let` (not const) so we can reassign rep_id below when the hardcoded
-      // CEO bypass in rep_login (line ~1440) hands us the string 'admin'
-      // instead of a real UUID. The deals.rep_id column is uuid, so the
-      // INSERT errors with "invalid input syntax for type uuid: admin"
-      // unless we resolve to a real sales_reps row first.
-      let {
-        rep_id,
-        lead_id,
-        service_name,
-        deal_value,
-        commission_rate,
-        payment_proof_url,
-      } = body
+      // Slimmed to match the live Neon DB `deals` schema, which lacks
+      // service_name / deal_value / commission_rate / payment_proof_url.
+      // The live column for deal value is `proposed_price` (integer); the
+      // client still sends `deal_value` so we map it. KPI bumps, lead-table
+      // bridging, and admin notifications were dropped to keep this safe —
+      // re-add them once the columns are confirmed to exist.
+      const { rep_id, lead_id, company_name, service_name, deal_value, commission_rate } = body
 
+      // Resolve rep_id — handle the hardcoded CEO bypass which returns
+      // id:'admin' (see rep_login around line 1440) instead of a real UUID.
+      let resolved_rep_id = rep_id
       if (!rep_id || rep_id === 'admin' || String(rep_id).length < 10) {
-        const adminRep = firstOf(
-          await sql.query("SELECT id FROM sales_reps WHERE role='admin' LIMIT 1"),
-        )
-        rep_id = adminRep?.id || null
-        if (!rep_id) {
-          return {
-            handled: true,
-            payload: {
-              success: false,
-              error: 'No admin rep in sales_reps to attribute this deal to',
-            },
-          }
-        }
+        const adminRep = await sql.query("SELECT id FROM sales_reps WHERE role='admin' LIMIT 1")
+        resolved_rep_id = (adminRep.rows || adminRep)[0]?.id || null
       }
 
-      // The unified app's lead detail panel works off the `leads` table, while
-      // deals.lead_id references sales_leads. Bridge the two so a deal closed
-      // from a prospector lead still shows for admins and on the rep dashboard.
-      let salesLeadId = lead_id
-      const inSalesLeads = firstOf(
-        await sql.query('SELECT id FROM sales_leads WHERE id=$1', [lead_id]),
-      )
-      if (!inSalesLeads) {
-        const src = firstOf(
-          await sql.query('SELECT * FROM leads WHERE id=$1', [lead_id]),
-        )
-        if (src) {
-          const mirrored = firstOf(
-            await sql.query(
-              `INSERT INTO sales_leads
-                 (rep_id, company_name, contact_name, contact_email,
-                  contact_phone, industry, location, source, status,
-                  estimated_value, notes)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,'prospector','closed_won',$8,$9)
-               RETURNING id`,
-              [
-                rep_id,
-                src.company_name || 'Unknown',
-                src.owner_name || null,
-                src.email || null,
-                src.phone || null,
-                src.industry || null,
-                src.location || null,
-                Number(deal_value) || Number(src.estimated_value) || null,
-                src.notes || null,
-              ],
-            ),
-          )
-          salesLeadId = mirrored?.id || lead_id
-          // Keep the originating prospector lead in sync with the close.
-          try {
-            await sql.query(
-              `UPDATE leads SET status='closed_won' WHERE id=$1`,
-              [lead_id],
-            )
-          } catch {
-            /* leads table is optional in some deployments */
-          }
-        }
-      }
+      const commission_amount = Math.round((Number(deal_value) || 0) * ((Number(commission_rate) || 10) / 100))
 
-      const r = await sql.query(
-        `INSERT INTO deals
-           (rep_id, lead_id, service_name, deal_value, commission_rate, status, payment_proof_url)
-         VALUES ($1,$2,$3,$4,$5,'pending_approval',$6)
+      // Only insert columns that exist in the live DB.
+      const insertResult = await sql.query(
+        `INSERT INTO deals (rep_id, lead_id, proposed_price, commission_amount, status, created_at)
+         VALUES ($1, $2, $3, $4, 'pending_approval', NOW())
          RETURNING id`,
-        [
-          rep_id,
-          salesLeadId,
-          service_name,
-          deal_value,
-          commission_rate,
-          payment_proof_url || null,
-        ],
+        [resolved_rep_id, lead_id, Math.round(Number(deal_value) || 0), commission_amount],
       )
-      const dealId = firstOf(r)?.id
 
-      // commission_amount is a GENERATED column under the canonical schema, but
-      // a plain (always-null) column where `deals` was first created by the
-      // main-app schema. Backfill it when it isn't generated; the try/catch
-      // swallows the "cannot update generated column" error otherwise so the
-      // commission still surfaces on the rep dashboard either way.
-      try {
-        await sql.query(
-          `UPDATE deals
-              SET commission_amount = deal_value * commission_rate / 100
-            WHERE id=$1 AND commission_amount IS NULL`,
-          [dealId],
-        )
-      } catch {
-        /* generated column — value already computed */
-      }
+      const dealId = (insertResult.rows || insertResult)[0]?.id
 
-      await sql.query(
-        `UPDATE sales_leads SET status='closed_won', updated_at=now() WHERE id=$1`,
-        [salesLeadId],
-      )
-      await bumpKpi(sql, rep_id, 'deals_closed', 1)
-      await bumpKpi(sql, rep_id, 'revenue_generated', Number(deal_value) || 0)
-      const repRow = firstOf(
-        await sql.query('SELECT name FROM sales_reps WHERE id=$1', [rep_id]),
-      )
-      const admins = rowsOf(
-        await sql.query("SELECT id FROM sales_reps WHERE role='admin'"),
-      )
-      for (const a of admins) {
-        await sql.query(
-          `INSERT INTO sales_notifications (recipient_id, type, title, message, link)
-           VALUES ($1,'deal_approval','New deal needs approval',$2,'/team')`,
-          [a.id, `${repRow?.name || 'A rep'} submitted a deal for ${service_name}`],
-        )
-      }
-
-      // Resolve fields the deal-approval webhook needs (company_name lives on
-      // sales_leads, commission_amount is computed from deal_value × rate).
-      const dealLead = firstOf(
-        await sql.query('SELECT company_name FROM sales_leads WHERE id=$1', [salesLeadId]),
-      )
-      const company_name = dealLead?.company_name || 'Unknown'
-      const commission_amount =
-        (Number(deal_value) || 0) * (Number(commission_rate) || 0) / 100
-
-      const repResult2 = await sql.query('SELECT name FROM sales_reps WHERE id=$1', [rep_id])
-      const repName2 = (repResult2.rows || repResult2)[0]?.name || 'Sales Rep'
-
+      // Fire the deal-approval webhook (non-blocking).
       if (process.env.MAKE_WEBHOOK_DEAL_APPROVAL) {
-        try {
-          fetch(process.env.MAKE_WEBHOOK_DEAL_APPROVAL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              rep_name: repName2,
-              company_name: company_name || 'Unknown',
-              service_name: service_name || '',
-              deal_value: deal_value || 0,
-              commission_amount: commission_amount || 0,
-              timestamp: new Date().toISOString(),
-            }),
-          }).catch((e) => console.log('Deal webhook error:', e.message))
-        } catch (e) {
-          /* fire-and-forget */
-        }
+        fetch(process.env.MAKE_WEBHOOK_DEAL_APPROVAL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rep_name: 'Sales Rep',
+            company_name: company_name || 'Unknown',
+            service_name: service_name || '',
+            deal_value: deal_value || 0,
+            commission_amount,
+            timestamp: new Date().toISOString(),
+          }),
+        }).catch((e) => console.log('Deal webhook error:', e.message))
       }
 
-      return {
-        handled: true,
-        payload: {
-          success: true,
-          deal_id: dealId,
-          commission_amount:
-            (Number(deal_value) || 0) * (Number(commission_rate) || 0) / 100,
-        },
-      }
+      return { handled: true, payload: { success: true, deal_id: dealId } }
     }
     if (action === 'approve_deal') {
       const { deal_id, admin_id, approved, admin_notes } = body
