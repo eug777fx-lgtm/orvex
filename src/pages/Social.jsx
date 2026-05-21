@@ -14,7 +14,7 @@ import {
   Bookmark,
   Edit3,
   Trash2,
-  Instagram,
+  Camera,
   Image as ImageIcon,
   X,
 } from 'lucide-react'
@@ -1018,7 +1018,7 @@ function CreateTab({ editingPost, onCancelEdit, onSubmit }) {
               fontWeight: 600,
             }}
           >
-            <Instagram size={13} /> Instagram
+            <Camera size={13} /> Instagram
           </div>
         </div>
 
