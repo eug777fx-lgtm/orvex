@@ -2578,6 +2578,158 @@ View dashboard: https://lithos-labs.vercel.app`
 
         return res.json({ success: true, report, date: today })
       }
+      // ---- Social media manager (admin-only) ----
+      if (action === 'get_social_posts') {
+        const result = await sql.query(`
+          SELECT * FROM social_posts
+           ORDER BY
+             CASE status
+               WHEN 'scheduled' THEN 1
+               WHEN 'draft'     THEN 2
+               WHEN 'published' THEN 3
+               ELSE 4
+             END,
+             scheduled_at ASC,
+             created_at DESC`)
+        return res.json({ success: true, posts: result.rows || result })
+      }
+
+      if (action === 'get_social_analytics') {
+        const summary = await sql.query(`
+          SELECT
+            COUNT(*) FILTER (WHERE status = 'published') AS total_published,
+            COUNT(*) FILTER (WHERE status = 'scheduled') AS total_scheduled,
+            COUNT(*) FILTER (WHERE status = 'draft')     AS total_drafts,
+            COALESCE(SUM(likes), 0)    AS total_likes,
+            COALESCE(SUM(views), 0)    AS total_views,
+            COALESCE(SUM(reach), 0)    AS total_reach,
+            COALESCE(SUM(comments), 0) AS total_comments,
+            COALESCE(SUM(saves), 0)    AS total_saves,
+            COALESCE(AVG(likes) FILTER (WHERE status = 'published'), 0) AS avg_likes,
+            COALESCE(AVG(reach) FILTER (WHERE status = 'published'), 0) AS avg_reach
+          FROM social_posts`)
+        const recent = await sql.query(`
+          SELECT * FROM social_posts
+           WHERE status = 'published'
+           ORDER BY published_at DESC
+           LIMIT 5`)
+        return res.json({
+          success: true,
+          analytics: (summary.rows || summary)[0] || {},
+          recent_posts: recent.rows || recent || [],
+        })
+      }
+
+      if (action === 'publish_due_posts') {
+        // Called by Make.com on a 15-minute cron.
+        const now = new Date().toISOString()
+        const dueResult = await sql.query(
+          `SELECT * FROM social_posts WHERE status = 'scheduled' AND scheduled_at <= $1`,
+          [now],
+        )
+        const duePosts = dueResult.rows || dueResult || []
+        const results = []
+        for (const post of duePosts) {
+          try {
+            const igUserId = process.env.INSTAGRAM_USER_ID
+            const igToken = process.env.INSTAGRAM_ACCESS_TOKEN
+            if (!igUserId || !igToken) {
+              results.push({ id: post.id, success: false, error: 'IG credentials not set' })
+              continue
+            }
+            if (!post.image_url) {
+              results.push({ id: post.id, success: false, error: 'No image URL' })
+              continue
+            }
+            // 1. Create media container
+            const containerRes = await fetch(
+              `https://graph.facebook.com/v18.0/${igUserId}/media`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  image_url: post.image_url,
+                  caption: post.caption,
+                  access_token: igToken,
+                }),
+              },
+            )
+            const container = await containerRes.json()
+            const mediaId = container.id
+            if (!mediaId) {
+              results.push({ id: post.id, success: false, error: container.error?.message || 'No media id' })
+              continue
+            }
+            // 2. Wait for media processing
+            await new Promise((r) => setTimeout(r, 5000))
+            // 3. Publish
+            const publishRes = await fetch(
+              `https://graph.facebook.com/v18.0/${igUserId}/media_publish`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ creation_id: mediaId, access_token: igToken }),
+              },
+            )
+            const published = await publishRes.json()
+            await sql.query(
+              `UPDATE social_posts
+                  SET status = 'published',
+                      published_at = NOW(),
+                      instagram_post_id = $1,
+                      updated_at = NOW()
+                WHERE id = $2`,
+              [published.id || null, post.id],
+            )
+            results.push({ id: post.id, success: true, ig_id: published.id })
+          } catch (e) {
+            results.push({ id: post.id, success: false, error: e.message })
+          }
+        }
+        return res.json({ success: true, processed: results.length, results })
+      }
+
+      if (action === 'sync_instagram_analytics') {
+        const igToken = process.env.INSTAGRAM_ACCESS_TOKEN
+        const posts = await sql.query(`
+          SELECT * FROM social_posts
+           WHERE status = 'published'
+             AND instagram_post_id IS NOT NULL
+             AND published_at > NOW() - INTERVAL '30 days'`)
+        const rows = posts.rows || posts || []
+        for (const post of rows) {
+          try {
+            const r = await fetch(
+              `https://graph.facebook.com/v18.0/${post.instagram_post_id}/insights?metric=impressions,reach,likes,comments,saved&access_token=${igToken}`,
+            )
+            const data = await r.json()
+            if (data.data) {
+              const metrics = {}
+              data.data.forEach((m) => {
+                metrics[m.name] = m.values?.[0]?.value || 0
+              })
+              await sql.query(
+                `UPDATE social_posts
+                    SET views = $1, reach = $2, likes = $3, comments = $4, saves = $5,
+                        updated_at = NOW()
+                  WHERE id = $6`,
+                [
+                  metrics.impressions || 0,
+                  metrics.reach || 0,
+                  metrics.likes || 0,
+                  metrics.comments || 0,
+                  metrics.saved || 0,
+                  post.id,
+                ],
+              )
+            }
+          } catch (e) {
+            console.log('Analytics sync error for post', post.id, e.message)
+          }
+        }
+        return res.json({ success: true, synced: rows.length })
+      }
+
       const salesGet = await handleSales(sql, {
         method: 'GET',
         action,
@@ -2594,6 +2746,44 @@ View dashboard: https://lithos-labs.vercel.app`
     if (req.method === 'POST') {
       const body = req.body || {}
       const action = body.action
+
+      // ---- Social media manager (admin-only write actions) ----
+      if (action === 'create_social_post') {
+        const { caption, image_url, scheduled_at, status } = body
+        if (!caption) return res.json({ success: false, error: 'Caption required' })
+        const result = await sql.query(
+          `INSERT INTO social_posts (caption, image_url, scheduled_at, status)
+           VALUES ($1, $2, $3, $4)
+           RETURNING *`,
+          [caption, image_url || null, scheduled_at || null, status || 'draft'],
+        )
+        return res.json({ success: true, post: (result.rows || result)[0] })
+      }
+
+      if (action === 'update_social_post') {
+        const { post_id, caption, image_url, scheduled_at, status } = body
+        if (!post_id) return res.json({ success: false, error: 'post_id required' })
+        const result = await sql.query(
+          `UPDATE social_posts
+              SET caption     = COALESCE($1, caption),
+                  image_url   = COALESCE($2, image_url),
+                  scheduled_at = $3,
+                  status      = COALESCE($4, status),
+                  updated_at  = NOW()
+            WHERE id = $5
+            RETURNING *`,
+          [caption || null, image_url || null, scheduled_at || null, status || null, post_id],
+        )
+        return res.json({ success: true, post: (result.rows || result)[0] })
+      }
+
+      if (action === 'delete_social_post') {
+        const { post_id } = body
+        if (!post_id) return res.json({ success: false, error: 'post_id required' })
+        await sql.query(`DELETE FROM social_posts WHERE id = $1 AND status != 'published'`, [post_id])
+        return res.json({ success: true })
+      }
+
       if (action === 'approve') {
         const result = await handleApprove(sql, body)
         return res.status(200).json({ success: true, ...result })

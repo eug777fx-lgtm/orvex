@@ -9,7 +9,7 @@ export async function setupMarketingDB() {
   // Roles are now: sales | manager | admin. Convert any legacy 'rep' rows.
   try { await db.query("UPDATE sales_reps SET role='sales' WHERE role='rep'") } catch(e) {}
 
-  const allTables = ['analytics','content_pipeline','schedules','agent_runs','post_packages','content','brands','brand_memory','sales_leads','sales_reps','deals','rep_tasks','lead_activities','rep_kpis','sales_notifications','services_catalog','clients','documents','automation_workflows']
+  const allTables = ['analytics','content_pipeline','schedules','agent_runs','post_packages','content','brands','brand_memory','sales_leads','sales_reps','deals','rep_tasks','lead_activities','rep_kpis','sales_notifications','services_catalog','clients','documents','automation_workflows','social_posts']
   for (const t of allTables) {
     try { await db.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`) } catch(e) {}
     try { await db.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`) } catch(e) {}
@@ -438,6 +438,27 @@ export async function setupMarketingDB() {
       booking_link TEXT,
       status TEXT DEFAULT 'requested',
       created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  // Social media manager — admin-only Instagram publishing + analytics.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS social_posts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      caption TEXT NOT NULL,
+      image_url TEXT,
+      platform VARCHAR(50) DEFAULT 'instagram',
+      status VARCHAR(50) DEFAULT 'draft',
+      scheduled_at TIMESTAMP WITH TIME ZONE,
+      published_at TIMESTAMP WITH TIME ZONE,
+      instagram_post_id VARCHAR(255),
+      likes INTEGER DEFAULT 0,
+      views INTEGER DEFAULT 0,
+      reach INTEGER DEFAULT 0,
+      comments INTEGER DEFAULT 0,
+      saves INTEGER DEFAULT 0,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )
   `)
 
