@@ -14,8 +14,6 @@ import {
   Clock,
   TrendingUp,
   Mic,
-  CheckCircle2,
-  AlertCircle,
   Copy as CopyIcon,
 } from 'lucide-react'
 import PageShell from '../components/PageShell'
@@ -90,20 +88,6 @@ const dangerBtn = {
   color: '#FF4444',
   border: '1px solid rgba(255, 68, 68, 0.4)',
 }
-
-const VOICE_OPTIONS = [
-  { id: 'eleven_turbo_v2', label: 'Professional Female' },
-  { id: '11labs-Adrian', label: 'Professional Male' },
-  { id: '11labs-Bria', label: 'Friendly Female' },
-  { id: '11labs-Cody', label: 'Friendly Male' },
-]
-
-const LANGUAGE_OPTIONS = [
-  { id: 'en-US', label: 'English' },
-  { id: 'es-ES', label: 'Spanish' },
-  { id: 'nl-NL', label: 'Dutch' },
-  { id: 'pap', label: 'Papiamento' },
-]
 
 const TABS = [
   { key: 'overview', label: 'Overview', icon: BarChart3 },
@@ -932,135 +916,83 @@ function CallRow({ log }) {
 }
 
 // ---------- Settings ----------
+const WEBHOOK_URL = 'https://app.lithoslabs.agency/api/workflow?action=retell_webhook'
+
 function SettingsTab({ showToast }) {
-  const [status, setStatus] = useState(null)
-  const [testing, setTesting] = useState(false)
-  const [tempKey, setTempKey] = useState('')
-
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const webhookUrl = `${origin}/api/workflow?action=retell_webhook`
-
-  async function checkStatus() {
-    setTesting(true)
-    try {
-      const d = await workflowApi('get_retell_status')
-      setStatus(d || null)
-      if (d?.connected) showToast(`Connected · ${d.agent_count ?? '?'} agents on Retell`)
-      else if (d?.configured) showToast(`API key set but Retell rejected it (HTTP ${d.status_code})`)
-      else showToast('RETELL_API_KEY not set on the server')
-    } catch (e) {
-      showToast('Connection check failed')
-    } finally {
-      setTesting(false)
-    }
-  }
-
-  useEffect(() => {
-    checkStatus()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   function copy(text) {
     navigator.clipboard?.writeText(text)
-    showToast('Copied to clipboard')
+    showToast('Webhook URL copied')
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
-      <div style={{ ...card, padding: 22 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 14 }}>
-          Retell connection
+    <div style={{ ...card, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>
+          Webhook URL to paste in Retell dashboard
         </h3>
-        <ConnectionRow status={status} testing={testing} onTest={checkStatus} />
-        <div
-          style={{
-            marginTop: 18,
-            padding: 14,
-            background: '#0A0A0A',
-            border: '1px solid ' + BORDER_SUBTLE,
-            borderRadius: 8,
-            fontSize: 12.5,
-            color: TEXT_MUTED,
-            lineHeight: 1.6,
-          }}
-        >
-          The Retell API key is stored as the <code style={mono}>RETELL_API_KEY</code> environment
-          variable on Vercel. To set or rotate it, open the Vercel project &rarr; Settings &rarr;
-          Environment Variables, add or update <code style={mono}>RETELL_API_KEY</code> for the
-          Production scope, and redeploy.
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <label style={labelStyle}>Paste a new key (visual only — does NOT save server-side)</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="password"
-              placeholder="sk_..."
-              value={tempKey}
-              onChange={(e) => setTempKey(e.target.value)}
-              style={inputStyle}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (tempKey) copy(tempKey)
-              }}
-              style={ghostBtn}
-            >
-              <CopyIcon size={13} /> Copy
-            </button>
-          </div>
-          <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 6 }}>
-            Use this field to safely view / copy a key before pasting it into the Vercel env-vars
-            UI. The value is not transmitted anywhere.
-          </div>
-        </div>
+        <p style={{ fontSize: 12.5, color: TEXT_MUTED, marginTop: 6, lineHeight: 1.6 }}>
+          Paste this URL in your Retell agent settings under{' '}
+          <strong style={{ color: TEXT }}>Webhook &rarr; Post Call Webhook</strong>.
+        </p>
       </div>
 
-      <div style={{ ...card, padding: 22 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 14 }}>
-          Retell webhook URL
-        </h3>
-        <p style={{ fontSize: 12.5, color: TEXT_MUTED, marginBottom: 10, lineHeight: 1.6 }}>
-          Paste this URL into the Retell dashboard &rarr; your agent &rarr; Webhooks &rarr;
-          <code style={mono}> call_ended</code> event:
-        </p>
-        <div
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+          padding: 12,
+          background: BG_INPUT,
+          border: '1px solid ' + BORDER,
+          borderRadius: 8,
+        }}
+      >
+        <code
           style={{
-            display: 'flex',
-            gap: 8,
-            alignItems: 'center',
-            padding: 10,
-            background: BG_INPUT,
-            border: '1px solid ' + BORDER,
-            borderRadius: 8,
+            flex: 1,
+            minWidth: 0,
+            fontSize: 12.5,
+            color: TEXT,
+            fontFamily: 'monospace',
+            wordBreak: 'break-all',
           }}
         >
-          <code
-            style={{
-              flex: 1,
-              minWidth: 0,
-              fontSize: 12,
-              color: TEXT,
-              fontFamily: 'monospace',
-              wordBreak: 'break-all',
-            }}
-          >
-            {webhookUrl}
-          </code>
-          <button
-            type="button"
-            onClick={() => copy(webhookUrl)}
-            style={{ ...ghostBtn, padding: '6px 10px', fontSize: 11.5 }}
-          >
-            <CopyIcon size={12} /> Copy
-          </button>
-        </div>
-        <div style={{ marginTop: 16, fontSize: 12, color: TEXT_DIM, lineHeight: 1.7 }}>
-          Retell will POST <code style={mono}>{`{event, call}`}</code> JSON payloads to this URL
-          when a call ends. The server logs the call to <code style={mono}>ai_call_logs</code>{' '}
-          and increments <code style={mono}>total_calls</code> / <code style={mono}>total_minutes</code>{' '}
-          on the linked <code style={mono}>ai_agents</code> row.
-        </div>
+          {WEBHOOK_URL}
+        </code>
+        <button
+          type="button"
+          onClick={() => copy(WEBHOOK_URL)}
+          style={{ ...primaryBtn, padding: '8px 14px', fontSize: 12.5 }}
+        >
+          <CopyIcon size={12} /> Copy
+        </button>
+      </div>
+
+      <div
+        style={{
+          padding: 14,
+          background: '#0A0A0A',
+          border: '1px solid ' + BORDER_SUBTLE,
+          borderRadius: 8,
+          fontSize: 12.5,
+          color: TEXT_MUTED,
+          lineHeight: 1.7,
+        }}
+      >
+        <strong style={{ color: TEXT }}>How it wires up</strong>
+        <ol style={{ paddingLeft: 18, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <li>Build the agent in the Retell dashboard (prompt, voice, language, etc.).</li>
+          <li>
+            Copy its <code style={mono}>agent_id</code> and paste it into{' '}
+            <strong style={{ color: TEXT }}>Agents &rarr; Add Agent</strong> here.
+          </li>
+          <li>Paste the URL above into Retell&rsquo;s Post Call Webhook field.</li>
+          <li>
+            When a call ends, Retell sends <code style={mono}>{`{event, call}`}</code> to this
+            endpoint, which logs to <code style={mono}>ai_call_logs</code> and bumps the agent&rsquo;s
+            totals.
+          </li>
+        </ol>
       </div>
     </div>
   )
@@ -1075,70 +1007,26 @@ const mono = {
   borderRadius: 4,
 }
 
-function ConnectionRow({ status, testing, onTest }) {
-  const connected = status?.connected
-  const configured = status?.configured
-  const Icon = connected ? CheckCircle2 : AlertCircle
-  const label = !configured
-    ? 'RETELL_API_KEY not set'
-    : connected
-      ? 'Connected'
-      : 'API key set but Retell rejected it'
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '8px 14px',
-          borderRadius: 999,
-          background: BG_ELEVATED,
-          border: '1px solid ' + BORDER,
-          fontSize: 12.5,
-          fontWeight: 600,
-          color: connected ? TEXT : TEXT_MUTED,
-        }}
-      >
-        <Icon size={13} style={{ color: connected ? '#FFFFFF' : '#FF4444' }} />
-        {label}
-        {connected && status?.agent_count != null && (
-          <span style={{ color: TEXT_DIM, fontWeight: 400 }}>· {status.agent_count} agents</span>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={onTest}
-        disabled={testing}
-        style={{ ...ghostBtn, padding: '8px 14px', fontSize: 12.5 }}
-      >
-        {testing && <Loader2 size={12} className="spin" />}
-        Test connection
-      </button>
-    </div>
-  )
-}
-
 // ---------- Modals ----------
 function AgentModal({ mode, agent, onClose, onSubmit }) {
   const [form, setForm] = useState({
     client_name: agent?.client_name || '',
     agent_name: agent?.agent_name || '',
-    business_name: agent?.business_name || '',
-    business_services: agent?.business_services || '',
-    business_hours: agent?.business_hours || '',
-    business_location: agent?.business_location || '',
-    business_website: agent?.business_website || '',
-    welcome_message: agent?.welcome_message || '',
-    voice_id: agent?.voice_id || 'eleven_turbo_v2',
-    language: agent?.language || 'en-US',
+    retell_agent_id: agent?.retell_agent_id || '',
     phone_number: agent?.phone_number || '',
+    business_name: agent?.business_name || '',
+    status: agent?.status || 'active',
   })
   const [submitting, setSubmitting] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
+  const canSubmit =
+    form.client_name.trim() &&
+    form.agent_name.trim() &&
+    form.retell_agent_id.trim()
+
   async function handleSubmit() {
-    if (!form.client_name.trim() || !form.agent_name.trim() || !form.business_name.trim()) return
+    if (!canSubmit) return
     setSubmitting(true)
     try {
       await onSubmit(form)
@@ -1148,7 +1036,24 @@ function AgentModal({ mode, agent, onClose, onSubmit }) {
   }
 
   return (
-    <ModalShell onClose={onClose} title={mode === 'create' ? 'Create AI Agent' : 'Edit AI Agent'}>
+    <ModalShell onClose={onClose} title={mode === 'create' ? 'Add AI Agent' : 'Edit AI Agent'}>
+      <p
+        style={{
+          fontSize: 12.5,
+          color: TEXT_MUTED,
+          lineHeight: 1.6,
+          marginBottom: 18,
+          padding: 12,
+          background: '#0A0A0A',
+          border: '1px solid ' + BORDER_SUBTLE,
+          borderRadius: 8,
+        }}
+      >
+        Create the agent in the <a href="https://app.retellai.com" target="_blank" rel="noopener noreferrer" style={{ color: TEXT, textDecoration: 'underline' }}>Retell dashboard</a> first,
+        then paste its <code style={mono}>agent_id</code> below. The webhook will use it to attach
+        incoming calls to this client.
+      </p>
+
       <div
         style={{
           display: 'grid',
@@ -1159,10 +1064,24 @@ function AgentModal({ mode, agent, onClose, onSubmit }) {
         <Field label="Client name *" full>
           <input style={inputStyle} value={form.client_name} onChange={set('client_name')} />
         </Field>
-        <Field label="Agent name (what the AI calls itself) *">
+        <Field label="Agent name *">
           <input style={inputStyle} value={form.agent_name} onChange={set('agent_name')} />
         </Field>
-        <Field label="Phone number (optional)">
+        <Field label="Status">
+          <select style={inputStyle} value={form.status} onChange={set('status')}>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </Field>
+        <Field label="Retell Agent ID *" full>
+          <input
+            style={{ ...inputStyle, fontFamily: 'monospace', fontSize: 13 }}
+            value={form.retell_agent_id}
+            onChange={set('retell_agent_id')}
+            placeholder="agent_xxxxxxxxxxxx"
+          />
+        </Field>
+        <Field label="Phone number">
           <input
             style={inputStyle}
             value={form.phone_number}
@@ -1170,56 +1089,8 @@ function AgentModal({ mode, agent, onClose, onSubmit }) {
             placeholder="+1297…"
           />
         </Field>
-        <Field label="Business name *" full>
+        <Field label="Business name">
           <input style={inputStyle} value={form.business_name} onChange={set('business_name')} />
-        </Field>
-        <Field label="Business services" full>
-          <textarea
-            style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
-            value={form.business_services}
-            onChange={set('business_services')}
-            placeholder="List the services this business offers…"
-          />
-        </Field>
-        <Field label="Business hours">
-          <input
-            style={inputStyle}
-            value={form.business_hours}
-            onChange={set('business_hours')}
-            placeholder="Mon–Fri, 8AM–5PM"
-          />
-        </Field>
-        <Field label="Business location">
-          <input style={inputStyle} value={form.business_location} onChange={set('business_location')} />
-        </Field>
-        <Field label="Business website" full>
-          <input style={inputStyle} value={form.business_website} onChange={set('business_website')} />
-        </Field>
-        <Field label="Welcome message" full>
-          <textarea
-            style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
-            value={form.welcome_message}
-            onChange={set('welcome_message')}
-            placeholder="Thank you for calling [Business]! How can I help you today?"
-          />
-        </Field>
-        <Field label="Voice">
-          <select style={inputStyle} value={form.voice_id} onChange={set('voice_id')}>
-            {VOICE_OPTIONS.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Language">
-          <select style={inputStyle} value={form.language} onChange={set('language')}>
-            {LANGUAGE_OPTIONS.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.label}
-              </option>
-            ))}
-          </select>
         </Field>
       </div>
 
@@ -1236,9 +1107,14 @@ function AgentModal({ mode, agent, onClose, onSubmit }) {
         <button type="button" onClick={onClose} style={ghostBtn} disabled={submitting}>
           Cancel
         </button>
-        <button type="button" onClick={handleSubmit} style={primaryBtn} disabled={submitting}>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          style={{ ...primaryBtn, opacity: canSubmit ? 1 : 0.5 }}
+          disabled={submitting || !canSubmit}
+        >
           {submitting && <Loader2 size={13} className="spin" />}
-          {mode === 'create' ? 'Create Agent' : 'Save Changes'}
+          {mode === 'create' ? 'Add Agent' : 'Save Changes'}
         </button>
       </div>
     </ModalShell>

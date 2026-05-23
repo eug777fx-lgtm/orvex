@@ -2685,36 +2685,6 @@ View dashboard: https://lithos-labs.vercel.app`
         })
       }
 
-      if (action === 'get_retell_status') {
-        // Cheap health-check: is the API key set, and can we hit Retell's
-        // list-agents endpoint? Used by the Settings tab.
-        const hasKey = !!process.env.RETELL_API_KEY
-        if (!hasKey) {
-          return res.json({ success: true, configured: false })
-        }
-        try {
-          const r = await fetch('https://api.retellai.com/list-agents', {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${process.env.RETELL_API_KEY}` },
-          })
-          const ok = r.ok
-          let agent_count = null
-          if (ok) {
-            const data = await r.json()
-            agent_count = Array.isArray(data) ? data.length : data?.agents?.length || null
-          }
-          return res.json({
-            success: true,
-            configured: true,
-            connected: ok,
-            status_code: r.status,
-            agent_count,
-          })
-        } catch (e) {
-          return res.json({ success: true, configured: true, connected: false, error: e.message })
-        }
-      }
-
       if (action === 'get_social_posts') {
         const result = await sql.query(`
           SELECT * FROM social_posts
@@ -2885,112 +2855,41 @@ View dashboard: https://lithos-labs.vercel.app`
 
       // ---- AI receptionist (admin-only write actions) ----
       if (action === 'create_ai_agent') {
+        // Simplified: agents are created in the Retell dashboard. Admin pastes
+        // the resulting `retell_agent_id` here so the webhook can resolve it.
         const {
           client_name,
           agent_name,
-          business_name,
-          business_services,
-          business_hours,
-          business_location,
-          business_website,
-          welcome_message,
-          voice_id,
-          language,
+          retell_agent_id,
           phone_number,
+          business_name,
+          status,
         } = body
 
-        if (!client_name || !agent_name || !business_name) {
+        if (!client_name || !agent_name || !retell_agent_id) {
           return res.json({
             success: false,
-            error: 'client_name, agent_name, business_name required',
+            error: 'client_name, agent_name, retell_agent_id required',
           })
-        }
-
-        // Build system prompt automatically from the business info.
-        const system_prompt = `You are ${agent_name}, the virtual receptionist for ${business_name}.
-
-Your job is to:
-- Answer calls professionally and warmly
-- Tell callers about the services: ${business_services || 'our services'}
-- Take down the caller's name, phone number, and what service they need
-- Let them know the team will call them back shortly to schedule
-- If it's an emergency, tell them to stay calm and someone will contact them immediately
-
-Business hours: ${business_hours || 'Monday to Friday, 8AM to 5PM'}
-Location: ${business_location || 'Contact us for our location'}
-Website: ${business_website || ''}
-
-Always be friendly, professional, and keep responses short and natural.
-When you collect caller info, confirm: "Perfect, I have your name as [name] and your number as [number]. Someone will call you back shortly."
-`
-
-        // Create the agent in Retell (best-effort; we still save locally if it
-        // fails so the admin can wire it up after configuring the API key).
-        let retell_agent_id = null
-        let retell_error = null
-        if (process.env.RETELL_API_KEY) {
-          try {
-            const retellRes = await fetch('https://api.retellai.com/v2/create-agent', {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${process.env.RETELL_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                agent_name,
-                voice_id: voice_id || 'eleven_turbo_v2',
-                language: language || 'en-US',
-                response_engine: { type: 'retell-llm', llm_id: 'gpt-4o' },
-                general_prompt: system_prompt,
-                begin_message:
-                  welcome_message ||
-                  `Thank you for calling ${business_name}! How can I help you today?`,
-              }),
-            })
-            const retellData = await retellRes.json()
-            if (retellRes.ok) {
-              retell_agent_id = retellData.agent_id || null
-            } else {
-              retell_error = retellData?.error || `HTTP ${retellRes.status}`
-            }
-          } catch (e) {
-            retell_error = e.message
-            console.log('Retell agent creation error:', e.message)
-          }
-        } else {
-          retell_error = 'RETELL_API_KEY not configured'
         }
 
         const result = await sql.query(
           `INSERT INTO ai_agents (
              client_name, agent_name, retell_agent_id, phone_number,
-             voice_id, language, system_prompt, business_name,
-             business_services, business_hours, business_location,
-             business_website, welcome_message
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+             business_name, status
+           ) VALUES ($1,$2,$3,$4,$5,$6)
            RETURNING *`,
           [
             client_name,
             agent_name,
             retell_agent_id,
             phone_number || null,
-            voice_id || 'eleven_turbo_v2',
-            language || 'en-US',
-            system_prompt,
-            business_name,
-            business_services || null,
-            business_hours || null,
-            business_location || null,
-            business_website || null,
-            welcome_message || null,
+            business_name || null,
+            status || 'active',
           ],
         )
 
-        return res.json({
-          success: true,
-          agent: (result.rows || result)[0],
-          retell_error,
-        })
+        return res.json({ success: true, agent: (result.rows || result)[0] })
       }
 
       if (action === 'update_ai_agent') {
@@ -2998,21 +2897,21 @@ When you collect caller info, confirm: "Perfect, I have your name as [name] and 
         if (!agent_id) return res.json({ success: false, error: 'agent_id required' })
         const result = await sql.query(
           `UPDATE ai_agents SET
-              client_name       = COALESCE($1, client_name),
-              agent_name        = COALESCE($2, agent_name),
-              business_services = COALESCE($3, business_services),
-              business_hours    = COALESCE($4, business_hours),
-              welcome_message   = COALESCE($5, welcome_message),
-              status            = COALESCE($6, status),
-              updated_at        = NOW()
+              client_name      = COALESCE($1, client_name),
+              agent_name       = COALESCE($2, agent_name),
+              retell_agent_id  = COALESCE($3, retell_agent_id),
+              phone_number     = COALESCE($4, phone_number),
+              business_name    = COALESCE($5, business_name),
+              status           = COALESCE($6, status),
+              updated_at       = NOW()
             WHERE id = $7
             RETURNING *`,
           [
             updates.client_name || null,
             updates.agent_name || null,
-            updates.business_services || null,
-            updates.business_hours || null,
-            updates.welcome_message || null,
+            updates.retell_agent_id || null,
+            updates.phone_number || null,
+            updates.business_name || null,
             updates.status || null,
             agent_id,
           ],
