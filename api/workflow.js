@@ -2436,6 +2436,59 @@ export default async function handler(req, res) {
   // Handled before the GET/POST split so it works with either method.
   const action = req.body?.action || req.query?.action
 
+  // Retell webhook handler — lives BEFORE the GET/POST split so it works for
+  // POST /api/workflow?action=retell_webhook (action via query string, since
+  // Retell's webhook payload is flat `{event, call, ...}` with no `action`
+  // field in the body).
+  if (action === 'retell_webhook') {
+    try {
+      const sql = await getDb()
+      const { event, call } = req.body || {}
+      if (event === 'call_ended' && call) {
+        const agentRows = await sql.query(
+          'SELECT * FROM ai_agents WHERE retell_agent_id = $1',
+          [call.agent_id],
+        )
+        const agent = (agentRows.rows || agentRows)[0]
+        if (agent) {
+          const durationSec = call.duration_ms ? Math.round(call.duration_ms / 1000) : 0
+          const durationMin = call.duration_ms ? call.duration_ms / 60000 : 0
+          await sql.query(
+            `INSERT INTO ai_call_logs (
+               agent_id, retell_call_id, caller_number, duration_seconds,
+               status, transcript, summary, started_at, ended_at
+             ) VALUES ($1,$2,$3,$4,$5,$6,$7,
+               COALESCE(to_timestamp($8 / 1000.0), NOW()),
+               COALESCE(to_timestamp($9 / 1000.0), NOW()))`,
+            [
+              agent.id,
+              call.call_id || null,
+              call.from_number || null,
+              durationSec,
+              call.call_status || null,
+              call.transcript || null,
+              call.call_analysis?.call_summary || null,
+              call.start_timestamp || null,
+              call.end_timestamp || null,
+            ],
+          )
+          await sql.query(
+            `UPDATE ai_agents
+                SET total_calls   = total_calls + 1,
+                    total_minutes = total_minutes + $1,
+                    updated_at    = NOW()
+              WHERE id = $2`,
+            [durationMin, agent.id],
+          )
+        }
+      }
+      return res.json({ success: true })
+    } catch (e) {
+      console.error('retell_webhook error:', e.message)
+      return res.json({ success: false, error: e.message })
+    }
+  }
+
   if (action === 'test_webhook') {
     const webhookType = req.query?.type || req.body?.type || 'lead'
     const webhookUrl =
@@ -2579,6 +2632,89 @@ View dashboard: https://lithos-labs.vercel.app`
         return res.json({ success: true, report, date: today })
       }
       // ---- Social media manager (admin-only) ----
+      // ---- AI receptionist (admin-only) ----
+      if (action === 'get_ai_agents') {
+        const result = await sql.query('SELECT * FROM ai_agents ORDER BY created_at DESC')
+        return res.json({ success: true, agents: result.rows || result })
+      }
+
+      if (action === 'get_call_logs') {
+        const { agent_id } = req.query || {}
+        const result = agent_id
+          ? await sql.query(
+              `SELECT cl.*, a.agent_name, a.client_name
+                 FROM ai_call_logs cl
+                 LEFT JOIN ai_agents a ON a.id = cl.agent_id
+                WHERE cl.agent_id = $1
+                ORDER BY cl.created_at DESC
+                LIMIT 200`,
+              [agent_id],
+            )
+          : await sql.query(
+              `SELECT cl.*, a.agent_name, a.client_name
+                 FROM ai_call_logs cl
+                 LEFT JOIN ai_agents a ON a.id = cl.agent_id
+                ORDER BY cl.created_at DESC
+                LIMIT 200`,
+            )
+        return res.json({ success: true, logs: result.rows || result })
+      }
+
+      if (action === 'get_ai_analytics') {
+        const summary = await sql.query(`
+          SELECT
+            COUNT(DISTINCT a.id) AS total_agents,
+            COALESCE(SUM(a.total_calls), 0)    AS total_calls,
+            COALESCE(SUM(a.total_minutes), 0)  AS total_minutes,
+            COALESCE(SUM(a.leads_captured), 0) AS total_leads,
+            COUNT(DISTINCT cl.id) FILTER (
+              WHERE cl.created_at > NOW() - INTERVAL '7 days'
+            ) AS calls_this_week
+          FROM ai_agents a
+          LEFT JOIN ai_call_logs cl ON cl.agent_id = a.id`)
+        const recent = await sql.query(`
+          SELECT cl.*, a.agent_name, a.client_name
+            FROM ai_call_logs cl
+            LEFT JOIN ai_agents a ON a.id = cl.agent_id
+           ORDER BY cl.created_at DESC
+           LIMIT 5`)
+        return res.json({
+          success: true,
+          analytics: (summary.rows || summary)[0] || {},
+          recent_calls: recent.rows || recent || [],
+        })
+      }
+
+      if (action === 'get_retell_status') {
+        // Cheap health-check: is the API key set, and can we hit Retell's
+        // list-agents endpoint? Used by the Settings tab.
+        const hasKey = !!process.env.RETELL_API_KEY
+        if (!hasKey) {
+          return res.json({ success: true, configured: false })
+        }
+        try {
+          const r = await fetch('https://api.retellai.com/list-agents', {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${process.env.RETELL_API_KEY}` },
+          })
+          const ok = r.ok
+          let agent_count = null
+          if (ok) {
+            const data = await r.json()
+            agent_count = Array.isArray(data) ? data.length : data?.agents?.length || null
+          }
+          return res.json({
+            success: true,
+            configured: true,
+            connected: ok,
+            status_code: r.status,
+            agent_count,
+          })
+        } catch (e) {
+          return res.json({ success: true, configured: true, connected: false, error: e.message })
+        }
+      }
+
       if (action === 'get_social_posts') {
         const result = await sql.query(`
           SELECT * FROM social_posts
@@ -2746,6 +2882,150 @@ View dashboard: https://lithos-labs.vercel.app`
     if (req.method === 'POST') {
       const body = req.body || {}
       const action = body.action
+
+      // ---- AI receptionist (admin-only write actions) ----
+      if (action === 'create_ai_agent') {
+        const {
+          client_name,
+          agent_name,
+          business_name,
+          business_services,
+          business_hours,
+          business_location,
+          business_website,
+          welcome_message,
+          voice_id,
+          language,
+          phone_number,
+        } = body
+
+        if (!client_name || !agent_name || !business_name) {
+          return res.json({
+            success: false,
+            error: 'client_name, agent_name, business_name required',
+          })
+        }
+
+        // Build system prompt automatically from the business info.
+        const system_prompt = `You are ${agent_name}, the virtual receptionist for ${business_name}.
+
+Your job is to:
+- Answer calls professionally and warmly
+- Tell callers about the services: ${business_services || 'our services'}
+- Take down the caller's name, phone number, and what service they need
+- Let them know the team will call them back shortly to schedule
+- If it's an emergency, tell them to stay calm and someone will contact them immediately
+
+Business hours: ${business_hours || 'Monday to Friday, 8AM to 5PM'}
+Location: ${business_location || 'Contact us for our location'}
+Website: ${business_website || ''}
+
+Always be friendly, professional, and keep responses short and natural.
+When you collect caller info, confirm: "Perfect, I have your name as [name] and your number as [number]. Someone will call you back shortly."
+`
+
+        // Create the agent in Retell (best-effort; we still save locally if it
+        // fails so the admin can wire it up after configuring the API key).
+        let retell_agent_id = null
+        let retell_error = null
+        if (process.env.RETELL_API_KEY) {
+          try {
+            const retellRes = await fetch('https://api.retellai.com/v2/create-agent', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${process.env.RETELL_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                agent_name,
+                voice_id: voice_id || 'eleven_turbo_v2',
+                language: language || 'en-US',
+                response_engine: { type: 'retell-llm', llm_id: 'gpt-4o' },
+                general_prompt: system_prompt,
+                begin_message:
+                  welcome_message ||
+                  `Thank you for calling ${business_name}! How can I help you today?`,
+              }),
+            })
+            const retellData = await retellRes.json()
+            if (retellRes.ok) {
+              retell_agent_id = retellData.agent_id || null
+            } else {
+              retell_error = retellData?.error || `HTTP ${retellRes.status}`
+            }
+          } catch (e) {
+            retell_error = e.message
+            console.log('Retell agent creation error:', e.message)
+          }
+        } else {
+          retell_error = 'RETELL_API_KEY not configured'
+        }
+
+        const result = await sql.query(
+          `INSERT INTO ai_agents (
+             client_name, agent_name, retell_agent_id, phone_number,
+             voice_id, language, system_prompt, business_name,
+             business_services, business_hours, business_location,
+             business_website, welcome_message
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+           RETURNING *`,
+          [
+            client_name,
+            agent_name,
+            retell_agent_id,
+            phone_number || null,
+            voice_id || 'eleven_turbo_v2',
+            language || 'en-US',
+            system_prompt,
+            business_name,
+            business_services || null,
+            business_hours || null,
+            business_location || null,
+            business_website || null,
+            welcome_message || null,
+          ],
+        )
+
+        return res.json({
+          success: true,
+          agent: (result.rows || result)[0],
+          retell_error,
+        })
+      }
+
+      if (action === 'update_ai_agent') {
+        const { agent_id, ...updates } = body
+        if (!agent_id) return res.json({ success: false, error: 'agent_id required' })
+        const result = await sql.query(
+          `UPDATE ai_agents SET
+              client_name       = COALESCE($1, client_name),
+              agent_name        = COALESCE($2, agent_name),
+              business_services = COALESCE($3, business_services),
+              business_hours    = COALESCE($4, business_hours),
+              welcome_message   = COALESCE($5, welcome_message),
+              status            = COALESCE($6, status),
+              updated_at        = NOW()
+            WHERE id = $7
+            RETURNING *`,
+          [
+            updates.client_name || null,
+            updates.agent_name || null,
+            updates.business_services || null,
+            updates.business_hours || null,
+            updates.welcome_message || null,
+            updates.status || null,
+            agent_id,
+          ],
+        )
+        return res.json({ success: true, agent: (result.rows || result)[0] })
+      }
+
+      if (action === 'delete_ai_agent') {
+        const { agent_id } = body
+        if (!agent_id) return res.json({ success: false, error: 'agent_id required' })
+        await sql.query('DELETE FROM ai_agents WHERE id = $1', [agent_id])
+        return res.json({ success: true })
+      }
 
       // ---- Social media manager (admin-only write actions) ----
       if (action === 'create_social_post') {

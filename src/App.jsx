@@ -24,6 +24,7 @@ import {
   Zap,
   UserCog,
   Share2,
+  Phone,
 } from 'lucide-react'
 import { migrateSchema } from './utils/migrateSchema'
 import Background from './components/Background'
@@ -43,6 +44,7 @@ import Documents from './pages/Documents'
 import Automations from './pages/Automations'
 import Team from './pages/Team'
 import Social from './pages/Social'
+import AIReceptionist from './pages/AIReceptionist'
 import AppLogin from './components/AppLogin'
 import { AuthContext } from './lib/auth'
 import useIsMobile from './utils/useIsMobile'
@@ -68,6 +70,7 @@ const navItems = [
   { path: '/team', label: 'Team', icon: UserCog, roles: ['admin', 'manager'] },
   { path: '/marketing', label: 'AI Office', icon: Sparkles, adminOnly: true },
   { path: '/social', label: 'Social Media', icon: Share2, adminOnly: true },
+  { path: '/ai-receptionist', label: 'AI Receptionist', icon: Phone, adminOnly: true },
   { path: '/demos', label: 'Demos', icon: Monitor, adminOnly: true },
   { path: '/import', label: 'Import', icon: Upload, adminOnly: true },
 ]
@@ -288,6 +291,14 @@ function AnimatedRoutes({ role }) {
           element={
             <AdminOnly role={role}>
               <Social />
+            </AdminOnly>
+          }
+        />
+        <Route
+          path="/ai-receptionist"
+          element={
+            <AdminOnly role={role}>
+              <AIReceptionist />
             </AdminOnly>
           }
         />

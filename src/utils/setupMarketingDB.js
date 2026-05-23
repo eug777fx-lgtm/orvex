@@ -9,7 +9,7 @@ export async function setupMarketingDB() {
   // Roles are now: sales | manager | admin. Convert any legacy 'rep' rows.
   try { await db.query("UPDATE sales_reps SET role='sales' WHERE role='rep'") } catch(e) {}
 
-  const allTables = ['analytics','content_pipeline','schedules','agent_runs','post_packages','content','brands','brand_memory','sales_leads','sales_reps','deals','rep_tasks','lead_activities','rep_kpis','sales_notifications','services_catalog','clients','documents','automation_workflows','social_posts']
+  const allTables = ['analytics','content_pipeline','schedules','agent_runs','post_packages','content','brands','brand_memory','sales_leads','sales_reps','deals','rep_tasks','lead_activities','rep_kpis','sales_notifications','services_catalog','clients','documents','automation_workflows','social_posts','ai_agents','ai_call_logs']
   for (const t of allTables) {
     try { await db.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`) } catch(e) {}
     try { await db.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`) } catch(e) {}
@@ -438,6 +438,53 @@ export async function setupMarketingDB() {
       booking_link TEXT,
       status TEXT DEFAULT 'requested',
       created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `)
+
+  // AI receptionist — admin-only Retell agent + call log tracking.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS ai_agents (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_name VARCHAR(255) NOT NULL,
+      agent_name VARCHAR(255) NOT NULL,
+      retell_agent_id VARCHAR(255),
+      phone_number VARCHAR(50),
+      voice_id VARCHAR(100) DEFAULT 'eleven_turbo_v2',
+      language VARCHAR(10) DEFAULT 'en-US',
+      status VARCHAR(50) DEFAULT 'active',
+      system_prompt TEXT,
+      business_name VARCHAR(255),
+      business_services TEXT,
+      business_hours VARCHAR(255),
+      business_location VARCHAR(255),
+      business_website VARCHAR(255),
+      welcome_message TEXT,
+      total_calls INTEGER DEFAULT 0,
+      total_minutes DECIMAL DEFAULT 0,
+      leads_captured INTEGER DEFAULT 0,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS ai_call_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      agent_id UUID REFERENCES ai_agents(id) ON DELETE CASCADE,
+      retell_call_id VARCHAR(255),
+      caller_number VARCHAR(50),
+      duration_seconds INTEGER DEFAULT 0,
+      status VARCHAR(50),
+      transcript TEXT,
+      summary TEXT,
+      sentiment VARCHAR(50),
+      lead_captured BOOLEAN DEFAULT false,
+      lead_name VARCHAR(255),
+      lead_phone VARCHAR(50),
+      lead_service VARCHAR(255),
+      recording_url TEXT,
+      started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      ended_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )
   `)
 
