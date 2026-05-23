@@ -2685,6 +2685,37 @@ View dashboard: https://lithos-labs.vercel.app`
         })
       }
 
+      if (action === 'get_retell_agent') {
+        // Fetch agent metadata from Retell using the pasted retell_agent_id.
+        // Used by the UI to verify the ID is valid + show voice/language info.
+        const { agent_id } = req.query || {}
+        if (!agent_id || !process.env.RETELL_API_KEY) {
+          return res.json({
+            success: false,
+            error: !agent_id
+              ? 'agent_id required'
+              : 'RETELL_API_KEY not configured',
+          })
+        }
+        try {
+          const retellRes = await fetch(
+            `https://api.retellai.com/v2/get-agent/${agent_id}`,
+            { headers: { Authorization: `Bearer ${process.env.RETELL_API_KEY}` } },
+          )
+          const data = await retellRes.json()
+          if (!retellRes.ok) {
+            return res.json({
+              success: false,
+              status: retellRes.status,
+              error: data?.error || data?.message || `HTTP ${retellRes.status}`,
+            })
+          }
+          return res.json({ success: true, agent: data })
+        } catch (e) {
+          return res.json({ success: false, error: e.message })
+        }
+      }
+
       if (action === 'get_social_posts') {
         const result = await sql.query(`
           SELECT * FROM social_posts
