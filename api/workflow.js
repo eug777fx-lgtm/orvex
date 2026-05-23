@@ -2523,17 +2523,19 @@ export default async function handler(req, res) {
       const pdfDoc = await PDFDocument.load(templateBytes)
       const pages = pdfDoc.getPages()
       const page = pages[0]
-      const { height } = page.getSize()
+      const pageHeight = page.getSize().height
 
       const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-      // Figma y-axis is from top; pdf-lib is from bottom. Accept Figma
-      // coordinates and flip internally.
+      // y is already in PDF coordinates (measured from the bottom). Callers
+      // do the Figma-to-PDF flip themselves with `pageHeight - figma_y`. This
+      // avoids the previous bug where the helper double-flipped and pushed
+      // every line item further down the page on each iteration.
       const fillField = (text, x, y, opts = {}) => {
         page.drawText(String(text || ''), {
           x,
-          y: height - y,
+          y,
           size: opts.size || 10,
           font: opts.bold ? fontBold : fontRegular,
           color: opts.color || rgb(0.05, 0.05, 0.05),
@@ -2555,37 +2557,48 @@ export default async function handler(req, res) {
           total_awg,
         } = data || {}
 
-        fillField(`#${invoice_number || 'INV-001'}`, 453, 65, {
+        // Invoice number — top right
+        fillField(`#${invoice_number || 'INV-001'}`, 453, pageHeight - 65, {
           size: 9,
           color: rgb(0.55, 0.55, 0.55),
         })
 
-        fillField(client_name || '', 52, 128, { bold: true, size: 12 })
-        fillField(client_company || '', 52, 144, { size: 9, color: rgb(0.55, 0.55, 0.55) })
-        fillField(client_email || '', 52, 157, { size: 9, color: rgb(0.55, 0.55, 0.55) })
+        // Bill to — left side
+        fillField(client_name || '', 52, pageHeight - 130, { bold: true, size: 12 })
+        fillField(client_company || '', 52, pageHeight - 148, {
+          size: 9,
+          color: rgb(0.55, 0.55, 0.55),
+        })
+        fillField(client_email || '', 52, pageHeight - 163, {
+          size: 9,
+          color: rgb(0.55, 0.55, 0.55),
+        })
 
-        fillField(invoice_date || '', 403, 128, { size: 9 })
-        fillField(due_date || '', 403, 158, { size: 9 })
+        // Dates — right side
+        fillField(invoice_date || '', 403, pageHeight - 130, { size: 9 })
+        fillField(due_date || '', 403, pageHeight - 160, { size: 9 })
 
-        let itemY = 236
+        // Line items — move DOWN by subtracting in PDF coordinates
+        let itemY = pageHeight - 240
         line_items.forEach((item) => {
           fillField(item.name || '', 62, itemY, { size: 9 })
           fillField(item.description || '', 207, itemY, {
-            size: 9,
+            size: 8,
             color: rgb(0.55, 0.55, 0.55),
-            maxWidth: 140,
+            maxWidth: 130,
           })
           fillField(`$${item.price_usd || 0}`, 440, itemY, { size: 9, bold: true })
           fillField(`Afl. ${item.price_awg || 0}`, 510, itemY, {
             size: 9,
             color: rgb(0.55, 0.55, 0.55),
           })
-          itemY += 32
+          itemY -= 32
         })
 
-        fillField(`$${subtotal_usd || total_usd || 0}`, 510, itemY + 12, { size: 8 })
-        fillField(`$${total_usd || 0} USD`, 440, itemY + 46, { bold: true, size: 13 })
-        fillField(`Afl. ${total_awg || 0}`, 440, itemY + 62, {
+        // Totals — below the line items
+        fillField(`$${subtotal_usd || total_usd || 0}`, 510, itemY - 8, { size: 8 })
+        fillField(`$${total_usd || 0} USD`, 440, itemY - 40, { bold: true, size: 12 })
+        fillField(`Afl. ${total_awg || 0}`, 440, itemY - 56, {
           size: 9,
           color: rgb(0.55, 0.55, 0.55),
         })
@@ -2604,28 +2617,37 @@ export default async function handler(req, res) {
           timeline,
         } = data || {}
 
-        fillField(proposal_date || '', 433, 63, { size: 9, color: rgb(0.55, 0.55, 0.55) })
-        fillField(client_name || '', 52, 128, { bold: true, size: 14 })
-        fillField(client_company || '', 52, 147, { size: 9, color: rgb(0.55, 0.55, 0.55) })
-        fillField(valid_until || '', 413, 128, { size: 9 })
-        fillField(project_name || '', 52, 210, { bold: true, size: 16 })
+        fillField(proposal_date || '', 433, pageHeight - 63, {
+          size: 9,
+          color: rgb(0.55, 0.55, 0.55),
+        })
+        fillField(client_name || '', 52, pageHeight - 130, { bold: true, size: 14 })
+        fillField(client_company || '', 52, pageHeight - 148, {
+          size: 9,
+          color: rgb(0.55, 0.55, 0.55),
+        })
+        fillField(valid_until || '', 413, pageHeight - 130, { size: 9 })
+        fillField(project_name || '', 52, pageHeight - 212, { bold: true, size: 14 })
 
-        let scopeY = 338
+        // Scope items
+        let scopeY = pageHeight - 346
         scope_items.forEach((item) => {
           fillField(item, 64, scopeY, { size: 9 })
-          scopeY += 20
+          scopeY -= 20
         })
 
-        fillField(`$${total_usd || 0} USD`, 52, scopeY + 58, { bold: true, size: 22 })
-        fillField(`/ Afl. ${total_awg || 0} AWG`, 222, scopeY + 52, {
+        // Investment amount
+        fillField(`$${total_usd || 0} USD`, 52, scopeY - 60, { bold: true, size: 20 })
+        fillField(`/ Afl. ${total_awg || 0} AWG`, 220, scopeY - 55, {
           size: 10,
           color: rgb(0.55, 0.55, 0.55),
         })
 
+        // Timeline
         fillField(
-          `${timeline || ''} business days from project kickoff`,
+          `${timeline || ''} business days from kickoff`,
           52,
-          scopeY + 120,
+          scopeY - 118,
           { size: 9 },
         )
       }
@@ -2650,47 +2672,54 @@ export default async function handler(req, res) {
         fillField(
           `Contract #${contract_number || 'LTH-001'}  ·  ${contract_date || ''}`,
           363,
-          60,
+          pageHeight - 60,
           { size: 8, color: rgb(0.55, 0.55, 0.55) },
         )
         fillField(
           `${client_name || ''}  ·  ${client_company || ''}  ("Client")`,
           52,
-          175,
+          pageHeight - 176,
           { bold: true, size: 10 },
         )
-        fillField(client_email || '', 52, 191, { size: 9, color: rgb(0.55, 0.55, 0.55) })
-        fillField(project_name || '', 52, 243, { bold: true, size: 13 })
+        fillField(client_email || '', 52, pageHeight - 192, {
+          size: 9,
+          color: rgb(0.55, 0.55, 0.55),
+        })
+        fillField(project_name || '', 52, pageHeight - 244, { bold: true, size: 12 })
 
-        let csY = 299
+        // Scope items
+        let cScopeY = pageHeight - 300
         scope_items.forEach((item) => {
-          fillField(item, 64, csY, { size: 9 })
-          csY += 17
+          fillField(item, 64, cScopeY, { size: 9 })
+          cScopeY -= 17
         })
 
-        const termsStartY = csY + 32
+        // Terms table
+        const termsY = cScopeY - 30
         fillField(
           `$${total_usd || 0} USD  ·  Afl. ${total_awg || 0} AWG`,
           212,
-          termsStartY,
+          termsY,
           { size: 9 },
         )
         fillField(
           payment_terms || '50% upfront, 50% on delivery',
           212,
-          termsStartY + 22,
+          termsY - 22,
           { size: 9 },
         )
-        fillField(start_date || '', 212, termsStartY + 44, { size: 9 })
-        fillField(delivery_date || '', 212, termsStartY + 66, { size: 9 })
+        fillField(start_date || '', 212, termsY - 44, { size: 9 })
+        fillField(delivery_date || '', 212, termsY - 66, { size: 9 })
         fillField(
           revision_rounds || '2 revision rounds included',
           212,
-          termsStartY + 88,
+          termsY - 88,
           { size: 9 },
         )
 
-        fillField(client_name || '', 52, termsStartY + 220, { bold: true, size: 9 })
+        // Signatures
+        fillField(client_name || '', 52, termsY - 230, { bold: true, size: 9 })
+        fillField('Eugene Muyden', 363, termsY - 230, { bold: true, size: 9 })
       }
 
       const pdfBytes = await pdfDoc.save()
