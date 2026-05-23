@@ -2489,6 +2489,338 @@ export default async function handler(req, res) {
     }
   }
 
+  // PDF generation lives inside workflow.js (instead of a separate function)
+  // to stay under the Vercel Hobby 12-function ceiling. Lazy-import pdf-lib so
+  // the module only loads when this action fires, keeping cold start fast for
+  // everything else.
+  if (action === 'generate_pdf') {
+    try {
+      const { type, data } = req.body || {}
+      const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib')
+
+      const pdfDoc = await PDFDocument.create()
+      const page = pdfDoc.addPage([595.28, 841.89])
+      const { width, height } = page.getSize()
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+      const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
+
+      const BLACK = rgb(0, 0, 0)
+      const GRAY = rgb(0.55, 0.55, 0.55)
+      const LIGHT = rgb(0.97, 0.97, 0.97)
+      const WHITE = rgb(1, 1, 1)
+      void WHITE
+
+      const drawText = (text, x, y, opts = {}) => {
+        page.drawText(String(text || ''), {
+          x,
+          y,
+          size: opts.size || 10,
+          font: opts.bold ? fontBold : fontRegular,
+          color: opts.color || BLACK,
+          maxWidth: opts.maxWidth,
+        })
+      }
+      const drawRect = (x, y, w, h, color) => {
+        page.drawRectangle({ x, y, width: w, height: h, color })
+      }
+      const drawLine = (x1, y1, x2, y2, color = rgb(0.88, 0.88, 0.88)) => {
+        page.drawLine({
+          start: { x: x1, y: y1 },
+          end: { x: x2, y: y2 },
+          thickness: 0.75,
+          color,
+        })
+      }
+
+      const M = 52
+
+      if (type === 'invoice') {
+        const {
+          client_name,
+          client_email,
+          client_company,
+          invoice_number,
+          invoice_date,
+          due_date,
+          line_items = [],
+          subtotal_usd,
+          total_usd,
+          total_awg,
+        } = data || {}
+
+        drawRect(0, height - 3, width, 3, BLACK)
+        drawText('Lithos Labs', M, height - 35, { bold: true, size: 16 })
+        drawText('lithoslabs.agency', M, height - 50, { size: 8, color: GRAY })
+        drawText('INVOICE', width - M - 92, height - 35, { bold: true, size: 22 })
+        drawText(`#${invoice_number || 'INV-001'}`, width - M - 92, height - 57, { size: 9, color: GRAY })
+
+        drawLine(M, height - 88, width - M, height - 88)
+
+        drawText('BILL TO', M, height - 110, { size: 7.5, color: GRAY })
+        drawText(client_name || '', M, height - 124, { bold: true, size: 12 })
+        drawText(client_company || '', M, height - 140, { size: 9, color: GRAY })
+        drawText(client_email || '', M, height - 153, { size: 9, color: GRAY })
+
+        drawText('DATE', width - M - 140, height - 110, { size: 7.5, color: GRAY })
+        drawText(invoice_date || '', width - M - 140, height - 124, { size: 9 })
+        drawText('DUE', width - M - 140, height - 142, { size: 7.5, color: GRAY })
+        drawText(due_date || '', width - M - 140, height - 155, { size: 9 })
+
+        drawLine(M, height - 184, width - M, height - 184)
+
+        drawRect(M, height - 218, width - M * 2, 24, LIGHT)
+        drawText('SERVICE', M + 10, height - 210, { size: 7.5, color: GRAY })
+        drawText('DESCRIPTION', M + 155, height - 210, { size: 7.5, color: GRAY })
+        drawText('USD', width - 155, height - 210, { size: 7.5, color: GRAY })
+        drawText('AWG', width - 85, height - 210, { size: 7.5, color: GRAY })
+
+        let iy = height - 248
+        line_items.forEach((item) => {
+          drawText(item.name || '', M + 10, iy, { size: 9 })
+          drawText(item.description || '', M + 155, iy, { size: 9, color: GRAY, maxWidth: 140 })
+          drawText(`$${item.price_usd || 0}`, width - 155, iy, { bold: true, size: 9 })
+          drawText(`Afl. ${item.price_awg || 0}`, width - 85, iy, { size: 9, color: GRAY })
+          drawLine(M, iy - 20, width - M, iy - 20)
+          iy -= 32
+        })
+
+        drawText('SUBTOTAL', width - M - 145, iy - 8, { size: 8, color: GRAY })
+        drawText(`$${subtotal_usd || total_usd || 0}`, width - M - 30, iy - 8, { size: 8 })
+        drawLine(width - M - 150, iy - 28, width - M, iy - 28, BLACK)
+        drawText('TOTAL', width - M - 145, iy - 42, { bold: true, size: 11 })
+        drawText(`$${total_usd || 0} USD`, width - M - 110, iy - 42, { bold: true, size: 13 })
+        drawText(`Afl. ${total_awg || 0}`, width - M - 110, iy - 58, { size: 9, color: GRAY })
+
+        drawText('PAYMENT METHODS', M, iy - 20, { size: 7.5, color: GRAY })
+        drawText('Bank Transfer  ·  Cash  ·  Sentoo  ·  Debit / Credit Card', M, iy - 35, { size: 9 })
+
+        drawLine(M, iy - 80, width - M, iy - 80)
+        drawText('NOTES', M, iy - 96, { size: 7.5, color: GRAY })
+        drawText(
+          'Payment is due within 7 days. Thank you for choosing Lithos Labs.',
+          M,
+          iy - 110,
+          { size: 9, color: GRAY, maxWidth: width - M * 2 },
+        )
+
+        drawLine(0, 18, width, 18, rgb(0.88, 0.88, 0.88))
+        drawText('lithoslabs.agency', M, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
+        drawText(`Invoice #${invoice_number || 'INV-001'}`, width - M - 100, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
+      }
+
+      if (type === 'proposal') {
+        const {
+          client_name,
+          client_company,
+          proposal_date,
+          valid_until,
+          project_name,
+          scope_items = [],
+          total_usd,
+          total_awg,
+          timeline,
+        } = data || {}
+
+        drawRect(0, height - 3, width, 3, BLACK)
+        drawText('Lithos Labs', M, height - 35, { bold: true, size: 16 })
+        drawText('lithoslabs.agency', M, height - 50, { size: 8, color: GRAY })
+        drawText('PROPOSAL', width - M - 110, height - 35, { bold: true, size: 20 })
+        drawText(proposal_date || '', width - M - 110, height - 57, { size: 9, color: GRAY })
+        drawLine(M, height - 88, width - M, height - 88)
+
+        drawText('PREPARED FOR', M, height - 108, { size: 7.5, color: GRAY })
+        drawText(client_name || '', M, height - 122, { bold: true, size: 14 })
+        drawText(client_company || '', M, height - 140, { size: 9, color: GRAY })
+        drawText('Valid Until', width - M - 130, height - 108, { size: 7.5, color: GRAY })
+        drawText(valid_until || '', width - M - 130, height - 122, { size: 9 })
+
+        drawLine(M, height - 170, width - M, height - 170)
+        drawText('PROJECT', M, height - 188, { size: 7.5, color: GRAY })
+        drawText(project_name || '', M, height - 204, { bold: true, size: 16 })
+
+        drawLine(M, height - 234, width - M, height - 234)
+        drawText('ABOUT LITHOS LABS', M, height - 252, { size: 7.5, color: GRAY })
+        drawText(
+          'Lithos Labs is a premium digital agency based in Aruba, specializing in web development,',
+          M,
+          height - 266,
+          { size: 9, color: GRAY, maxWidth: width - M * 2 },
+        )
+        drawText(
+          'business automation, AI systems, and CRM solutions for growing businesses.',
+          M,
+          height - 279,
+          { size: 9, color: GRAY, maxWidth: width - M * 2 },
+        )
+
+        drawLine(M, height - 306, width - M, height - 306)
+        drawText('SCOPE OF WORK', M, height - 324, { size: 7.5, color: GRAY })
+        let sy = height - 342
+        scope_items.forEach((item) => {
+          page.drawRectangle({ x: M, y: sy + 2, width: 3, height: 3, color: BLACK })
+          drawText(item, M + 12, sy, { size: 9 })
+          sy -= 20
+        })
+
+        drawLine(M, sy - 8, width - M, sy - 8)
+        drawText('INVESTMENT', M, sy - 26, { size: 7.5, color: GRAY })
+        drawText(`$${total_usd || 0} USD`, M, sy - 52, { bold: true, size: 22 })
+        drawText(`/ Afl. ${total_awg || 0} AWG`, M + 170, sy - 46, { size: 10, color: GRAY })
+
+        drawLine(M, sy - 82, width - M, sy - 82)
+        drawText('TIMELINE', M, sy - 100, { size: 7.5, color: GRAY })
+        drawText(
+          `${timeline || ''} business days from project kickoff and initial payment`,
+          M,
+          sy - 114,
+          { size: 9 },
+        )
+
+        drawLine(M, sy - 138, width - M, sy - 138)
+        drawText('NEXT STEPS', M, sy - 156, { size: 7.5, color: GRAY })
+        const steps = [
+          '1.  Review and approve this proposal',
+          '2.  Sign the Lithos Labs Service Agreement',
+          '3.  Submit 50% upfront payment to begin',
+          '4.  Schedule a kick-off call',
+        ]
+        let nsy = sy - 172
+        steps.forEach((s) => {
+          drawText(s, M, nsy, { size: 9 })
+          nsy -= 18
+        })
+
+        drawLine(0, 18, width, 18, rgb(0.88, 0.88, 0.88))
+        drawText('lithoslabs.agency', M, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
+        drawText('Valid for 30 days from proposal date', width - M - 200, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
+      }
+
+      if (type === 'contract') {
+        const {
+          contract_number,
+          contract_date,
+          client_name,
+          client_company,
+          client_email,
+          project_name,
+          scope_items = [],
+          total_usd,
+          total_awg,
+          payment_terms,
+          start_date,
+          delivery_date,
+          revision_rounds,
+        } = data || {}
+
+        drawRect(0, height - 3, width, 3, BLACK)
+        drawText('Lithos Labs', M, height - 35, { bold: true, size: 16 })
+        drawText('lithoslabs.agency', M, height - 50, { size: 8, color: GRAY })
+        drawText('SERVICE AGREEMENT', width - M - 180, height - 35, { bold: true, size: 16 })
+        drawText(
+          `Contract #${contract_number || 'LTH-001'}  ·  ${contract_date || ''}`,
+          width - M - 180,
+          height - 54,
+          { size: 8, color: GRAY },
+        )
+
+        drawLine(M, height - 88, width - M, height - 88)
+        drawText('BETWEEN', M, height - 106, { size: 7.5, color: GRAY })
+        drawText('Lithos Labs Digital Agency  ("Service Provider")', M, height - 120, { bold: true, size: 10 })
+        drawText('lithoslabs.agency  ·  Aruba', M, height - 134, { size: 9, color: GRAY })
+        drawText('AND', M, height - 154, { size: 7.5, color: GRAY })
+        drawText(
+          `${client_name || ''}  ·  ${client_company || ''}  ("Client")`,
+          M,
+          height - 168,
+          { bold: true, size: 10 },
+        )
+        drawText(client_email || '', M, height - 182, { size: 9, color: GRAY })
+
+        drawLine(M, height - 204, width - M, height - 204)
+        drawText('PROJECT', M, height - 222, { size: 7.5, color: GRAY })
+        drawText(project_name || '', M, height - 236, { bold: true, size: 13 })
+
+        drawLine(M, height - 260, width - M, height - 260)
+        drawText('SCOPE OF WORK', M, height - 278, { size: 7.5, color: GRAY })
+        let csY = height - 296
+        scope_items.forEach((item) => {
+          page.drawRectangle({ x: M, y: csY + 2, width: 3, height: 3, color: BLACK })
+          drawText(item, M + 12, csY, { size: 9 })
+          csY -= 17
+        })
+
+        drawLine(M, csY - 8, width - M, csY - 8)
+        const terms = [
+          ['INVESTMENT', `$${total_usd || 0} USD  ·  Afl. ${total_awg || 0} AWG`],
+          ['PAYMENT TERMS', payment_terms || '50% upfront, 50% on delivery'],
+          ['START DATE', start_date || ''],
+          ['DELIVERY DATE', delivery_date || ''],
+          ['REVISIONS', revision_rounds || '2 revision rounds included'],
+          ['PAYMENT METHODS', 'Bank Transfer  ·  Cash  ·  Sentoo  ·  Debit/Credit'],
+        ]
+        let ctY = csY - 26
+        terms.forEach(([label, val], i) => {
+          if (i % 2 === 0) drawRect(M, ctY - 4, width - M * 2, 20, LIGHT)
+          drawText(label, M + 8, ctY, { size: 7.5, color: GRAY })
+          drawText(val, M + 160, ctY, { size: 9 })
+          ctY -= 22
+        })
+
+        drawLine(M, ctY - 8, width - M, ctY - 8)
+        drawText('TERMS & CONDITIONS', M, ctY - 26, { bold: true, size: 9 })
+        const pols = [
+          ['Cancellation:', 'Projects cancelled after work begins are subject to a 50% cancellation fee.'],
+          ['Revisions:', 'Includes specified revision rounds. Additional revisions billed at $75 USD/hour.'],
+          ['Ownership:', 'Full ownership of all deliverables transfers to client upon complete payment.'],
+          ['Confidentiality:', 'Both parties agree to keep all project details and pricing confidential.'],
+          ['Delays:', 'Lithos Labs is not liable for delays due to client failure to provide materials.'],
+          ['Warranty:', '30 days of bug fixes provided after final delivery at no additional cost.'],
+        ]
+        let polY = ctY - 46
+        pols.forEach(([label, val]) => {
+          drawText(label, M, polY, { bold: true, size: 8 })
+          drawText(val, M + 100, polY, { size: 8, color: GRAY, maxWidth: width - M - 100 - M })
+          polY -= 20
+        })
+
+        drawLine(M, polY - 8, width - M, polY - 8)
+        drawText(
+          'By signing, both parties agree to the terms of this service agreement.',
+          M,
+          polY - 24,
+          { size: 8, color: GRAY, maxWidth: width - M * 2 },
+        )
+
+        const sigY = polY - 60
+        drawLine(M, sigY, M + 185, sigY, BLACK)
+        drawText('Client Signature', M, sigY - 14, { size: 8, color: GRAY })
+        drawText(client_name || '', M, sigY - 28, { bold: true, size: 9 })
+        drawText('Date: _______________________', M, sigY - 42, { size: 8, color: GRAY })
+
+        drawLine(width - M - 185, sigY, width - M, sigY, BLACK)
+        drawText('Lithos Labs', width - M - 185, sigY - 14, { size: 8, color: GRAY })
+        drawText('Eugene Muyden', width - M - 185, sigY - 28, { bold: true, size: 9 })
+        drawText('Date: _______________________', width - M - 185, sigY - 42, { size: 8, color: GRAY })
+
+        drawLine(0, 18, width, 18, rgb(0.88, 0.88, 0.88))
+        drawText('lithoslabs.agency  ·  Aruba', M, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
+        drawText(`Contract #${contract_number || 'LTH-001'}`, width - M - 120, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
+      }
+
+      const pdfBytes = await pdfDoc.save()
+      res.setHeader('Content-Type', 'application/pdf')
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=lithos-${type}-${Date.now()}.pdf`,
+      )
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      return res.send(Buffer.from(pdfBytes))
+    } catch (e) {
+      console.error('PDF generation error:', e)
+      return res.status(500).json({ error: e.message })
+    }
+  }
+
   if (action === 'test_webhook') {
     const webhookType = req.query?.type || req.body?.type || 'lead'
     const webhookUrl =

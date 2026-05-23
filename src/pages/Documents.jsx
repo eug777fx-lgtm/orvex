@@ -1262,14 +1262,16 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
     }
   }
 
-  // Trigger a browser download from a PDF blob returned by /api/generate-pdf.
+  // Trigger a browser download from a PDF blob. PDF generation lives inside
+  // /api/workflow under action=generate_pdf (single function — Vercel Hobby
+  // plan only allows 12 serverless functions, so we can't split it out).
   async function downloadPdf(type, payload) {
     setGeneratingPdf(type)
     try {
-      const res = await fetch('/api/generate-pdf', {
+      const res = await fetch('/api/workflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, data: payload }),
+        body: JSON.stringify({ action: 'generate_pdf', type, data: payload }),
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
