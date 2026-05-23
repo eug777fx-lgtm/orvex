@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "@remotion/lambda-client": "^4.0.460",
     "@remotion/motion-blur": "^4.0.460",
     "@remotion/player": "^4.0.460",
@@ -19,6 +20,7 @@
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.8.0",
     "papaparse": "^5.5.3",
+    "pdf-lib": "^1.17.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.1",

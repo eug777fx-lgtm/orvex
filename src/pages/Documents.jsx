@@ -1140,6 +1140,21 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
   const [selectedRetainer, setSelectedRetainer] = useState(null)
   const [invoice, setInvoice] = useState(null)
   const [proposal, setProposal] = useState(null)
+  const [generating, setGeneratingPdf] = useState(null) // 'invoice' | 'proposal' | 'contract' | null
+
+  // Client info — free-form inputs at top of the calculator. Pre-fill from the
+  // selected client (sidebar) when present, but allow override.
+  const [clientName, setClientName] = useState('')
+  const [clientCompany, setClientCompany] = useState('')
+  const [clientEmail, setClientEmail] = useState('')
+
+  useEffect(() => {
+    if (selected) {
+      setClientName(selected.contact_name || '')
+      setClientCompany(selected.company_name || '')
+      setClientEmail(selected.contact_email || '')
+    }
+  }, [selected])
 
   const pkg = useMemo(
     () => CATALOG.packages.find((p) => p.id === selectedPackage) || null,
@@ -1199,79 +1214,178 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
     }
   }
 
-  function generateInvoice() {
-    if (lineItems.length === 0 && retainerItems.length === 0) {
+  // Collect selected addon ids as a plain array — the underlying state is a
+  // {id:bool} map; the PDF builders below want a clean iterable.
+  function selectedAddonIds() {
+    return Object.keys(selectedAddons).filter((id) => selectedAddons[id])
+  }
+
+  function buildPdfLineItems() {
+    const items = []
+    if (selectedPackage) {
+      const p = CATALOG.packages.find((x) => x.id === selectedPackage)
+      if (p)
+        items.push({
+          name: p.name,
+          description: p.subtitle,
+          price_usd: p.price_usd,
+          price_awg: p.price_awg,
+        })
+    }
+    for (const id of selectedAddonIds()) {
+      const a = CATALOG.addons.find((x) => x.id === id)
+      if (a)
+        items.push({
+          name: a.name,
+          description: a.description,
+          price_usd: a.price_usd,
+          price_awg: a.price_awg,
+        })
+    }
+    if (selectedRetainer) {
+      const r = CATALOG.retainers.find((x) => x.id === selectedRetainer)
+      if (r)
+        items.push({
+          name: r.name + ' (Monthly Retainer)',
+          description: r.description,
+          price_usd: r.price_usd ?? 0,
+          price_awg: r.price_awg ?? 0,
+        })
+    }
+    return items
+  }
+
+  function pdfTotals(items) {
+    return {
+      total_usd: items.reduce((s, i) => s + (i.price_usd || 0), 0),
+      total_awg: items.reduce((s, i) => s + (i.price_awg || 0), 0),
+    }
+  }
+
+  // Trigger a browser download from a PDF blob returned by /api/generate-pdf.
+  async function downloadPdf(type, payload) {
+    setGeneratingPdf(type)
+    try {
+      const res = await fetch('/api/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, data: payload }),
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        showToast(`PDF generation failed${text ? ': ' + text.slice(0, 80) : ''}`)
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Lithos-Labs-${type[0].toUpperCase() + type.slice(1)}-${Date.now()}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      showToast(`${type[0].toUpperCase() + type.slice(1)} PDF downloaded`)
+    } catch (e) {
+      showToast('PDF generation failed')
+    } finally {
+      setGeneratingPdf(null)
+    }
+  }
+
+  async function generateInvoice() {
+    if (!selectedPackage && selectedAddonIds().length === 0 && !selectedRetainer) {
       showToast('Select at least one service')
       return
     }
-    const number = nextInvoiceNumber()
-    const today = new Date()
-    const due = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-    setProposal(null)
-    setInvoice({
-      number,
-      date: today.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }),
-      dueDate: due.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }),
-      client: clientInfo(),
-      items: lineItems,
-      retainers: retainerItems,
-      subtotal,
-      monthly,
+    const items = buildPdfLineItems()
+    const { total_usd, total_awg } = pdfTotals(items)
+    await downloadPdf('invoice', {
+      client_name: clientName || 'Client Name',
+      client_email: clientEmail || '',
+      client_company: clientCompany || '',
+      invoice_number: 'INV-' + Date.now().toString().slice(-6),
+      invoice_date: new Date().toLocaleDateString(),
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      line_items: items,
+      total_usd,
+      total_awg,
     })
   }
 
-  function generateProposal() {
-    if (lineItems.length === 0 && retainerItems.length === 0) {
+  async function generateProposal() {
+    if (!selectedPackage && selectedAddonIds().length === 0 && !selectedRetainer) {
       showToast('Select at least one service')
       return
     }
-    const ci = clientInfo()
-    const lines = []
-    lines.push('PROJECT PROPOSAL')
-    lines.push('')
-    lines.push(`Prepared for: ${ci.company || ci.name || 'Prospective Client'}`)
-    if (ci.name && ci.company) lines.push(`Attn: ${ci.name}`)
-    lines.push(`Date: ${new Date().toLocaleDateString()}`)
-    lines.push('')
-    lines.push('EXECUTIVE SUMMARY')
-    lines.push(
-      `Lithos Labs proposes the following digital systems engagement for ${
-        ci.company || 'your business'
-      }, designed to streamline operations and accelerate growth.`,
-    )
-    lines.push('')
-    lines.push('SCOPE & DELIVERABLES')
-    for (const it of lineItems) lines.push(`  • ${it.name} — ${money(it.price)}`)
-    lines.push('')
-    if (retainerItems.length) {
-      lines.push('ONGOING MANAGEMENT (MONTHLY)')
-      for (const r of retainerItems) lines.push(`  • ${r.name} — ${money(r.price)}/mo`)
-      lines.push('')
+    const scope_items = []
+    if (selectedPackage) {
+      const p = CATALOG.packages.find((x) => x.id === selectedPackage)
+      if (p?.includes) scope_items.push(...p.includes)
     }
-    lines.push('INVESTMENT')
-    lines.push(`  One-time total: ${money(subtotal)}`)
-    if (monthly) lines.push(`  Monthly retainer: ${money(monthly)}/mo`)
-    lines.push('')
-    lines.push('TIMELINE')
-    lines.push('  Estimated delivery: 2–4 weeks from project kickoff.')
-    lines.push('')
-    lines.push('NEXT STEPS')
-    lines.push(
-      '  Approve this proposal and we will issue an invoice and onboarding schedule to begin immediately.',
-    )
-    setInvoice(null)
-    setProposal({
-      title:
-        'Proposal — ' + (ci.company || ci.name || new Date().toLocaleDateString()),
-      content: lines.join('\n'),
+    for (const id of selectedAddonIds()) {
+      const a = CATALOG.addons.find((x) => x.id === id)
+      if (a) scope_items.push(a.name)
+    }
+    if (selectedRetainer) {
+      const r = CATALOG.retainers.find((x) => x.id === selectedRetainer)
+      if (r) scope_items.push(r.name + ' (Monthly Retainer)')
+    }
+
+    const items = buildPdfLineItems()
+    const { total_usd, total_awg } = pdfTotals(items)
+    const pkgRow = CATALOG.packages.find((x) => x.id === selectedPackage)
+
+    await downloadPdf('proposal', {
+      client_name: clientName || 'Client Name',
+      client_company: clientCompany || '',
+      proposal_date: new Date().toLocaleDateString(),
+      valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      project_name: pkgRow ? pkgRow.name + ' Package' : 'Custom Project',
+      scope_items,
+      total_usd,
+      total_awg,
+      timeline: pkgRow ? `${pkgRow.delivery_days} business days` : 'To be confirmed',
+    })
+  }
+
+  async function generateContract() {
+    if (!selectedPackage && selectedAddonIds().length === 0 && !selectedRetainer) {
+      showToast('Select at least one service')
+      return
+    }
+    const scope_items = []
+    if (selectedPackage) {
+      const p = CATALOG.packages.find((x) => x.id === selectedPackage)
+      if (p?.includes) scope_items.push(...p.includes)
+    }
+    for (const id of selectedAddonIds()) {
+      const a = CATALOG.addons.find((x) => x.id === id)
+      if (a) scope_items.push(a.name)
+    }
+    if (selectedRetainer) {
+      const r = CATALOG.retainers.find((x) => x.id === selectedRetainer)
+      if (r) scope_items.push(r.name + ' (Monthly Retainer)')
+    }
+
+    const items = buildPdfLineItems()
+    const { total_usd } = pdfTotals(items)
+    const pkgRow = CATALOG.packages.find((x) => x.id === selectedPackage)
+    const days = pkgRow?.delivery_days || 14
+
+    await downloadPdf('contract', {
+      contract_number: 'LTH-' + Date.now().toString().slice(-6),
+      contract_date: new Date().toLocaleDateString(),
+      client_name: clientName || 'Client Name',
+      client_company: clientCompany || '',
+      client_email: clientEmail || '',
+      project_name: pkgRow ? pkgRow.name + ' Package' : 'Custom Project',
+      scope_items,
+      total_usd,
+      payment_terms: '50% upfront, 50% on delivery',
+      start_date: new Date().toLocaleDateString(),
+      delivery_date: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      revision_rounds: '2 revision rounds included',
     })
   }
 
@@ -1302,6 +1416,48 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
           >
             <Calculator size={14} /> Estimate Calculator
           </h3>
+
+          {/* Client info — used in generated PDFs */}
+          <section>
+            <SectionLabel>Client info — appears on every PDF</SectionLabel>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: 10,
+                marginTop: 8,
+              }}
+            >
+              <div>
+                <label style={labelStyle}>Client name</label>
+                <input
+                  style={inputStyle}
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Company</label>
+                <input
+                  style={inputStyle}
+                  value={clientCompany}
+                  onChange={(e) => setClientCompany(e.target.value)}
+                  placeholder="Acme Inc."
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Email</label>
+                <input
+                  style={inputStyle}
+                  type="email"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  placeholder="client@example.com"
+                />
+              </div>
+            </div>
+          </section>
 
           {/* Packages */}
           <section>
@@ -1514,6 +1670,7 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
               <button
                 type="button"
                 onClick={generateInvoice}
+                disabled={generating != null}
                 style={{
                   width: '100%',
                   marginTop: 18,
@@ -1524,14 +1681,21 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                   padding: 13,
                   fontSize: 14,
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: generating ? 'wait' : 'pointer',
+                  opacity: generating && generating !== 'invoice' ? 0.5 : 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
                 }}
               >
-                Generate Estimate / Invoice
+                {generating === 'invoice' && <Loader2 size={14} className="spin" />}
+                Generate Invoice PDF
               </button>
               <button
                 type="button"
                 onClick={generateProposal}
+                disabled={generating != null}
                 style={{
                   width: '100%',
                   marginTop: 10,
@@ -1542,10 +1706,41 @@ function EstimatesTab({ selected, banking, showToast, onSaveDoc }) {
                   padding: 13,
                   fontSize: 14,
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: generating ? 'wait' : 'pointer',
+                  opacity: generating && generating !== 'proposal' ? 0.5 : 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
                 }}
               >
-                Generate Proposal
+                {generating === 'proposal' && <Loader2 size={14} className="spin" />}
+                Generate Proposal PDF
+              </button>
+              <button
+                type="button"
+                onClick={generateContract}
+                disabled={generating != null}
+                style={{
+                  width: '100%',
+                  marginTop: 10,
+                  background: 'rgba(255,255,255,0.04)',
+                  color: '#fff',
+                  border: '0.5px solid rgba(255,255,255,0.12)',
+                  borderRadius: 12,
+                  padding: 13,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: generating ? 'wait' : 'pointer',
+                  opacity: generating && generating !== 'contract' ? 0.5 : 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                {generating === 'contract' && <Loader2 size={14} className="spin" />}
+                Generate Contract PDF
               </button>
             </>
           )}
