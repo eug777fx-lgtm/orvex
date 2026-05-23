@@ -642,35 +642,42 @@ export default function Team() {
 
       <AnimatePresence>
         {deleteConfirm && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => !deleting && setDeleteConfirm(null)}
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.7)',
-                zIndex: 999,
-              }}
-            />
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !deleting && setDeleteConfirm(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100%',
+              height: '100%',
+              background: 'rgba(0,0,0,0.85)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: 20,
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
+              onClick={(e) => e.stopPropagation()}
               style={{
                 background: '#111111',
                 border: '0.5px solid rgba(255, 68, 68,0.3)',
                 borderRadius: 16,
                 padding: 32,
+                width: '90%',
                 maxWidth: 400,
-                width: 'calc(100% - 40px)',
-                position: 'fixed',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%,-50%)',
-                zIndex: 1000,
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                position: 'relative',
               }}
             >
               <div
@@ -758,7 +765,7 @@ export default function Team() {
                 </button>
               </div>
             </motion.div>
-          </>
+          </motion.div>
         )}
       </AnimatePresence>
 

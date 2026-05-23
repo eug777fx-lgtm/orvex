@@ -1271,38 +1271,48 @@ function CallLogsModal({ agent, onClose }) {
 }
 
 function ModalShell({ onClose, title, children, maxWidth = 640 }) {
+  // Single flex-centered overlay. The inner motion.div can scale/translate
+  // freely without colliding with positioning — the previous version used
+  // `transform: translate(-50%, -50%)` for centering, which framer-motion's
+  // `animate` prop overwrote with its scale+y transform, leaving the modal
+  // pinned to the top-left corner of the viewport.
   return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.8)',
-          zIndex: 400,
-        }}
-      />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: '100%',
+        background: 'rgba(0, 0, 0, 0.85)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: 20,
+      }}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96 }}
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
           background: BG_CARD,
           border: '1px solid ' + BORDER,
           borderRadius: 16,
           padding: 24,
-          width: 'calc(100% - 40px)',
+          width: '90%',
           maxWidth,
-          maxHeight: '88vh',
+          maxHeight: '90vh',
           overflowY: 'auto',
-          zIndex: 401,
+          position: 'relative',
           boxShadow: '0 24px 80px rgba(0, 0, 0, 0.9)',
         }}
       >
@@ -1319,8 +1329,8 @@ function ModalShell({ onClose, title, children, maxWidth = 640 }) {
             type="button"
             onClick={onClose}
             style={{
-              width: 28,
-              height: 28,
+              width: 32,
+              height: 32,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1329,15 +1339,16 @@ function ModalShell({ onClose, title, children, maxWidth = 640 }) {
               borderRadius: 8,
               color: TEXT_MUTED,
               cursor: 'pointer',
+              flexShrink: 0,
             }}
             aria-label="Close"
           >
-            <X size={14} />
+            <X size={16} />
           </button>
         </div>
         {children}
       </motion.div>
-    </>
+    </motion.div>
   )
 }
 

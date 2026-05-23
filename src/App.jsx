@@ -169,7 +169,9 @@ function NavTabs({ items }) {
 
 function MobileBottomNav({ items }) {
   const location = useLocation()
-  const bottomItems = items.slice(0, 6)
+  // Show ALL items — horizontal scroll so admins with 13+ tabs (Social Media,
+  // AI Receptionist, etc.) can still reach every page on mobile. The first
+  // ~5 items remain visible without scrolling; the rest are one swipe right.
   return (
     <nav
       style={{
@@ -177,47 +179,58 @@ function MobileBottomNav({ items }) {
         bottom: 0,
         left: 0,
         right: 0,
-        height: 64,
         background: 'rgba(8,8,8,0.95)',
         borderTop: '0.5px solid rgba(255,255,255,0.08)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        padding: '0 4px',
         zIndex: 90,
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        WebkitOverflowScrolling: 'touch',
       }}
     >
-      {bottomItems.map((item) => {
-        const Icon = item.icon
-        const active = item.end
-          ? location.pathname === item.path
-          : location.pathname.startsWith(item.path)
-        return (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.end}
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 3,
-              padding: '8px 0',
-              minHeight: 48,
-              color: active ? '#ffffff' : 'rgba(255,255,255,0.35)',
-              transition: 'color 0.15s ease',
-            }}
-          >
-            <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
-            <span style={{ fontSize: 10, fontWeight: 500 }}>{item.label}</span>
-          </NavLink>
-        )
-      })}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          height: 64,
+          padding: '0 4px',
+          minWidth: 'min-content',
+        }}
+      >
+        {items.map((item) => {
+          const Icon = item.icon
+          const active = item.end
+            ? location.pathname === item.path
+            : location.pathname.startsWith(item.path)
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.end}
+              style={{
+                flexShrink: 0,
+                minWidth: 72,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 3,
+                padding: '8px 4px',
+                minHeight: 48,
+                color: active ? '#ffffff' : 'rgba(255,255,255,0.35)',
+                transition: 'color 0.15s ease',
+              }}
+            >
+              <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+              <span style={{ fontSize: 10, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                {item.label}
+              </span>
+            </NavLink>
+          )
+        })}
+      </div>
     </nav>
   )
 }
