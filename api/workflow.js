@@ -2489,50 +2489,57 @@ export default async function handler(req, res) {
     }
   }
 
-  // PDF generation lives inside workflow.js (instead of a separate function)
-  // to stay under the Vercel Hobby 12-function ceiling. Lazy-import pdf-lib so
-  // the module only loads when this action fires, keeping cold start fast for
-  // everything else.
+  // PDF generation by overlaying text on Figma templates in `public/templates/`.
+  // Lives inside workflow.js to stay under the Vercel Hobby 12-function ceiling.
+  // pdf-lib is lazy-imported so cold start stays fast for every other action.
+  //
+  // Note: `public/` files are NOT bundled into Vercel serverless functions by
+  // default — they're static CDN assets. So we fetch the template over HTTP
+  // from the same deployment instead of reading from disk. Works in both
+  // `vercel dev` (serves public/ over HTTP) and production (CDN).
   if (action === 'generate_pdf') {
     try {
       const { type, data } = req.body || {}
-      const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib')
+      if (!type || !['invoice', 'proposal', 'contract'].includes(type)) {
+        return res.status(400).json({ error: 'type must be invoice|proposal|contract' })
+      }
 
-      const pdfDoc = await PDFDocument.create()
-      const page = pdfDoc.addPage([595.28, 841.89])
-      const { width, height } = page.getSize()
-      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+      const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+
+      const host = req.headers.host
+      const proto =
+        req.headers['x-forwarded-proto'] ||
+        (host && host.includes('localhost') ? 'http' : 'https')
+      const templateUrl = `${proto}://${host}/templates/${type}-template.pdf`
+
+      const templateRes = await fetch(templateUrl)
+      if (!templateRes.ok) {
+        return res.status(404).json({
+          error: `Template not found: ${templateUrl} (HTTP ${templateRes.status})`,
+        })
+      }
+      const templateBytes = new Uint8Array(await templateRes.arrayBuffer())
+
+      const pdfDoc = await PDFDocument.load(templateBytes)
+      const pages = pdfDoc.getPages()
+      const page = pages[0]
+      const { height } = page.getSize()
+
       const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-      const BLACK = rgb(0, 0, 0)
-      const GRAY = rgb(0.55, 0.55, 0.55)
-      const LIGHT = rgb(0.97, 0.97, 0.97)
-      const WHITE = rgb(1, 1, 1)
-      void WHITE
-
-      const drawText = (text, x, y, opts = {}) => {
+      // Figma y-axis is from top; pdf-lib is from bottom. Accept Figma
+      // coordinates and flip internally.
+      const fillField = (text, x, y, opts = {}) => {
         page.drawText(String(text || ''), {
           x,
-          y,
+          y: height - y,
           size: opts.size || 10,
           font: opts.bold ? fontBold : fontRegular,
-          color: opts.color || BLACK,
+          color: opts.color || rgb(0.05, 0.05, 0.05),
           maxWidth: opts.maxWidth,
         })
       }
-      const drawRect = (x, y, w, h, color) => {
-        page.drawRectangle({ x, y, width: w, height: h, color })
-      }
-      const drawLine = (x1, y1, x2, y2, color = rgb(0.88, 0.88, 0.88)) => {
-        page.drawLine({
-          start: { x: x1, y: y1 },
-          end: { x: x2, y: y2 },
-          thickness: 0.75,
-          color,
-        })
-      }
-
-      const M = 52
 
       if (type === 'invoice') {
         const {
@@ -2548,64 +2555,40 @@ export default async function handler(req, res) {
           total_awg,
         } = data || {}
 
-        drawRect(0, height - 3, width, 3, BLACK)
-        drawText('Lithos Labs', M, height - 35, { bold: true, size: 16 })
-        drawText('lithoslabs.agency', M, height - 50, { size: 8, color: GRAY })
-        drawText('INVOICE', width - M - 92, height - 35, { bold: true, size: 22 })
-        drawText(`#${invoice_number || 'INV-001'}`, width - M - 92, height - 57, { size: 9, color: GRAY })
-
-        drawLine(M, height - 88, width - M, height - 88)
-
-        drawText('BILL TO', M, height - 110, { size: 7.5, color: GRAY })
-        drawText(client_name || '', M, height - 124, { bold: true, size: 12 })
-        drawText(client_company || '', M, height - 140, { size: 9, color: GRAY })
-        drawText(client_email || '', M, height - 153, { size: 9, color: GRAY })
-
-        drawText('DATE', width - M - 140, height - 110, { size: 7.5, color: GRAY })
-        drawText(invoice_date || '', width - M - 140, height - 124, { size: 9 })
-        drawText('DUE', width - M - 140, height - 142, { size: 7.5, color: GRAY })
-        drawText(due_date || '', width - M - 140, height - 155, { size: 9 })
-
-        drawLine(M, height - 184, width - M, height - 184)
-
-        drawRect(M, height - 218, width - M * 2, 24, LIGHT)
-        drawText('SERVICE', M + 10, height - 210, { size: 7.5, color: GRAY })
-        drawText('DESCRIPTION', M + 155, height - 210, { size: 7.5, color: GRAY })
-        drawText('USD', width - 155, height - 210, { size: 7.5, color: GRAY })
-        drawText('AWG', width - 85, height - 210, { size: 7.5, color: GRAY })
-
-        let iy = height - 248
-        line_items.forEach((item) => {
-          drawText(item.name || '', M + 10, iy, { size: 9 })
-          drawText(item.description || '', M + 155, iy, { size: 9, color: GRAY, maxWidth: 140 })
-          drawText(`$${item.price_usd || 0}`, width - 155, iy, { bold: true, size: 9 })
-          drawText(`Afl. ${item.price_awg || 0}`, width - 85, iy, { size: 9, color: GRAY })
-          drawLine(M, iy - 20, width - M, iy - 20)
-          iy -= 32
+        fillField(`#${invoice_number || 'INV-001'}`, 453, 65, {
+          size: 9,
+          color: rgb(0.55, 0.55, 0.55),
         })
 
-        drawText('SUBTOTAL', width - M - 145, iy - 8, { size: 8, color: GRAY })
-        drawText(`$${subtotal_usd || total_usd || 0}`, width - M - 30, iy - 8, { size: 8 })
-        drawLine(width - M - 150, iy - 28, width - M, iy - 28, BLACK)
-        drawText('TOTAL', width - M - 145, iy - 42, { bold: true, size: 11 })
-        drawText(`$${total_usd || 0} USD`, width - M - 110, iy - 42, { bold: true, size: 13 })
-        drawText(`Afl. ${total_awg || 0}`, width - M - 110, iy - 58, { size: 9, color: GRAY })
+        fillField(client_name || '', 52, 128, { bold: true, size: 12 })
+        fillField(client_company || '', 52, 144, { size: 9, color: rgb(0.55, 0.55, 0.55) })
+        fillField(client_email || '', 52, 157, { size: 9, color: rgb(0.55, 0.55, 0.55) })
 
-        drawText('PAYMENT METHODS', M, iy - 20, { size: 7.5, color: GRAY })
-        drawText('Bank Transfer  ·  Cash  ·  Sentoo  ·  Debit / Credit Card', M, iy - 35, { size: 9 })
+        fillField(invoice_date || '', 403, 128, { size: 9 })
+        fillField(due_date || '', 403, 158, { size: 9 })
 
-        drawLine(M, iy - 80, width - M, iy - 80)
-        drawText('NOTES', M, iy - 96, { size: 7.5, color: GRAY })
-        drawText(
-          'Payment is due within 7 days. Thank you for choosing Lithos Labs.',
-          M,
-          iy - 110,
-          { size: 9, color: GRAY, maxWidth: width - M * 2 },
-        )
+        let itemY = 236
+        line_items.forEach((item) => {
+          fillField(item.name || '', 62, itemY, { size: 9 })
+          fillField(item.description || '', 207, itemY, {
+            size: 9,
+            color: rgb(0.55, 0.55, 0.55),
+            maxWidth: 140,
+          })
+          fillField(`$${item.price_usd || 0}`, 440, itemY, { size: 9, bold: true })
+          fillField(`Afl. ${item.price_awg || 0}`, 510, itemY, {
+            size: 9,
+            color: rgb(0.55, 0.55, 0.55),
+          })
+          itemY += 32
+        })
 
-        drawLine(0, 18, width, 18, rgb(0.88, 0.88, 0.88))
-        drawText('lithoslabs.agency', M, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
-        drawText(`Invoice #${invoice_number || 'INV-001'}`, width - M - 100, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
+        fillField(`$${subtotal_usd || total_usd || 0}`, 510, itemY + 12, { size: 8 })
+        fillField(`$${total_usd || 0} USD`, 440, itemY + 46, { bold: true, size: 13 })
+        fillField(`Afl. ${total_awg || 0}`, 440, itemY + 62, {
+          size: 9,
+          color: rgb(0.55, 0.55, 0.55),
+        })
       }
 
       if (type === 'proposal') {
@@ -2621,78 +2604,30 @@ export default async function handler(req, res) {
           timeline,
         } = data || {}
 
-        drawRect(0, height - 3, width, 3, BLACK)
-        drawText('Lithos Labs', M, height - 35, { bold: true, size: 16 })
-        drawText('lithoslabs.agency', M, height - 50, { size: 8, color: GRAY })
-        drawText('PROPOSAL', width - M - 110, height - 35, { bold: true, size: 20 })
-        drawText(proposal_date || '', width - M - 110, height - 57, { size: 9, color: GRAY })
-        drawLine(M, height - 88, width - M, height - 88)
+        fillField(proposal_date || '', 433, 63, { size: 9, color: rgb(0.55, 0.55, 0.55) })
+        fillField(client_name || '', 52, 128, { bold: true, size: 14 })
+        fillField(client_company || '', 52, 147, { size: 9, color: rgb(0.55, 0.55, 0.55) })
+        fillField(valid_until || '', 413, 128, { size: 9 })
+        fillField(project_name || '', 52, 210, { bold: true, size: 16 })
 
-        drawText('PREPARED FOR', M, height - 108, { size: 7.5, color: GRAY })
-        drawText(client_name || '', M, height - 122, { bold: true, size: 14 })
-        drawText(client_company || '', M, height - 140, { size: 9, color: GRAY })
-        drawText('Valid Until', width - M - 130, height - 108, { size: 7.5, color: GRAY })
-        drawText(valid_until || '', width - M - 130, height - 122, { size: 9 })
-
-        drawLine(M, height - 170, width - M, height - 170)
-        drawText('PROJECT', M, height - 188, { size: 7.5, color: GRAY })
-        drawText(project_name || '', M, height - 204, { bold: true, size: 16 })
-
-        drawLine(M, height - 234, width - M, height - 234)
-        drawText('ABOUT LITHOS LABS', M, height - 252, { size: 7.5, color: GRAY })
-        drawText(
-          'Lithos Labs is a premium digital agency based in Aruba, specializing in web development,',
-          M,
-          height - 266,
-          { size: 9, color: GRAY, maxWidth: width - M * 2 },
-        )
-        drawText(
-          'business automation, AI systems, and CRM solutions for growing businesses.',
-          M,
-          height - 279,
-          { size: 9, color: GRAY, maxWidth: width - M * 2 },
-        )
-
-        drawLine(M, height - 306, width - M, height - 306)
-        drawText('SCOPE OF WORK', M, height - 324, { size: 7.5, color: GRAY })
-        let sy = height - 342
+        let scopeY = 338
         scope_items.forEach((item) => {
-          page.drawRectangle({ x: M, y: sy + 2, width: 3, height: 3, color: BLACK })
-          drawText(item, M + 12, sy, { size: 9 })
-          sy -= 20
+          fillField(item, 64, scopeY, { size: 9 })
+          scopeY += 20
         })
 
-        drawLine(M, sy - 8, width - M, sy - 8)
-        drawText('INVESTMENT', M, sy - 26, { size: 7.5, color: GRAY })
-        drawText(`$${total_usd || 0} USD`, M, sy - 52, { bold: true, size: 22 })
-        drawText(`/ Afl. ${total_awg || 0} AWG`, M + 170, sy - 46, { size: 10, color: GRAY })
+        fillField(`$${total_usd || 0} USD`, 52, scopeY + 58, { bold: true, size: 22 })
+        fillField(`/ Afl. ${total_awg || 0} AWG`, 222, scopeY + 52, {
+          size: 10,
+          color: rgb(0.55, 0.55, 0.55),
+        })
 
-        drawLine(M, sy - 82, width - M, sy - 82)
-        drawText('TIMELINE', M, sy - 100, { size: 7.5, color: GRAY })
-        drawText(
-          `${timeline || ''} business days from project kickoff and initial payment`,
-          M,
-          sy - 114,
+        fillField(
+          `${timeline || ''} business days from project kickoff`,
+          52,
+          scopeY + 120,
           { size: 9 },
         )
-
-        drawLine(M, sy - 138, width - M, sy - 138)
-        drawText('NEXT STEPS', M, sy - 156, { size: 7.5, color: GRAY })
-        const steps = [
-          '1.  Review and approve this proposal',
-          '2.  Sign the Lithos Labs Service Agreement',
-          '3.  Submit 50% upfront payment to begin',
-          '4.  Schedule a kick-off call',
-        ]
-        let nsy = sy - 172
-        steps.forEach((s) => {
-          drawText(s, M, nsy, { size: 9 })
-          nsy -= 18
-        })
-
-        drawLine(0, 18, width, 18, rgb(0.88, 0.88, 0.88))
-        drawText('lithoslabs.agency', M, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
-        drawText('Valid for 30 days from proposal date', width - M - 200, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
       }
 
       if (type === 'contract') {
@@ -2712,99 +2647,50 @@ export default async function handler(req, res) {
           revision_rounds,
         } = data || {}
 
-        drawRect(0, height - 3, width, 3, BLACK)
-        drawText('Lithos Labs', M, height - 35, { bold: true, size: 16 })
-        drawText('lithoslabs.agency', M, height - 50, { size: 8, color: GRAY })
-        drawText('SERVICE AGREEMENT', width - M - 180, height - 35, { bold: true, size: 16 })
-        drawText(
+        fillField(
           `Contract #${contract_number || 'LTH-001'}  ·  ${contract_date || ''}`,
-          width - M - 180,
-          height - 54,
-          { size: 8, color: GRAY },
+          363,
+          60,
+          { size: 8, color: rgb(0.55, 0.55, 0.55) },
         )
-
-        drawLine(M, height - 88, width - M, height - 88)
-        drawText('BETWEEN', M, height - 106, { size: 7.5, color: GRAY })
-        drawText('Lithos Labs Digital Agency  ("Service Provider")', M, height - 120, { bold: true, size: 10 })
-        drawText('lithoslabs.agency  ·  Aruba', M, height - 134, { size: 9, color: GRAY })
-        drawText('AND', M, height - 154, { size: 7.5, color: GRAY })
-        drawText(
+        fillField(
           `${client_name || ''}  ·  ${client_company || ''}  ("Client")`,
-          M,
-          height - 168,
+          52,
+          175,
           { bold: true, size: 10 },
         )
-        drawText(client_email || '', M, height - 182, { size: 9, color: GRAY })
+        fillField(client_email || '', 52, 191, { size: 9, color: rgb(0.55, 0.55, 0.55) })
+        fillField(project_name || '', 52, 243, { bold: true, size: 13 })
 
-        drawLine(M, height - 204, width - M, height - 204)
-        drawText('PROJECT', M, height - 222, { size: 7.5, color: GRAY })
-        drawText(project_name || '', M, height - 236, { bold: true, size: 13 })
-
-        drawLine(M, height - 260, width - M, height - 260)
-        drawText('SCOPE OF WORK', M, height - 278, { size: 7.5, color: GRAY })
-        let csY = height - 296
+        let csY = 299
         scope_items.forEach((item) => {
-          page.drawRectangle({ x: M, y: csY + 2, width: 3, height: 3, color: BLACK })
-          drawText(item, M + 12, csY, { size: 9 })
-          csY -= 17
+          fillField(item, 64, csY, { size: 9 })
+          csY += 17
         })
 
-        drawLine(M, csY - 8, width - M, csY - 8)
-        const terms = [
-          ['INVESTMENT', `$${total_usd || 0} USD  ·  Afl. ${total_awg || 0} AWG`],
-          ['PAYMENT TERMS', payment_terms || '50% upfront, 50% on delivery'],
-          ['START DATE', start_date || ''],
-          ['DELIVERY DATE', delivery_date || ''],
-          ['REVISIONS', revision_rounds || '2 revision rounds included'],
-          ['PAYMENT METHODS', 'Bank Transfer  ·  Cash  ·  Sentoo  ·  Debit/Credit'],
-        ]
-        let ctY = csY - 26
-        terms.forEach(([label, val], i) => {
-          if (i % 2 === 0) drawRect(M, ctY - 4, width - M * 2, 20, LIGHT)
-          drawText(label, M + 8, ctY, { size: 7.5, color: GRAY })
-          drawText(val, M + 160, ctY, { size: 9 })
-          ctY -= 22
-        })
-
-        drawLine(M, ctY - 8, width - M, ctY - 8)
-        drawText('TERMS & CONDITIONS', M, ctY - 26, { bold: true, size: 9 })
-        const pols = [
-          ['Cancellation:', 'Projects cancelled after work begins are subject to a 50% cancellation fee.'],
-          ['Revisions:', 'Includes specified revision rounds. Additional revisions billed at $75 USD/hour.'],
-          ['Ownership:', 'Full ownership of all deliverables transfers to client upon complete payment.'],
-          ['Confidentiality:', 'Both parties agree to keep all project details and pricing confidential.'],
-          ['Delays:', 'Lithos Labs is not liable for delays due to client failure to provide materials.'],
-          ['Warranty:', '30 days of bug fixes provided after final delivery at no additional cost.'],
-        ]
-        let polY = ctY - 46
-        pols.forEach(([label, val]) => {
-          drawText(label, M, polY, { bold: true, size: 8 })
-          drawText(val, M + 100, polY, { size: 8, color: GRAY, maxWidth: width - M - 100 - M })
-          polY -= 20
-        })
-
-        drawLine(M, polY - 8, width - M, polY - 8)
-        drawText(
-          'By signing, both parties agree to the terms of this service agreement.',
-          M,
-          polY - 24,
-          { size: 8, color: GRAY, maxWidth: width - M * 2 },
+        const termsStartY = csY + 32
+        fillField(
+          `$${total_usd || 0} USD  ·  Afl. ${total_awg || 0} AWG`,
+          212,
+          termsStartY,
+          { size: 9 },
+        )
+        fillField(
+          payment_terms || '50% upfront, 50% on delivery',
+          212,
+          termsStartY + 22,
+          { size: 9 },
+        )
+        fillField(start_date || '', 212, termsStartY + 44, { size: 9 })
+        fillField(delivery_date || '', 212, termsStartY + 66, { size: 9 })
+        fillField(
+          revision_rounds || '2 revision rounds included',
+          212,
+          termsStartY + 88,
+          { size: 9 },
         )
 
-        const sigY = polY - 60
-        drawLine(M, sigY, M + 185, sigY, BLACK)
-        drawText('Client Signature', M, sigY - 14, { size: 8, color: GRAY })
-        drawText(client_name || '', M, sigY - 28, { bold: true, size: 9 })
-        drawText('Date: _______________________', M, sigY - 42, { size: 8, color: GRAY })
-
-        drawLine(width - M - 185, sigY, width - M, sigY, BLACK)
-        drawText('Lithos Labs', width - M - 185, sigY - 14, { size: 8, color: GRAY })
-        drawText('Eugene Muyden', width - M - 185, sigY - 28, { bold: true, size: 9 })
-        drawText('Date: _______________________', width - M - 185, sigY - 42, { size: 8, color: GRAY })
-
-        drawLine(0, 18, width, 18, rgb(0.88, 0.88, 0.88))
-        drawText('lithoslabs.agency  ·  Aruba', M, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
-        drawText(`Contract #${contract_number || 'LTH-001'}`, width - M - 120, 6, { size: 8, color: rgb(0.75, 0.75, 0.75) })
+        fillField(client_name || '', 52, termsStartY + 220, { bold: true, size: 9 })
       }
 
       const pdfBytes = await pdfDoc.save()
