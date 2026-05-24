@@ -2634,14 +2634,12 @@ export default async function handler(req, res) {
         itemY += 38
       })
 
-      // Subtotal + Total — aligned to match template
-      // Template has SUBTOTAL at y≈500, TOTAL at y≈540 from top
-      wipe(560, 492, 180, 14)
-      wipe(560, 536, 180, 28)
-      wipe(560, 564, 180, 16)
-      fill(`$${subtotal_usd || total_usd || 0}`, 700, 498, { size: 9, bold: true })
-      fill(`${total_usd || 0} USD`, 648, 548, { bold: true, size: 14 })
-      fill(`Afl. ${total_awg || 0}`, 648, 568, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+      // Subtotal + Total — wipe template placeholders then draw real values
+      wipe(380, 492, 215, 14)
+      wipe(380, 530, 215, 40)
+      fill(`$${subtotal_usd || total_usd || 0}`, 460, 498, { size: 9, bold: true })
+      fill(`$${total_usd || 0} USD`, 400, 542, { bold: true, size: 14 })
+      fill(`Afl. ${total_awg || 0}`, 400, 560, { size: 9, color: rgb(0.4, 0.4, 0.4) })
       }
 
       if (type === 'contract') {
