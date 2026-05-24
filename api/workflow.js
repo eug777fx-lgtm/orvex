@@ -2630,14 +2630,18 @@ export default async function handler(req, res) {
         fill(name, 52, itemY, { size: 9, bold: true })
         fill(desc, 207, itemY, { size: 8, color: rgb(0.4, 0.4, 0.4) })
         fill(`$${item.price_usd || 0}`, 420, itemY, { size: 9, bold: true })
-        fill(`Afl. ${item.price_awg || 0}`, 480, itemY, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+        fill(`Afl. ${item.price_awg || 0}`, 475, itemY, { size: 9, color: rgb(0.4, 0.4, 0.4) })
         itemY += 38
       })
 
-      const totalsY = itemY + 16
-      wipe(380, totalsY - 5, 200, 80)
-      fill(`$${total_usd || 0} USD`, 400, totalsY + 16, { bold: true, size: 13 })
-      fill(`Afl. ${total_awg || 0}`, 400, totalsY + 34, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+      // Subtotal + Total — aligned to match template
+      // Template has SUBTOTAL at y≈500, TOTAL at y≈540 from top
+      wipe(560, 492, 180, 14)
+      wipe(560, 536, 180, 28)
+      wipe(560, 564, 180, 16)
+      fill(`$${subtotal_usd || total_usd || 0}`, 700, 498, { size: 9, bold: true })
+      fill(`${total_usd || 0} USD`, 648, 548, { bold: true, size: 14 })
+      fill(`Afl. ${total_awg || 0}`, 648, 568, { size: 9, color: rgb(0.4, 0.4, 0.4) })
       }
 
       if (type === 'contract') {
