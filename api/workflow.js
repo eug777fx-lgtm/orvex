@@ -2445,6 +2445,15 @@ export default async function handler(req, res) {
       const sql = await getDb()
       const { event, call } = req.body || {}
       if (event === 'call_ended' && call) {
+        // Extract richer fields from Retell payload (sentiment, lead info,
+        // recording URL). Fields that aren't present in the payload fall
+        // through to null and are written as such.
+        const sentiment = call.call_analysis?.user_sentiment || null
+        const lead_name = call.call_analysis?.custom_analysis_data?.caller_name || null
+        const lead_phone = call.from_number || null
+        const lead_service = call.call_analysis?.custom_analysis_data?.service_interest || null
+        const recording_url = call.recording_url || null
+
         const agentRows = await sql.query(
           'SELECT * FROM ai_agents WHERE retell_agent_id = $1',
           [call.agent_id],
@@ -2456,10 +2465,12 @@ export default async function handler(req, res) {
           await sql.query(
             `INSERT INTO ai_call_logs (
                agent_id, retell_call_id, caller_number, duration_seconds,
-               status, transcript, summary, started_at, ended_at
-             ) VALUES ($1,$2,$3,$4,$5,$6,$7,
-               COALESCE(to_timestamp($8 / 1000.0), NOW()),
-               COALESCE(to_timestamp($9 / 1000.0), NOW()))`,
+               status, transcript, summary, sentiment,
+               lead_name, lead_phone, lead_service, recording_url,
+               lead_captured, started_at, ended_at
+             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+               COALESCE(to_timestamp($14 / 1000.0), NOW()),
+               COALESCE(to_timestamp($15 / 1000.0), NOW()))`,
             [
               agent.id,
               call.call_id || null,
@@ -2468,18 +2479,71 @@ export default async function handler(req, res) {
               call.call_status || null,
               call.transcript || null,
               call.call_analysis?.call_summary || null,
+              sentiment,
+              lead_name,
+              lead_phone,
+              lead_service,
+              recording_url,
+              !!(lead_name || lead_service),
               call.start_timestamp || null,
               call.end_timestamp || null,
             ],
           )
           await sql.query(
             `UPDATE ai_agents
-                SET total_calls   = total_calls + 1,
-                    total_minutes = total_minutes + $1,
-                    updated_at    = NOW()
-              WHERE id = $2`,
-            [durationMin, agent.id],
+                SET total_calls    = total_calls + 1,
+                    total_minutes  = total_minutes + $1,
+                    leads_captured = leads_captured + $2,
+                    updated_at     = NOW()
+              WHERE id = $3`,
+            [durationMin, lead_name || lead_service ? 1 : 0, agent.id],
           )
+
+          // Auto-create AWATEC HQ job ticket when Marco (the AWATEC AI
+          // receptionist) handles a call. Non-fatal — the webhook still
+          // returns success even if AWATEC HQ is down.
+          const MARCO_AGENT_ID = 'agent_62e644f7e87b21baf4f1d84144'
+          if (call.agent_id === MARCO_AGENT_ID) {
+            try {
+              const ticketPayload = {
+                title: `Call from ${call.from_number || 'Unknown'}`,
+                description: `AI Receptionist Marco handled this call.\n\nSummary: ${
+                  call.call_analysis?.call_summary || 'No summary available.'
+                }\n\nTranscript:\n${call.transcript || 'No transcript.'}`,
+                status: 'new',
+                priority: sentiment === 'negative' ? 'high' : 'normal',
+                source: 'ai_receptionist',
+                customer_phone: call.from_number || null,
+                customer_name: lead_name || null,
+                service_interest: lead_service || null,
+                call_id: call.call_id || null,
+                duration_seconds: Math.round((call.duration_ms || 0) / 1000),
+                recording_url: call.recording_url || null,
+                created_at: new Date().toISOString(),
+              }
+
+              const awatecRes = await fetch('https://awatec-hq.vercel.app/api/tickets', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-internal-key':
+                    process.env.AWATEC_INTERNAL_KEY || 'awatec_internal_2024',
+                },
+                body: JSON.stringify(ticketPayload),
+              })
+
+              if (!awatecRes.ok) {
+                console.log(
+                  'AWATEC ticket creation failed:',
+                  await awatecRes.text(),
+                )
+              } else {
+                console.log('AWATEC job ticket created for call:', call.call_id)
+              }
+            } catch (ticketErr) {
+              console.log('AWATEC ticket error (non-fatal):', ticketErr.message)
+            }
+          }
         }
       }
       return res.json({ success: true })
