@@ -2621,10 +2621,13 @@ export default async function handler(req, res) {
       wipe(50, 225, 545, 230)
       let itemY = 238
       line_items.forEach((item) => {
+        const name = (item.name || '').length > 28
+          ? (item.name || '').substring(0, 28) + '...'
+          : (item.name || '')
         const desc = (item.description || '').length > 40
           ? (item.description || '').substring(0, 40) + '...'
           : (item.description || '')
-        fill(item.name || '', 52, itemY, { size: 9, bold: true })
+        fill(name, 52, itemY, { size: 9, bold: true })
         fill(desc, 207, itemY, { size: 8, color: rgb(0.4, 0.4, 0.4) })
         fill(`$${item.price_usd || 0}`, 420, itemY, { size: 9, bold: true })
         fill(`Afl. ${item.price_awg || 0}`, 480, itemY, { size: 9, color: rgb(0.4, 0.4, 0.4) })
@@ -2633,9 +2636,8 @@ export default async function handler(req, res) {
 
       const totalsY = itemY + 16
       wipe(380, totalsY - 5, 200, 80)
-      fill(`$${subtotal_usd || total_usd || 0}`, 480, totalsY, { size: 8 })
-      fill(`$${total_usd || 0} USD`, 400, totalsY + 28, { bold: true, size: 13 })
-      fill(`Afl. ${total_awg || 0}`, 400, totalsY + 46, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+      fill(`$${total_usd || 0} USD`, 400, totalsY + 16, { bold: true, size: 13 })
+      fill(`Afl. ${total_awg || 0}`, 400, totalsY + 34, { size: 9, color: rgb(0.4, 0.4, 0.4) })
       }
 
       if (type === 'contract') {
