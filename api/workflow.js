@@ -2523,84 +2523,30 @@ export default async function handler(req, res) {
       const pdfDoc = await PDFDocument.load(templateBytes)
       const pages = pdfDoc.getPages()
       const page = pages[0]
-      const pageHeight = page.getSize().height
+      const { width, height } = page.getSize()
 
       const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-      // y is already in PDF coordinates (measured from the bottom). Callers
-      // do the Figma-to-PDF flip themselves with `pageHeight - figma_y`. This
-      // avoids the previous bug where the helper double-flipped and pushed
-      // every line item further down the page on each iteration.
-      const fillField = (text, x, y, opts = {}) => {
-        page.drawText(String(text || ''), {
+      const wipe = (x, y, w, h) => {
+        page.drawRectangle({
           x,
-          y,
+          y: height - y - h,
+          width: w,
+          height: h,
+          color: rgb(1, 1, 1),
+          opacity: 1,
+        })
+      }
+
+      const fill = (text, x, y, opts = {}) => {
+        page.drawText(String(text ?? ''), {
+          x,
+          y: height - y,
           size: opts.size || 10,
           font: opts.bold ? fontBold : fontRegular,
           color: opts.color || rgb(0.05, 0.05, 0.05),
           maxWidth: opts.maxWidth,
-        })
-      }
-
-      if (type === 'invoice') {
-        const {
-          client_name,
-          client_email,
-          client_company,
-          invoice_number,
-          invoice_date,
-          due_date,
-          line_items = [],
-          subtotal_usd,
-          total_usd,
-          total_awg,
-        } = data || {}
-
-        // Invoice number — top right
-        fillField(`#${invoice_number || 'INV-001'}`, 453, pageHeight - 65, {
-          size: 9,
-          color: rgb(0.55, 0.55, 0.55),
-        })
-
-        // Bill to — left side
-        fillField(client_name || '', 52, pageHeight - 130, { bold: true, size: 12 })
-        fillField(client_company || '', 52, pageHeight - 148, {
-          size: 9,
-          color: rgb(0.55, 0.55, 0.55),
-        })
-        fillField(client_email || '', 52, pageHeight - 163, {
-          size: 9,
-          color: rgb(0.55, 0.55, 0.55),
-        })
-
-        // Dates — right side
-        fillField(invoice_date || '', 403, pageHeight - 130, { size: 9 })
-        fillField(due_date || '', 403, pageHeight - 160, { size: 9 })
-
-        // Line items — move DOWN by subtracting in PDF coordinates
-        let itemY = pageHeight - 240
-        line_items.forEach((item) => {
-          fillField(item.name || '', 62, itemY, { size: 9 })
-          fillField(item.description || '', 207, itemY, {
-            size: 8,
-            color: rgb(0.55, 0.55, 0.55),
-            maxWidth: 130,
-          })
-          fillField(`$${item.price_usd || 0}`, 440, itemY, { size: 9, bold: true })
-          fillField(`Afl. ${item.price_awg || 0}`, 510, itemY, {
-            size: 9,
-            color: rgb(0.55, 0.55, 0.55),
-          })
-          itemY -= 32
-        })
-
-        // Totals — below the line items
-        fillField(`$${subtotal_usd || total_usd || 0}`, 510, itemY - 8, { size: 8 })
-        fillField(`$${total_usd || 0} USD`, 440, itemY - 40, { bold: true, size: 12 })
-        fillField(`Afl. ${total_awg || 0}`, 440, itemY - 56, {
-          size: 9,
-          color: rgb(0.55, 0.55, 0.55),
         })
       }
 
@@ -2617,122 +2563,120 @@ export default async function handler(req, res) {
           timeline,
         } = data || {}
 
-        fillField(proposal_date || '', 433, pageHeight - 63, {
-          size: 9,
-          color: rgb(0.55, 0.55, 0.55),
-        })
-        fillField(client_name || '', 52, pageHeight - 130, { bold: true, size: 14 })
-        fillField(client_company || '', 52, pageHeight - 148, {
-          size: 9,
-          color: rgb(0.55, 0.55, 0.55),
-        })
-        fillField(valid_until || '', 413, pageHeight - 130, { size: 9 })
-        fillField(project_name || '', 52, pageHeight - 212, { bold: true, size: 14 })
+        wipe(430, 68, 160, 18)
+        fill(proposal_date || '', 433, 72, { size: 9, color: rgb(0.4, 0.4, 0.4) })
 
-        // Scope items
-        let scopeY = pageHeight - 346
-        scope_items.forEach((item) => {
-          fillField(item, 64, scopeY, { size: 9 })
-          scopeY -= 20
-        })
+        wipe(148, 155, 260, 20)
+        wipe(148, 178, 260, 14)
+        fill(client_name || '', 148, 160, { bold: true, size: 14 })
+        fill(client_company || '', 148, 180, { size: 9, color: rgb(0.4, 0.4, 0.4) })
 
-        // Investment amount
-        fillField(`$${total_usd || 0} USD`, 52, scopeY - 60, { bold: true, size: 20 })
-        fillField(`/ Afl. ${total_awg || 0} AWG`, 220, scopeY - 55, {
-          size: 10,
-          color: rgb(0.55, 0.55, 0.55),
+        wipe(656, 155, 180, 18)
+        fill(valid_until || '', 660, 160, { size: 9 })
+
+        wipe(148, 270, 380, 22)
+        fill(project_name || '', 148, 275, { bold: true, size: 14 })
+
+        wipe(148, 455, 560, 160)
+        let scopeY = 462
+        ;(scope_items.length ? scope_items : []).forEach((item) => {
+          fill(`• ${item}`, 162, scopeY, { size: 9 })
+          scopeY += 22
         })
 
-        // Timeline
-        fillField(
-          `${timeline || ''} business days from kickoff`,
-          52,
-          scopeY - 118,
-          { size: 9 },
-        )
+        wipe(148, 680, 400, 30)
+        fill(`$${total_usd || 0} USD`, 148, 688, { bold: true, size: 20 })
+        fill(`/ Afl. ${total_awg || 0} AWG`, 310, 690, { size: 10, color: rgb(0.4, 0.4, 0.4) })
+
+        wipe(148, 798, 420, 16)
+        fill(`${timeline || ''} business days from project kickoff and initial payment`, 148, 802, { size: 9 })
+      }
+
+      if (type === 'invoice') {
+        const {
+          client_name,
+          client_email,
+          client_company,
+          invoice_number,
+          invoice_date,
+          due_date,
+          line_items = [],
+          subtotal_usd,
+          total_usd,
+          total_awg,
+        } = data || {}
+
+        wipe(430, 58, 160, 18)
+        fill(`#${invoice_number || 'INV-001'}`, 433, 64, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+
+        wipe(50, 128, 260, 50)
+        fill(client_name || '', 52, 133, { bold: true, size: 12 })
+        fill(client_company || '', 52, 150, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+        fill(client_email || '', 52, 165, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+
+        wipe(395, 128, 200, 50)
+        fill(invoice_date || '', 400, 133, { size: 9 })
+        fill(due_date || '', 400, 150, { size: 9 })
+
+        wipe(50, 230, 545, 200)
+        let itemY = 242
+        line_items.forEach((item) => {
+          fill(item.name || '', 62, itemY, { size: 9 })
+          fill(item.description || '', 207, itemY, { size: 8, color: rgb(0.4, 0.4, 0.4), maxWidth: 130 })
+          fill(`$${item.price_usd || 0}`, 440, itemY, { size: 9, bold: true })
+          fill(`Afl. ${item.price_awg || 0}`, 500, itemY, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+          itemY += 32
+        })
+
+        const totalsY = itemY + 16
+        wipe(395, totalsY, 200, 70)
+        fill(`$${subtotal_usd || total_usd || 0}`, 500, totalsY + 4, { size: 8 })
+        fill(`$${total_usd || 0} USD`, 440, totalsY + 36, { bold: true, size: 12 })
+        fill(`Afl. ${total_awg || 0}`, 440, totalsY + 52, { size: 9, color: rgb(0.4, 0.4, 0.4) })
       }
 
       if (type === 'contract') {
         const {
-          contract_number,
-          contract_date,
           client_name,
           client_company,
-          client_email,
+          contract_date,
           project_name,
-          scope_items = [],
           total_usd,
           total_awg,
-          payment_terms,
-          start_date,
-          delivery_date,
-          revision_rounds,
+          timeline,
+          payment_schedule,
         } = data || {}
 
-        fillField(
-          `Contract #${contract_number || 'LTH-001'}  ·  ${contract_date || ''}`,
-          363,
-          pageHeight - 60,
-          { size: 8, color: rgb(0.55, 0.55, 0.55) },
-        )
-        fillField(
-          `${client_name || ''}  ·  ${client_company || ''}  ("Client")`,
-          52,
-          pageHeight - 176,
-          { bold: true, size: 10 },
-        )
-        fillField(client_email || '', 52, pageHeight - 192, {
-          size: 9,
-          color: rgb(0.55, 0.55, 0.55),
-        })
-        fillField(project_name || '', 52, pageHeight - 244, { bold: true, size: 12 })
+        wipe(430, 68, 160, 18)
+        fill(contract_date || '', 433, 72, { size: 9, color: rgb(0.4, 0.4, 0.4) })
 
-        // Scope items
-        let cScopeY = pageHeight - 300
-        scope_items.forEach((item) => {
-          fillField(item, 64, cScopeY, { size: 9 })
-          cScopeY -= 17
-        })
+        wipe(148, 155, 260, 36)
+        fill(client_name || '', 148, 160, { bold: true, size: 14 })
+        fill(client_company || '', 148, 178, { size: 9, color: rgb(0.4, 0.4, 0.4) })
 
-        // Terms table
-        const termsY = cScopeY - 30
-        fillField(
-          `$${total_usd || 0} USD  ·  Afl. ${total_awg || 0} AWG`,
-          212,
-          termsY,
-          { size: 9 },
-        )
-        fillField(
-          payment_terms || '50% upfront, 50% on delivery',
-          212,
-          termsY - 22,
-          { size: 9 },
-        )
-        fillField(start_date || '', 212, termsY - 44, { size: 9 })
-        fillField(delivery_date || '', 212, termsY - 66, { size: 9 })
-        fillField(
-          revision_rounds || '2 revision rounds included',
-          212,
-          termsY - 88,
-          { size: 9 },
-        )
+        wipe(148, 270, 380, 22)
+        fill(project_name || '', 148, 275, { bold: true, size: 14 })
 
-        // Signatures
-        fillField(client_name || '', 52, termsY - 230, { bold: true, size: 9 })
-        fillField('Eugene Muyden', 363, termsY - 230, { bold: true, size: 9 })
+        wipe(148, 680, 400, 30)
+        fill(`$${total_usd || 0} USD`, 148, 688, { bold: true, size: 20 })
+        fill(`/ Afl. ${total_awg || 0} AWG`, 310, 690, { size: 10, color: rgb(0.4, 0.4, 0.4) })
+
+        wipe(148, 798, 420, 16)
+        fill(`${timeline || ''} business days from signed contract and deposit`, 148, 802, { size: 9 })
+
+        if (payment_schedule) {
+          wipe(148, 820, 420, 30)
+          fill(payment_schedule, 148, 824, { size: 9 })
+        }
       }
 
       const pdfBytes = await pdfDoc.save()
       res.setHeader('Content-Type', 'application/pdf')
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename=lithos-${type}-${Date.now()}.pdf`,
-      )
-      res.setHeader('Access-Control-Allow-Origin', '*')
-      return res.send(Buffer.from(pdfBytes))
-    } catch (e) {
-      console.error('PDF generation error:', e)
-      return res.status(500).json({ error: e.message })
+      res.setHeader('Content-Disposition', `attachment; filename="${type}-lithos-labs.pdf"`)
+      res.send(Buffer.from(pdfBytes))
+    } catch (err) {
+      console.error('PDF generation error:', err)
+      res.status(500).json({ error: err.message })
     }
   }
 
