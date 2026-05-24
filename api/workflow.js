@@ -2609,12 +2609,12 @@ export default async function handler(req, res) {
         wipe(430, 58, 160, 18)
         fill(`#${invoice_number || 'INV-001'}`, 433, 64, { size: 9, color: rgb(0.4, 0.4, 0.4) })
 
-        wipe(50, 128, 260, 50)
+        wipe(50, 120, 300, 60)
         fill(client_name || '', 52, 133, { bold: true, size: 12 })
         fill(client_company || '', 52, 150, { size: 9, color: rgb(0.4, 0.4, 0.4) })
         fill(client_email || '', 52, 165, { size: 9, color: rgb(0.4, 0.4, 0.4) })
 
-        wipe(395, 128, 200, 50)
+        wipe(395, 120, 220, 60)
         fill(invoice_date || '', 400, 133, { size: 9 })
         fill(due_date || '', 400, 150, { size: 9 })
 
@@ -2622,10 +2622,10 @@ export default async function handler(req, res) {
         let itemY = 242
         line_items.forEach((item) => {
           fill(item.name || '', 62, itemY, { size: 9 })
-          fill(item.description || '', 207, itemY, { size: 8, color: rgb(0.4, 0.4, 0.4), maxWidth: 130 })
+          fill(item.description || '', 207, itemY, { size: 8, color: rgb(0.4, 0.4, 0.4), maxWidth: 200 })
           fill(`$${item.price_usd || 0}`, 440, itemY, { size: 9, bold: true })
           fill(`Afl. ${item.price_awg || 0}`, 500, itemY, { size: 9, color: rgb(0.4, 0.4, 0.4) })
-          itemY += 32
+          itemY += 28
         })
 
         const totalsY = itemY + 16
