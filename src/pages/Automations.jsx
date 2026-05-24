@@ -1,309 +1,542 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Zap,
-  PhoneCall,
-  BellRing,
-  CheckCircle2,
-  TrendingUp,
-  PhoneMissed,
-  MessageCircle,
-  Mail,
-  CalendarClock,
-  Eye,
-  Pencil,
-  X,
+  Phone,
+  Repeat,
+  Calendar,
+  MessageSquare,
+  RefreshCw,
+  Check,
   Loader2,
+  Trash2,
+  X,
+  PhoneCall,
 } from 'lucide-react'
 import PageShell from '../components/PageShell'
+import { workflowApi } from '../lib/auth'
 
-// ---- tokens (monochrome + minimal status colors) ----
-const BG_CARD = '#111111'
-const BG_ELEVATED = '#1A1A1A'
-const BG_INPUT = '#141414'
-const BORDER = '#2A2A2A'
-const BORDER_SUBTLE = '#1A1A1A'
-const TEXT = '#FFFFFF'
-const TEXT_MUTED = '#A0A0A0'
-const TEXT_DIM = '#666666'
-
-const STATUS = {
-  LIVE: { label: 'LIVE', bg: 'rgba(34, 197, 94, 0.12)', color: '#4ADE80', border: 'rgba(34, 197, 94, 0.35)' },
-  BUILDING: { label: 'BUILDING', bg: 'rgba(245, 158, 11, 0.12)', color: '#F59E0B', border: 'rgba(245, 158, 11, 0.35)' },
-  PLANNED: { label: 'PLANNED', bg: 'rgba(120, 120, 120, 0.12)', color: '#A0A0A0', border: 'rgba(120, 120, 120, 0.35)' },
-}
+const TEMPLATES = [
+  {
+    type: 'lead_capture',
+    name: 'Lead Capture → CRM',
+    icon: Zap,
+    desc: 'Form submitted → CRM saved → Rep notified → Welcome email sent',
+    flow: ['Form', 'CRM', 'Email', 'Rep'],
+    fields: [
+      { key: 'webhook_url', label: 'Webhook URL' },
+      { key: 'notify_email', label: 'Email to notify' },
+      { key: 'assign_rep', label: 'Rep to assign' },
+    ],
+  },
+  {
+    type: 'missed_call',
+    name: 'Missed Call Text-Back',
+    icon: Phone,
+    desc: 'Missed call → Instant WhatsApp → Qualify lead → Book appointment',
+    flow: ['Missed call', 'WhatsApp', 'Qualify', 'Book'],
+    fields: [
+      { key: 'business_phone', label: 'Business phone number' },
+      { key: 'whatsapp_number', label: 'WhatsApp number' },
+    ],
+  },
+  {
+    type: 'follow_up',
+    name: 'Follow-Up Sequence',
+    icon: Repeat,
+    desc: 'New lead → Day 1 → Day 3 → Day 7 → Day 30 reactivation',
+    flow: ['Day 1', 'Day 3', 'Day 7', 'Day 30'],
+    fields: [
+      { key: 'lead_source', label: 'Lead source' },
+      { key: 'email_template', label: 'Email template' },
+    ],
+  },
+  {
+    type: 'appointment_reminder',
+    name: 'Appointment Reminder',
+    icon: Calendar,
+    desc: '24h before → WhatsApp reminder → Confirm attendance',
+    flow: ['24h before', 'Reminder', 'Confirm'],
+    fields: [
+      { key: 'calendar_link', label: 'Calendar link' },
+      { key: 'whatsapp_number', label: 'WhatsApp number' },
+    ],
+  },
+  {
+    type: 'whatsapp_ai',
+    name: 'WhatsApp AI Chatbot',
+    icon: MessageSquare,
+    desc: 'Customer messages → AI responds 24/7 → Qualifies → Books → Saves to CRM',
+    flow: ['Message', 'AI reply', 'Qualify', 'Book'],
+    fields: [
+      { key: 'whatsapp_business', label: 'WhatsApp Business number' },
+      { key: 'ai_persona', label: 'AI persona name' },
+    ],
+  },
+  {
+    type: 'reactivation',
+    name: 'Lead Reactivation',
+    icon: RefreshCw,
+    desc: '30 days inactive → Reactivation campaign → Special offer → Book call',
+    flow: ['Inactive', 'Campaign', 'Offer', 'Book'],
+    fields: [
+      { key: 'inactive_days', label: 'Inactive days threshold' },
+      { key: 'offer_text', label: 'Offer text' },
+    ],
+  },
+]
 
 const card = {
-  background: BG_CARD,
-  border: '1px solid ' + BORDER,
-  borderRadius: 12,
-}
-
-const labelStyle = {
-  fontSize: 12,
-  fontWeight: 500,
-  color: TEXT_MUTED,
-  marginBottom: 6,
-  display: 'block',
+  background: 'rgba(255, 255, 255,0.03)',
+  border: '0.5px solid rgba(255, 255, 255,0.08)',
+  borderRadius: 14,
+  padding: 20,
 }
 
 const inputStyle = {
   width: '100%',
-  background: BG_INPUT,
-  border: '1px solid ' + BORDER,
-  borderRadius: 8,
-  color: TEXT,
-  padding: '10px 14px',
-  fontSize: 14,
+  background: 'rgba(255,255,255,0.04)',
+  border: '0.5px solid rgba(255,255,255,0.1)',
+  borderRadius: 10,
+  padding: '10px 12px',
+  color: '#fff',
+  fontSize: 13,
   outline: 'none',
   fontFamily: 'inherit',
 }
 
-const primaryBtn = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 7,
-  background: '#FFFFFF',
-  color: '#000000',
-  border: 'none',
-  borderRadius: 8,
-  padding: '10px 18px',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-}
-
-const ghostBtn = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 7,
-  background: 'transparent',
-  color: TEXT,
-  border: '1px solid ' + BORDER,
-  borderRadius: 8,
-  padding: '8px 14px',
-  fontSize: 12.5,
+const labelStyle = {
+  fontSize: 11,
   fontWeight: 500,
-  cursor: 'pointer',
+  color: 'rgba(255,255,255,0.4)',
+  marginBottom: 6,
+  display: 'block',
 }
-
-// ---- catalog of automations ----
-const AUTOMATIONS = [
-  {
-    id: 'ai_receptionist',
-    status: 'LIVE',
-    icon: PhoneCall,
-    title: 'AI Receptionist — Marco',
-    desc: 'Answers every call 24/7, qualifies leads, logs call summaries automatically.',
-    platform: 'Retell AI',
-    extra: { 'Agent ID': 'agent_62e644f7e87b21baf4f1d84144', 'Call logs (this month)': '0' },
-  },
-  {
-    id: 'new_lead',
-    status: 'LIVE',
-    icon: BellRing,
-    title: 'New Lead Notification',
-    desc: 'Fires instantly when a new lead is added — notifies the team via email.',
-    platform: 'Make.com',
-  },
-  {
-    id: 'deal_approval',
-    status: 'LIVE',
-    icon: CheckCircle2,
-    title: 'Deal Approval Alert',
-    desc: 'When a deal is submitted for approval, owner gets notified immediately.',
-    platform: 'Make.com',
-  },
-  {
-    id: 'daily_report',
-    status: 'LIVE',
-    icon: TrendingUp,
-    title: 'Daily Performance Report',
-    desc: 'Every day at 8PM sends a full pipeline summary to the team.',
-    platform: 'Make.com',
-  },
-  {
-    id: 'missed_call',
-    status: 'BUILDING',
-    icon: PhoneMissed,
-    title: 'Missed Call Text-Back',
-    desc: 'Client misses a call → instant WhatsApp message sent to the caller automatically.',
-    platform: 'Make.com + WhatsApp API',
-  },
-  {
-    id: 'whatsapp_ai',
-    status: 'BUILDING',
-    icon: MessageCircle,
-    title: 'WhatsApp AI Chatbot',
-    desc: '24/7 AI chatbot per client — each business gets its own brain and persona.',
-    platform: 'Make.com + Claude API + Meta',
-  },
-  {
-    id: 'follow_up',
-    status: 'PLANNED',
-    icon: Mail,
-    title: 'Follow-Up Sequence',
-    desc: 'New lead → Day 1, 3, 7, 30 automated follow-up emails.',
-    platform: 'Make.com',
-  },
-  {
-    id: 'appt_reminder',
-    status: 'PLANNED',
-    icon: CalendarClock,
-    title: 'Appointment Reminder',
-    desc: 'Booking confirmed → WhatsApp reminder sent 24h before.',
-    platform: 'Make.com',
-  },
-]
-
-// ---- seed WhatsApp clients (local state for now) ----
-const SEED_CLIENTS = [
-  {
-    id: 'awatec',
-    business_name: 'AWATEC',
-    whatsapp_number: '+297 5626784',
-    prompt:
-      'Leak detection & plumbing company in Aruba. Answer questions about leak detection, pressure service, plumbing repairs. Pricing: Inspection Afl.150. Always be professional and friendly. Escalate to human if customer is angry.',
-    ai_enabled: true,
-  },
-  {
-    id: 'restaurant_demo',
-    business_name: 'Restaurant Demo',
-    whatsapp_number: '+297 7401234',
-    prompt:
-      'Italian restaurant in Oranjestad. Hours: Mon-Sat 11am-10pm. Take reservations via WhatsApp. Menu includes pasta, pizza, seafood. Specials change daily.',
-    ai_enabled: true,
-  },
-  {
-    id: 'salon_demo',
-    business_name: 'Salon Demo',
-    whatsapp_number: '+297 7405678',
-    prompt:
-      'Beauty salon in Noord. Services: hair, nails, facials. Book appointments Mon-Sat 9am-6pm. Walk-ins welcome if available.',
-    ai_enabled: true,
-  },
-  {
-    id: 'car_dealer_demo',
-    business_name: 'Car Dealer Demo',
-    whatsapp_number: '+297 7409012',
-    prompt:
-      'Used car dealership in Santa Cruz. Stock changes weekly. Offer test drives by appointment. Financing available.',
-    ai_enabled: false,
-  },
-  {
-    id: 'real_estate_demo',
-    business_name: 'Real Estate Demo',
-    whatsapp_number: '+297 7403456',
-    prompt:
-      'Real estate agency covering all of Aruba. Rentals and sales. Respond in English and Papiamento.',
-    ai_enabled: true,
-  },
-]
-
-const TABS = [
-  { key: 'overview', label: 'Overview', icon: Zap },
-  { key: 'clients', label: 'WhatsApp Clients', icon: MessageCircle },
-]
 
 export default function Automations() {
-  const [tab, setTab] = useState('overview')
+  const [clients, setClients] = useState([])
+  const [clientId, setClientId] = useState('')
+  const [automations, setAutomations] = useState([])
+  const [deployTemplate, setDeployTemplate] = useState(null)
+  const [voiceOpen, setVoiceOpen] = useState(false)
   const [toast, setToast] = useState('')
-  const [viewing, setViewing] = useState(null)
-  const [clients, setClients] = useState(SEED_CLIENTS)
-  const [editingClient, setEditingClient] = useState(null)
+
+  const selectedClient = useMemo(
+    () => clients.find((c) => c.id === clientId) || null,
+    [clients, clientId],
+  )
 
   function showToast(m) {
     setToast(m)
-    setTimeout(() => setToast(''), 2400)
+    setTimeout(() => setToast(''), 2600)
   }
 
-  function toggleAi(id) {
-    setClients((list) =>
-      list.map((c) => (c.id === id ? { ...c, ai_enabled: !c.ai_enabled } : c)),
+  async function loadClients() {
+    try {
+      const data = await workflowApi('get_clients')
+      setClients(data?.clients || [])
+    } catch (e) {
+      /* noop */
+    }
+  }
+
+  async function loadAutomations(cid) {
+    try {
+      const data = await workflowApi('get_automations', {
+        params: cid ? { client_id: cid } : {},
+      })
+      setAutomations(data?.automations || [])
+    } catch (e) {
+      setAutomations([])
+    }
+  }
+
+  useEffect(() => {
+    loadClients()
+  }, [])
+
+  useEffect(() => {
+    loadAutomations(clientId)
+  }, [clientId])
+
+  async function toggleAutomation(a) {
+    const next = a.status === 'active' ? 'inactive' : 'active'
+    setAutomations((list) =>
+      list.map((x) => (x.id === a.id ? { ...x, status: next } : x)),
     )
+    try {
+      await workflowApi('toggle_automation', {
+        method: 'POST',
+        body: { automation_id: a.id, status: next },
+      })
+    } catch (e) {
+      loadAutomations(clientId)
+    }
   }
 
-  function saveBrain(id, prompt) {
-    setClients((list) => list.map((c) => (c.id === id ? { ...c, prompt } : c)))
-    showToast('Brain updated')
-    setEditingClient(null)
+  async function deleteAutomation(id) {
+    setAutomations((list) => list.filter((x) => x.id !== id))
+    try {
+      await workflowApi('delete_automation', {
+        method: 'POST',
+        body: { automation_id: id },
+      })
+    } catch (e) {
+      loadAutomations(clientId)
+    }
   }
 
   return (
-    <PageShell>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        {/* Header */}
+    <PageShell style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
         <div>
-          <h2
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: TEXT,
-              letterSpacing: '-0.3px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 10,
-            }}
-          >
-            <Zap size={22} /> AI Automations Hub
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: '#fff', letterSpacing: '-0.4px' }}>
+            Automations
           </h2>
-          <p style={{ fontSize: 13, color: TEXT_MUTED, marginTop: 6 }}>
-            Every active and planned automation across Lithos Labs clients.
+          <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
+            Manage client automation workflows
           </p>
         </div>
+        <select
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          style={{ ...inputStyle, width: 240 }}
+        >
+          <option value="">All clients</option>
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.company_name}
+            </option>
+          ))}
+        </select>
+      </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {TABS.map(({ key, label, icon: Icon }) => {
-            const active = tab === key
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTab(key)}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: 16,
+        }}
+      >
+        {TEMPLATES.map((t) => {
+          const Icon = t.icon
+          return (
+            <div key={t.type} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: 'rgba(255, 255, 255,0.12)',
+                    border: '0.5px solid rgba(255, 255, 255,0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#FFFFFF',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: '#fff' }}>
+                    {t.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'rgba(255,255,255,0.42)',
+                      marginTop: 4,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {t.desc}
+                  </div>
+                </div>
+              </div>
+
+              <div
                 style={{
-                  display: 'inline-flex',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: 7,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: active ? '#000000' : TEXT_MUTED,
-                  background: active ? '#FFFFFF' : 'transparent',
-                  border: active ? '1px solid #FFFFFF' : '1px solid ' + BORDER,
-                  borderRadius: 10,
-                  padding: '8px 16px',
-                  cursor: 'pointer',
+                  gap: 6,
+                  flexWrap: 'wrap',
                 }}
               >
-                <Icon size={13} />
-                {label}
-              </button>
-            )
-          })}
-        </div>
+                {t.flow.map((step, i) => (
+                  <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: 500,
+                        color: 'rgba(255,255,255,0.55)',
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '0.5px solid rgba(255,255,255,0.08)',
+                        borderRadius: 6,
+                        padding: '3px 8px',
+                      }}
+                    >
+                      {step}
+                    </span>
+                    {i < t.flow.length - 1 && (
+                      <span style={{ color: 'rgba(255, 255, 255,0.5)', fontSize: 11 }}>→</span>
+                    )}
+                  </span>
+                ))}
+              </div>
 
-        {tab === 'overview' && (
-          <OverviewTab onView={setViewing} />
-        )}
-        {tab === 'clients' && (
-          <ClientsTab
-            clients={clients}
-            onToggle={toggleAi}
-            onEditBrain={setEditingClient}
-            onViewChats={() => showToast('Coming soon')}
-          />
+              <button
+                type="button"
+                onClick={() => setDeployTemplate(t)}
+                style={{
+                  marginTop: 'auto',
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  color: '#FFFFFF',
+                  background: 'rgba(255, 255, 255,0.08)',
+                  border: '0.5px solid rgba(255, 255, 255,0.22)',
+                }}
+              >
+                Deploy for Client
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Active automations */}
+      <div style={{ ...card }}>
+        <h3
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#fff',
+            marginBottom: 14,
+          }}
+        >
+          Active Automations{' '}
+          {selectedClient && (
+            <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>
+              · {selectedClient.company_name}
+            </span>
+          )}
+        </h3>
+        {automations.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.35)' }}>
+            No automations deployed{selectedClient ? ' for this client' : ''} yet.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {automations.map((a) => {
+              const active = a.status === 'active'
+              return (
+                <div
+                  key={a.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '12px 14px',
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '0.5px solid rgba(255,255,255,0.06)',
+                    borderRadius: 10,
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: '#fff', fontWeight: 500 }}>
+                    {a.name}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.5)',
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: 6,
+                      padding: '3px 8px',
+                    }}
+                  >
+                    {a.type}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleAutomation(a)}
+                    aria-label="Toggle"
+                    style={{
+                      width: 40,
+                      height: 22,
+                      borderRadius: 999,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: active
+                        ? 'rgba(255, 255, 255,0.6)'
+                        : 'rgba(255,255,255,0.12)',
+                      position: 'relative',
+                      transition: 'background 0.15s ease',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 3,
+                        left: active ? 21 : 3,
+                        width: 16,
+                        height: 16,
+                        borderRadius: '50%',
+                        background: '#fff',
+                        transition: 'left 0.15s ease',
+                      }}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteAutomation(a.id)}
+                    style={iconBtn}
+                    aria-label="Delete"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
 
+      {/* AI Voice Agents */}
+      <div style={{ marginTop: 8 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 600, color: '#fff' }}>AI Voice Agents</h3>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 5, marginBottom: 16 }}>
+          24/7 AI phone receptionist for your clients
+        </p>
+
+        <div
+          style={{
+            background: 'rgba(255, 255, 255,0.04)',
+            border: '0.5px solid rgba(255, 255, 255,0.15)',
+            borderRadius: 14,
+            padding: 24,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 11,
+                background: 'rgba(255, 255, 255,0.12)',
+                border: '0.5px solid rgba(255, 255, 255,0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+              }}
+            >
+              <PhoneCall size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#fff' }}>
+                AI Phone Receptionist
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>
+                Never miss a call. AI answers 24/7, qualifies leads, books
+                appointments automatically.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {[
+              'Answers in English, Papiamento, Spanish',
+              'Qualifies every caller automatically',
+              'Books appointments to Google Calendar',
+              'Saves callers to CRM automatically',
+              'Sends instant WhatsApp confirmation',
+            ].map((f) => (
+              <div
+                key={f}
+                style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13 }}
+              >
+                <Check size={14} style={{ color: '#FFFFFF', flexShrink: 0 }} />
+                <span style={{ color: 'rgba(255,255,255,0.7)' }}>{f}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: '#FFFFFF',
+                background: 'rgba(255, 255, 255,0.1)',
+                border: '0.5px solid rgba(255, 255, 255,0.25)',
+                borderRadius: 999,
+                padding: '6px 14px',
+              }}
+            >
+              From $300/month per client
+            </span>
+            <button
+              type="button"
+              onClick={() => setVoiceOpen(true)}
+              style={{
+                padding: '10px 18px',
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                color: '#000000',
+                background: '#FFFFFF',
+                border: 'none',
+              }}
+            >
+              Set Up Voice Agent
+            </button>
+          </div>
+        </div>
+      </div>
+
       <AnimatePresence>
-        {viewing && <DetailsModal automation={viewing} onClose={() => setViewing(null)} />}
-        {editingClient && (
-          <EditBrainModal
-            client={editingClient}
-            onClose={() => setEditingClient(null)}
-            onSave={(prompt) => saveBrain(editingClient.id, prompt)}
+        {deployTemplate && (
+          <DeployModal
+            template={deployTemplate}
+            client={selectedClient}
+            onClose={() => setDeployTemplate(null)}
+            onSaved={() => {
+              setDeployTemplate(null)
+              loadAutomations(clientId)
+              showToast('Automation saved')
+            }}
           />
         )}
+        {voiceOpen && (
+          <VoiceModal
+            client={selectedClient}
+            onClose={() => setVoiceOpen(false)}
+            onSaved={() => {
+              setVoiceOpen(false)
+              showToast('Voice agent request submitted')
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {toast && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -314,15 +547,14 @@ export default function Automations() {
               bottom: 28,
               left: '50%',
               transform: 'translateX(-50%)',
-              background: BG_ELEVATED,
-              border: '1px solid ' + BORDER,
-              color: TEXT,
+              background: '#1A1A1A',
+              border: '0.5px solid rgba(255, 255, 255,0.2)',
+              color: '#fff',
               fontSize: 13,
               fontWeight: 500,
               padding: '12px 22px',
               borderRadius: 12,
               zIndex: 300,
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
             }}
           >
             {toast}
@@ -333,372 +565,21 @@ export default function Automations() {
   )
 }
 
-// ---------- Overview ----------
-function OverviewTab({ onView }) {
-  const grouped = useMemo(() => {
-    return {
-      LIVE: AUTOMATIONS.filter((a) => a.status === 'LIVE'),
-      BUILDING: AUTOMATIONS.filter((a) => a.status === 'BUILDING'),
-      PLANNED: AUTOMATIONS.filter((a) => a.status === 'PLANNED'),
-    }
-  }, [])
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      {(['LIVE', 'BUILDING', 'PLANNED']).map((key) => {
-        const list = grouped[key]
-        if (list.length === 0) return null
-        return (
-          <section key={key} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h3
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  letterSpacing: '0.1em',
-                  color: TEXT,
-                  textTransform: 'uppercase',
-                }}
-              >
-                {key}
-              </h3>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: TEXT_DIM,
-                  background: BG_ELEVATED,
-                  borderRadius: 999,
-                  padding: '2px 8px',
-                  border: '1px solid ' + BORDER_SUBTLE,
-                }}
-              >
-                {list.length}
-              </span>
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: 14,
-              }}
-            >
-              {list.map((a) => (
-                <AutomationCard key={a.id} automation={a} onView={() => onView(a)} />
-              ))}
-            </div>
-          </section>
-        )
-      })}
-    </div>
-  )
+const iconBtn = {
+  width: 28,
+  height: 28,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'transparent',
+  border: '0.5px solid rgba(255,255,255,0.1)',
+  borderRadius: 8,
+  color: 'rgba(255, 68, 68,0.7)',
+  cursor: 'pointer',
+  flexShrink: 0,
 }
 
-function StatusBadge({ status }) {
-  const s = STATUS[status]
-  return (
-    <span
-      style={{
-        fontSize: 10.5,
-        fontWeight: 700,
-        letterSpacing: '0.06em',
-        background: s.bg,
-        color: s.color,
-        border: '1px solid ' + s.border,
-        borderRadius: 999,
-        padding: '3px 10px',
-      }}
-    >
-      {s.label}
-    </span>
-  )
-}
-
-function PlatformBadge({ platform }) {
-  return (
-    <span
-      style={{
-        fontSize: 10.5,
-        fontWeight: 600,
-        color: TEXT_MUTED,
-        background: BG_ELEVATED,
-        border: '1px solid ' + BORDER_SUBTLE,
-        borderRadius: 6,
-        padding: '3px 8px',
-      }}
-    >
-      {platform}
-    </span>
-  )
-}
-
-function AutomationCard({ automation, onView }) {
-  const Icon = automation.icon
-  return (
-    <div
-      style={{
-        ...card,
-        padding: 18,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 10,
-            background: BG_ELEVATED,
-            border: '1px solid ' + BORDER_SUBTLE,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: TEXT,
-            flexShrink: 0,
-          }}
-        >
-          <Icon size={18} />
-        </div>
-        <StatusBadge status={automation.status} />
-      </div>
-      <div>
-        <div style={{ fontSize: 14.5, fontWeight: 700, color: TEXT, letterSpacing: '-0.1px' }}>
-          {automation.title}
-        </div>
-        <div
-          style={{
-            fontSize: 12.5,
-            color: TEXT_MUTED,
-            marginTop: 6,
-            lineHeight: 1.55,
-          }}
-        >
-          {automation.desc}
-        </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <PlatformBadge platform={automation.platform} />
-      </div>
-      {automation.extra && (
-        <div
-          style={{
-            fontSize: 11,
-            color: TEXT_DIM,
-            background: '#0A0A0A',
-            border: '1px solid ' + BORDER_SUBTLE,
-            borderRadius: 8,
-            padding: '8px 10px',
-            lineHeight: 1.6,
-            wordBreak: 'break-all',
-          }}
-        >
-          {Object.entries(automation.extra).map(([k, v]) => (
-            <div key={k}>
-              <span style={{ color: TEXT_MUTED }}>{k}:</span>{' '}
-              <span style={{ color: TEXT, fontFamily: k.toLowerCase().includes('id') ? 'monospace' : 'inherit' }}>
-                {v}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-      <button
-        type="button"
-        onClick={onView}
-        style={{
-          ...ghostBtn,
-          width: '100%',
-          justifyContent: 'center',
-          marginTop: 4,
-        }}
-      >
-        <Eye size={13} /> View Details
-      </button>
-    </div>
-  )
-}
-
-// ---------- WhatsApp Clients ----------
-function ClientsTab({ clients, onToggle, onEditBrain, onViewChats }) {
-  const totalClients = clients.length
-  const activeBots = clients.filter((c) => c.ai_enabled).length
-
-  const stats = [
-    { label: 'Clients connected', value: totalClients },
-    { label: 'Active AI bots', value: activeBots },
-    { label: 'Messages this month', value: 0 },
-    { label: 'Avg response time', value: '< 2s' },
-  ]
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: 12,
-        }}
-      >
-        {stats.map((s) => (
-          <div key={s.label} style={{ ...card, padding: 18 }}>
-            <div
-              style={{
-                fontSize: 10.5,
-                fontWeight: 600,
-                letterSpacing: '0.08em',
-                color: TEXT_DIM,
-                textTransform: 'uppercase',
-                marginBottom: 8,
-              }}
-            >
-              {s.label}
-            </div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: TEXT, letterSpacing: '-0.5px' }}>
-              {s.value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: 14,
-        }}
-      >
-        {clients.map((c) => (
-          <ClientCard
-            key={c.id}
-            client={c}
-            onToggle={() => onToggle(c.id)}
-            onEditBrain={() => onEditBrain(c)}
-            onViewChats={() => onViewChats(c)}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function AiToggle({ on, onChange }) {
-  return (
-    <button
-      type="button"
-      onClick={onChange}
-      aria-label="Toggle AI"
-      style={{
-        width: 46,
-        height: 24,
-        borderRadius: 999,
-        border: 'none',
-        cursor: 'pointer',
-        background: on ? 'rgba(34, 197, 94, 0.85)' : '#333333',
-        position: 'relative',
-        transition: 'background 0.15s ease',
-        flexShrink: 0,
-      }}
-    >
-      <span
-        style={{
-          position: 'absolute',
-          top: 3,
-          left: on ? 25 : 3,
-          width: 18,
-          height: 18,
-          borderRadius: '50%',
-          background: '#FFFFFF',
-          transition: 'left 0.15s ease',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.6)',
-        }}
-      />
-    </button>
-  )
-}
-
-function ClientCard({ client, onToggle, onEditBrain, onViewChats }) {
-  const preview = (client.prompt || '').slice(0, 80) + ((client.prompt || '').length > 80 ? '…' : '')
-  return (
-    <div
-      style={{
-        ...card,
-        padding: 18,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: TEXT }}>{client.business_name}</div>
-          <div
-            style={{
-              fontSize: 12,
-              color: TEXT_MUTED,
-              marginTop: 3,
-              fontFamily: 'monospace',
-            }}
-          >
-            {client.whatsapp_number}
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <span
-            style={{
-              fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: '0.06em',
-              color: client.ai_enabled ? '#4ADE80' : TEXT_DIM,
-            }}
-          >
-            {client.ai_enabled ? 'AI ON' : 'AI OFF'}
-          </span>
-          <AiToggle on={client.ai_enabled} onChange={onToggle} />
-        </div>
-      </div>
-
-      <div
-        style={{
-          fontSize: 11.5,
-          color: TEXT_MUTED,
-          background: '#0A0A0A',
-          border: '1px solid ' + BORDER_SUBTLE,
-          borderRadius: 8,
-          padding: 10,
-          lineHeight: 1.55,
-          fontStyle: 'italic',
-        }}
-      >
-        “{preview}”
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <PlatformBadge platform="Make.com + Claude API + Meta" />
-      </div>
-
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          type="button"
-          onClick={onEditBrain}
-          style={{ ...primaryBtn, padding: '8px 14px', fontSize: 12.5, flex: 1, justifyContent: 'center' }}
-        >
-          <Pencil size={12} /> Edit Brain
-        </button>
-        <button
-          type="button"
-          onClick={onViewChats}
-          style={{ ...ghostBtn, flex: 1, justifyContent: 'center' }}
-        >
-          <Eye size={13} /> View Chats
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ---------- Modals ----------
-function ModalShell({ onClose, title, children, maxWidth = 560 }) {
+function ModalShell({ title, children, onClose }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -707,36 +588,28 @@ function ModalShell({ onClose, title, children, maxWidth = 560 }) {
       onClick={onClose}
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100%',
-        height: '100%',
-        background: 'rgba(0, 0, 0, 0.85)',
+        inset: 0,
+        background: 'rgba(0,0,0,0.75)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
-        padding: 20,
+        zIndex: 300,
+        padding: 16,
       }}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96 }}
+        initial={{ scale: 0.96, y: 14 }}
+        animate={{ scale: 1, y: 0 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: BG_CARD,
-          border: '1px solid ' + BORDER,
+          background: '#111111',
+          border: '0.5px solid rgba(255,255,255,0.1)',
           borderRadius: 16,
           padding: 24,
-          width: '90%',
-          maxWidth,
-          maxHeight: '90vh',
+          width: '100%',
+          maxWidth: 460,
+          maxHeight: '88vh',
           overflowY: 'auto',
-          position: 'relative',
-          boxShadow: '0 24px 80px rgba(0, 0, 0, 0.9)',
         }}
       >
         <div
@@ -747,23 +620,11 @@ function ModalShell({ onClose, title, children, maxWidth = 560 }) {
             marginBottom: 18,
           }}
         >
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: TEXT }}>{title}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            style={{
-              width: 32,
-              height: 32,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: '1px solid ' + BORDER_SUBTLE,
-              borderRadius: 8,
-              color: TEXT_MUTED,
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
+            style={{ ...iconBtn, border: 'none', color: 'rgba(255,255,255,0.55)' }}
             aria-label="Close"
           >
             <X size={16} />
@@ -775,120 +636,168 @@ function ModalShell({ onClose, title, children, maxWidth = 560 }) {
   )
 }
 
-function DetailsModal({ automation, onClose }) {
-  const Icon = automation.icon
+const saveBtnStyle = (color) => ({
+  width: '100%',
+  marginTop: 18,
+  background: color,
+  color: '#000000',
+  border: 'none',
+  borderRadius: 12,
+  padding: 13,
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+})
+
+function DeployModal({ template, client, onClose, onSaved }) {
+  const [values, setValues] = useState({})
+  const [saving, setSaving] = useState(false)
+  const set = (k) => (e) => setValues((v) => ({ ...v, [k]: e.target.value }))
+
+  async function save() {
+    setSaving(true)
+    try {
+      const data = await workflowApi('save_automation', {
+        method: 'POST',
+        body: {
+          client_id: client?.id || null,
+          name: template.name,
+          type: template.type,
+          trigger_type: template.flow[0],
+          steps: { flow: template.flow, config: values },
+        },
+      })
+      if (data?.success) onSaved()
+    } catch (e) {
+      /* noop */
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <ModalShell onClose={onClose} title={automation.title}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              background: BG_ELEVATED,
-              border: '1px solid ' + BORDER_SUBTLE,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: TEXT,
-              flexShrink: 0,
-            }}
-          >
-            <Icon size={20} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <StatusBadge status={automation.status} />
-            <PlatformBadge platform={automation.platform} />
-          </div>
-        </div>
-
-        <p style={{ fontSize: 13, color: TEXT, lineHeight: 1.6 }}>{automation.desc}</p>
-
-        {automation.extra && (
-          <div
-            style={{
-              fontSize: 12,
-              background: '#0A0A0A',
-              border: '1px solid ' + BORDER_SUBTLE,
-              borderRadius: 8,
-              padding: 14,
-              lineHeight: 1.7,
-              color: TEXT,
-              wordBreak: 'break-all',
-            }}
-          >
-            {Object.entries(automation.extra).map(([k, v]) => (
-              <div key={k}>
-                <span style={{ color: TEXT_MUTED, fontWeight: 600 }}>{k}:</span>{' '}
-                <span style={{ fontFamily: k.toLowerCase().includes('id') ? 'monospace' : 'inherit' }}>{v}</span>
-              </div>
-            ))}
-          </div>
-        )}
+    <ModalShell title={template.name} onClose={onClose}>
+      <div
+        style={{
+          fontSize: 12.5,
+          color: 'rgba(255,255,255,0.5)',
+          marginBottom: 16,
+        }}
+      >
+        Client:{' '}
+        <span style={{ color: '#fff', fontWeight: 600 }}>
+          {client ? client.company_name : 'No client selected'}
+        </span>
       </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {template.fields.map((f) => (
+          <div key={f.key}>
+            <label style={labelStyle}>{f.label}</label>
+            <input
+              style={inputStyle}
+              value={values[f.key] || ''}
+              onChange={set(f.key)}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          marginTop: 16,
+          fontSize: 11.5,
+          color: 'rgba(255,255,255,0.4)',
+          background: 'rgba(255,255,255,0.03)',
+          border: '0.5px solid rgba(255,255,255,0.07)',
+          borderRadius: 10,
+          padding: '10px 12px',
+          lineHeight: 1.5,
+        }}
+      >
+        Make.com integration coming soon — we will connect this manually for
+        early clients.
+      </div>
+
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving}
+        style={saveBtnStyle('#FFFFFF')}
+      >
+        {saving && <Loader2 size={15} className="spin" />}
+        Save Automation
+      </button>
     </ModalShell>
   )
 }
 
-function EditBrainModal({ client, onClose, onSave }) {
-  const [prompt, setPrompt] = useState(client.prompt || '')
+function VoiceModal({ client, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    business_name: client?.company_name || '',
+    phone_number: '',
+    business_hours: '',
+    services: '',
+    booking_link: '',
+  })
   const [saving, setSaving] = useState(false)
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
-  function handleSave() {
+  async function submit() {
     setSaving(true)
-    // Local-only persistence for now — no API call.
-    setTimeout(() => {
-      onSave(prompt)
+    try {
+      const data = await workflowApi('voice_agent_request', {
+        method: 'POST',
+        body: { client_id: client?.id || null, ...form },
+      })
+      if (data?.success) onSaved()
+    } catch (e) {
+      /* noop */
+    } finally {
       setSaving(false)
-    }, 200)
+    }
   }
 
   return (
-    <ModalShell onClose={onClose} title="Edit AI Brain">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <label style={labelStyle}>Business name</label>
-          <input style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} value={client.business_name} readOnly />
-        </div>
-        <div>
-          <label style={labelStyle}>WhatsApp number</label>
-          <input
-            style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed', fontFamily: 'monospace' }}
-            value={client.whatsapp_number}
-            readOnly
-          />
-        </div>
-        <div>
-          <label style={labelStyle}>System prompt — the AI's brain</label>
-          <textarea
-            rows={8}
-            style={{ ...inputStyle, resize: 'vertical', minHeight: 180, lineHeight: 1.5 }}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-          <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 6 }}>
-            {prompt.length} characters
+    <ModalShell title="Vapi AI Voice Agent Setup" onClose={onClose}>
+      <p
+        style={{
+          fontSize: 12.5,
+          color: 'rgba(255,255,255,0.5)',
+          marginBottom: 16,
+          lineHeight: 1.55,
+        }}
+      >
+        We configure AI voice agents manually for each client. Fill in the
+        details below and we will set it up within 48 hours.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {[
+          { key: 'business_name', label: 'Client business name' },
+          { key: 'phone_number', label: 'Phone number' },
+          { key: 'business_hours', label: 'Business hours' },
+          { key: 'services', label: 'Services to handle' },
+          { key: 'booking_link', label: 'Booking link' },
+        ].map((f) => (
+          <div key={f.key}>
+            <label style={labelStyle}>{f.label}</label>
+            <input style={inputStyle} value={form[f.key]} onChange={set(f.key)} />
           </div>
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            gap: 8,
-            justifyContent: 'flex-end',
-            paddingTop: 8,
-            borderTop: '1px solid ' + BORDER_SUBTLE,
-          }}
-        >
-          <button type="button" onClick={onClose} style={ghostBtn} disabled={saving}>
-            Cancel
-          </button>
-          <button type="button" onClick={handleSave} style={primaryBtn} disabled={saving}>
-            {saving && <Loader2 size={13} className="spin" />}
-            Save Brain
-          </button>
-        </div>
+        ))}
       </div>
+      <button
+        type="button"
+        onClick={submit}
+        disabled={saving}
+        style={saveBtnStyle('#FFFFFF')}
+      >
+        {saving && <Loader2 size={15} className="spin" />}
+        Submit Request
+      </button>
     </ModalShell>
   )
 }
