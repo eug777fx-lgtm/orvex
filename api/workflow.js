@@ -2607,45 +2607,41 @@ export default async function handler(req, res) {
         } = data || {}
 
         // ── INVOICE NUMBER ──
-        wipe(430, 58, 160, 18)
+        wipe(0, 55, 595, 25)
         fill(`#${invoice_number || 'INV-001'}`, 433, 64, { size: 9, color: rgb(0.4, 0.4, 0.4) })
 
-        // ── BILL TO ──
-        wipe(50, 152, 350, 75)
+        // ── BILL TO — wipe entire left column top section ──
+        wipe(0, 130, 400, 120)
         fill(client_name || '', 52, 162, { bold: true, size: 12 })
         fill(client_company || '', 52, 178, { size: 9, color: rgb(0.4, 0.4, 0.4) })
         fill(client_email || '', 52, 193, { size: 9, color: rgb(0.4, 0.4, 0.4) })
 
-        // ── DATES ──
-        wipe(395, 152, 200, 75)
-        fill(invoice_date || '', 398, 162, { size: 9 })
-        fill(due_date || '', 398, 193, { size: 9 })
+        // ── DATES — wipe entire right column top section ──
+        wipe(400, 130, 195, 120)
+        fill(invoice_date || '', 403, 162, { size: 9 })
+        fill(due_date || '', 403, 210, { size: 9 })
 
-        // ── LINE ITEMS (up to 4 rows) ──
-        const rowPositions = [320, 358, 396, 434]
-        wipe(52, 310, 540, 145)
+        // ── LINE ITEMS — wipe entire table area including header ──
+        wipe(0, 270, 595, 220)
+        const rowY = [310, 348, 386, 424]
         line_items.slice(0, 4).forEach((item, i) => {
-          const y = rowPositions[i]
           const name = (item.name || '').length > 28
             ? (item.name || '').substring(0, 28) + '...'
             : (item.name || '')
           const desc = (item.description || '').length > 40
             ? (item.description || '').substring(0, 40) + '...'
             : (item.description || '')
-          fill(name, 52, y, { size: 9, bold: true })
-          fill(desc, 228, y, { size: 8, color: rgb(0.4, 0.4, 0.4) })
-          fill(`$${item.price_usd || 0}`, 450, y, { size: 9, bold: true })
-          fill(`Afl. ${item.price_awg || 0}`, 505, y, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+          fill(name, 52, rowY[i], { size: 9, bold: true })
+          fill(desc, 228, rowY[i], { size: 8, color: rgb(0.4, 0.4, 0.4) })
+          fill(`$${item.price_usd || 0}`, 450, rowY[i], { size: 9, bold: true })
+          fill(`Afl. ${item.price_awg || 0}`, 505, rowY[i], { size: 9, color: rgb(0.4, 0.4, 0.4) })
         })
 
-        // ── SUBTOTAL ──
-        wipe(430, 488, 155, 18)
-        fill(`$${subtotal_usd || total_usd || 0}`, 510, 497, { size: 9 })
-
-        // ── TOTAL ──
-        wipe(430, 522, 155, 45)
-        fill(`${total_usd || 0} USD`, 435, 533, { bold: true, size: 14 })
-        fill(`Afl. ${total_awg || 0}`, 435, 551, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+        // ── SUBTOTAL + TOTAL — wipe entire right side bottom ──
+        wipe(380, 480, 215, 100)
+        fill(`$${subtotal_usd || total_usd || 0}`, 480, 495, { size: 9 })
+        fill(`$${total_usd || 0} USD`, 420, 525, { bold: true, size: 14 })
+        fill(`Afl. ${total_awg || 0}`, 420, 545, { size: 9, color: rgb(0.4, 0.4, 0.4) })
       }
 
       if (type === 'contract') {
