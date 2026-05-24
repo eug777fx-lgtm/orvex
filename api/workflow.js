@@ -2618,21 +2618,24 @@ export default async function handler(req, res) {
         fill(invoice_date || '', 400, 133, { size: 9 })
         fill(due_date || '', 400, 150, { size: 9 })
 
-        wipe(50, 230, 545, 200)
-        let itemY = 242
-        line_items.forEach((item) => {
-          fill(item.name || '', 62, itemY, { size: 9 })
-          fill(item.description || '', 207, itemY, { size: 8, color: rgb(0.4, 0.4, 0.4), maxWidth: 200 })
-          fill(`$${item.price_usd || 0}`, 440, itemY, { size: 9, bold: true })
-          fill(`Afl. ${item.price_awg || 0}`, 500, itemY, { size: 9, color: rgb(0.4, 0.4, 0.4) })
-          itemY += 28
-        })
+      wipe(50, 230, 545, 220)
+      let itemY = 242
+      line_items.forEach((item) => {
+        const desc = (item.description || '').length > 45
+          ? (item.description || '').substring(0, 45) + '...'
+          : (item.description || '')
+        fill(item.name || '', 62, itemY, { size: 9, bold: true })
+        fill(desc, 310, itemY, { size: 8, color: rgb(0.4, 0.4, 0.4) })
+        fill(`$${item.price_usd || 0}`, 680, itemY, { size: 9, bold: true })
+        fill(`Afl. ${item.price_awg || 0}`, 740, itemY, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+        itemY += 38
+      })
 
-        const totalsY = itemY + 16
-        wipe(395, totalsY, 200, 70)
-        fill(`$${subtotal_usd || total_usd || 0}`, 500, totalsY + 4, { size: 8 })
-        fill(`$${total_usd || 0} USD`, 440, totalsY + 36, { bold: true, size: 12 })
-        fill(`Afl. ${total_awg || 0}`, 440, totalsY + 52, { size: 9, color: rgb(0.4, 0.4, 0.4) })
+      const totalsY = itemY + 20
+      wipe(395, totalsY - 10, 250, 80)
+      fill(`$${subtotal_usd || total_usd || 0}`, 740, totalsY, { size: 8 })
+      fill(`$${total_usd || 0} USD`, 640, totalsY + 30, { bold: true, size: 14 })
+      fill(`Afl. ${total_awg || 0}`, 640, totalsY + 50, { size: 9, color: rgb(0.4, 0.4, 0.4) })
       }
 
       if (type === 'contract') {
