@@ -2499,6 +2499,23 @@ export default async function handler(req, res) {
             [durationMin, lead_name || lead_service ? 1 : 0, agent.id],
           )
 
+          // Fire-and-forget Make.com webhook for Marco. Env-gated so it only
+          // fires when AWATEC_WEBHOOK_MARCO is set in Vercel. Doesn't block
+          // the response or fail the webhook if Make.com is down.
+          if (process.env.AWATEC_WEBHOOK_MARCO) {
+            fetch(process.env.AWATEC_WEBHOOK_MARCO, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from_number: call.from_number || '',
+                duration_ms: call.duration_ms || 0,
+                call_summary: call.call_analysis?.call_summary || '',
+                transcript: call.transcript || '',
+                call_id: call.call_id || '',
+              }),
+            }).catch((e) => console.log('Marco webhook error:', e.message))
+          }
+
           // Auto-create AWATEC HQ job ticket when Marco (the AWATEC AI
           // receptionist) handles a call. Non-fatal — the webhook still
           // returns success even if AWATEC HQ is down.
