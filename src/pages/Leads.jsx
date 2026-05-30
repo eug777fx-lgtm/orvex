@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Search, Plus, ExternalLink, Upload, X, Trash2, UserPlus } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  ExternalLink,
+  Upload,
+  X,
+  Trash2,
+  UserPlus,
+  Calendar,
+  Mail,
+  Phone,
+  Clock,
+} from 'lucide-react'
 import db from '@/lib/db'
 import AddLeadModal from '../components/AddLeadModal'
 import Discover from '../components/Discover'
@@ -238,6 +250,26 @@ function CenteredMessage({ children }) {
   )
 }
 
+// Booked-call leads stash their scheduled time inside notes as
+// "...Scheduled: <value>". Pull it back out for display.
+function parseScheduled(notes) {
+  const m = /Scheduled:\s*(.+?)\s*$/.exec(notes || '')
+  const v = m?.[1]?.trim()
+  if (!v || v === 'TBD') return null
+  return v
+}
+
+function formatBookedDate(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 export default function Leads() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -420,6 +452,17 @@ export default function Leads() {
     })
   }, [leads, search, industry, status, onlyUnassigned])
 
+  const bookedCalls = useMemo(
+    () =>
+      leads.filter(
+        (l) =>
+          l.source === 'booking' ||
+          l.lead_type === 'booking' ||
+          (l.notes || '').toLowerCase().includes('book'),
+      ),
+    [leads],
+  )
+
   const hasLeads = leads.length > 0
   const hasFilteredLeads = filtered.length > 0
 
@@ -454,6 +497,7 @@ export default function Leads() {
       >
         {[
           { value: 'my', label: 'My Leads' },
+          { value: 'booked', label: 'Booked Calls' },
           { value: 'discover', label: 'Discover' },
         ].map((t) => {
           const active = tab === t.value
@@ -481,6 +525,206 @@ export default function Leads() {
       </div>
 
       {tab === 'discover' && <Discover onLeadsAdded={fetchLeads} />}
+
+      {tab === 'booked' && (
+        <div style={glassCardStyle}>
+          {!db ? (
+            <CenteredMessage>
+              Database not connected. Please add VITE_DATABASE_URL to your .env file and
+              restart the dev server.
+            </CenteredMessage>
+          ) : loading ? (
+            <CenteredMessage>Loading booked calls...</CenteredMessage>
+          ) : error ? (
+            <CenteredMessage>
+              <div style={{ color: '#FF4444' }}>{error}</div>
+            </CenteredMessage>
+          ) : bookedCalls.length === 0 ? (
+            <div
+              style={{
+                padding: '4rem 1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 6,
+                }}
+              >
+                <Calendar size={20} color="rgba(255,255,255,0.5)" />
+              </div>
+              <div style={{ fontSize: 16, color: '#ffffff', fontWeight: 500 }}>
+                No booked calls yet
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', maxWidth: 320 }}>
+                Share your landing page to start getting bookings.
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: 16,
+                display: 'grid',
+                gridTemplateColumns: isMobile
+                  ? '1fr'
+                  : 'repeat(auto-fill, minmax(300px, 1fr))',
+                gap: 14,
+              }}
+            >
+              {bookedCalls.map((lead) => {
+                const scheduled = parseScheduled(lead.notes)
+                const name = lead.owner_name || lead.company_name || 'Unknown'
+                return (
+                  <div
+                    key={lead.id}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
+                    style={{
+                      background: 'rgba(17, 17, 17,0.85)',
+                      border: '0.5px solid rgba(255,255,255,0.08)',
+                      borderRadius: 14,
+                      padding: 16,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      cursor: 'pointer',
+                      transition: 'border-color 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            color: '#ffffff',
+                            fontWeight: 700,
+                            fontSize: 15,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {name}
+                        </div>
+                        {lead.company_name && lead.company_name !== name && (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: 'rgba(255,255,255,0.45)',
+                              marginTop: 2,
+                            }}
+                          >
+                            {lead.company_name}
+                          </div>
+                        )}
+                      </div>
+                      <span style={statusPillStyle(lead.status)}>
+                        {lead.status || 'new'}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                        paddingTop: 12,
+                        borderTop: '0.5px solid rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      {lead.email && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            fontSize: 13,
+                            color: 'rgba(255,255,255,0.75)',
+                          }}
+                        >
+                          <Mail size={13} color="rgba(255,255,255,0.4)" />
+                          <span
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {lead.email}
+                          </span>
+                        </div>
+                      )}
+                      {lead.phone && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            fontSize: 13,
+                            color: 'rgba(255,255,255,0.75)',
+                          }}
+                        >
+                          <Phone size={13} color="rgba(255,255,255,0.4)" />
+                          <span>{lead.phone}</span>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontSize: 13,
+                          color: scheduled ? '#ffffff' : 'rgba(255,255,255,0.4)',
+                        }}
+                      >
+                        <Clock size={13} color="rgba(255,255,255,0.4)" />
+                        <span>{scheduled || 'Time TBD'}</span>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: 12,
+                        color: 'rgba(255,255,255,0.4)',
+                      }}
+                    >
+                      <Calendar size={12} />
+                      <span>Booked {formatBookedDate(lead.created_at)}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {tab === 'my' && importBanner != null && importBanner > 0 && (
         <div

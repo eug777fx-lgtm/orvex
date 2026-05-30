@@ -1627,6 +1627,67 @@ async function handleSales(sql, { method, action, query, body }) {
 
       return { handled: true, payload: { success: true, lead_id: leadId } }
     }
+    if (action === 'book_call') {
+      // Public webhook: a visitor booked a call on the landing page (via
+      // Make.com or a direct form POST). No auth — creates a lead from scratch.
+      const { name, email, phone, company, message, scheduled_time } = body
+      const noteText = `Booked a call. Message: ${message || ''}. Scheduled: ${
+        scheduled_time || 'TBD'
+      }`
+
+      // Primary record in the sales CRM table. NOTE: sales_leads uses
+      // company_name (NOT NULL) / contact_* columns, not name/email/phone —
+      // so we map onto the real schema here.
+      const result = await sql.query(
+        `INSERT INTO sales_leads (
+           company_name, contact_name, contact_email, contact_phone,
+           notes, source, status, created_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         RETURNING *`,
+        [
+          company || name || 'Booking',
+          name || '',
+          email || '',
+          phone || '',
+          noteText,
+          'booking',
+          'new',
+        ],
+      )
+      const lead = firstOf(result)
+
+      // Mirror into the main app `leads` table so the booking shows up on the
+      // Leads page — the "Booked Calls" tab filters this table by
+      // source='booking'. Best-effort; non-fatal if the mirror fails.
+      try {
+        await sql.query(
+          `INSERT INTO leads (
+             company_name, owner_name, phone, email, source, notes, status
+           ) VALUES ($1, $2, $3, $4, 'booking', $5, 'new')`,
+          [company || name || 'Booking', name || '', phone || '', email || '', noteText],
+        )
+      } catch (e) {
+        /* main leads table mirror is best-effort — non-fatal */
+      }
+
+      // Notify via Make.com
+      if (process.env.MAKE_WEBHOOK_NEW_LEAD) {
+        fetch(process.env.MAKE_WEBHOOK_NEW_LEAD, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name || '',
+            email: email || '',
+            phone: phone || '',
+            company: company || '',
+            source: 'Book a Call — Landing Page',
+            scheduled_time: scheduled_time || '',
+          }),
+        }).catch((e) => console.log('Webhook error:', e.message))
+      }
+
+      return { handled: true, payload: { success: true, lead } }
+    }
     if (action === 'update_lead_status') {
       const { lead_id, rep_id, status, notes, next_followup } = body
       await sql.query(
