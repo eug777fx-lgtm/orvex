@@ -57,6 +57,7 @@
 //   runs the full Higgsfield + ElevenLabs + Creatomate production for each.
 
 import { produceVideo } from './_render-helper.js'
+import { docsHandler, issueAuthToken } from './_docs-helper.js'
 
 const MAX_PER_DAY = 3
 const SLOT_GAP_HOURS = 4
@@ -1436,19 +1437,20 @@ async function handleSales(sql, { method, action, query, body }) {
       // locked out even on a fresh / unreachable database.
       if (
         email.toLowerCase() === 'admin@lithoslabs.com' &&
-        password === 'admin123'
+        password === (process.env.ADMIN_BYPASS_PASSWORD || 'admin123')
       ) {
+        const adminUser = {
+          id: 'admin',
+          name: 'Eugene',
+          email: 'admin@lithoslabs.com',
+          role: 'admin',
+          commission_rate: 0,
+        }
         return {
           handled: true,
           payload: {
             success: true,
-            rep: {
-              id: 'admin',
-              name: 'Eugene',
-              email: 'admin@lithoslabs.com',
-              role: 'admin',
-              commission_rate: 0,
-            },
+            rep: { ...adminUser, auth_token: issueAuthToken(adminUser) },
           },
         }
       }
@@ -1471,16 +1473,15 @@ async function handleSales(sql, { method, action, query, body }) {
           : rep.role === 'manager'
             ? 'manager'
             : 'sales'
+      const repUser = { id: rep.id, name: rep.name, email: rep.email, role }
       return {
         handled: true,
         payload: {
           success: true,
           rep: {
-            id: rep.id,
-            name: rep.name,
-            email: rep.email,
-            role,
+            ...repUser,
             commission_rate: rep.commission_rate,
+            auth_token: issueAuthToken(repUser),
           },
         },
       }
@@ -2496,6 +2497,13 @@ export default async function handler(req, res) {
 
   // Handled before the GET/POST split so it works with either method.
   const action = req.body?.action || req.query?.action
+
+  // Payments & Documents module (proposals / e-signature / invoices / payments).
+  // All of its actions are namespaced docs_* and implemented in _docs-helper.js
+  // (underscore file: does not count toward the Vercel function limit).
+  if (typeof action === 'string' && action.startsWith('docs_')) {
+    return docsHandler(req, res)
+  }
 
   // Retell webhook handler — lives BEFORE the GET/POST split so it works for
   // POST /api/workflow?action=retell_webhook (action via query string, since

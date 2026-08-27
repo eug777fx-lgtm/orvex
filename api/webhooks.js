@@ -1,6 +1,25 @@
 // Required environment variables (set in Vercel project settings):
-//   VITE_DATABASE_URL   — Neon Postgres connection string
-//   WEBHOOK_SECRET      — shared secret required in x-webhook-secret header
+//   VITE_DATABASE_URL     — Neon Postgres connection string
+//   WEBHOOK_SECRET        — shared secret required in x-webhook-secret header
+//   STRIPE_WEBHOOK_SECRET — Stripe endpoint signing secret (for ?source=stripe)
+//
+// Stripe webhook endpoint: POST /api/webhooks?source=stripe
+//   Signature is verified against the RAW request body, which is why body
+//   parsing is disabled below and JSON is parsed manually for other callers.
+
+import { handleStripeWebhook } from './_docs-helper.js'
+
+// Stripe signature verification needs the exact raw bytes of the payload.
+export const config = { api: { bodyParser: false } }
+
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    req.on('data', (c) => chunks.push(c))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -10,12 +29,26 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
+  const rawBody = await readRawBody(req)
+
+  // Stripe events (signature-verified inside the handler; no shared secret).
+  if (req.query?.source === 'stripe') {
+    return handleStripeWebhook(req, res, rawBody)
+  }
+
   if (req.headers['x-webhook-secret'] !== process.env.WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'unauthorized' })
   }
 
+  let parsedBody = {}
   try {
-    const { event, brand_id, data } = req.body || {}
+    parsedBody = rawBody.length ? JSON.parse(rawBody.toString('utf8')) : {}
+  } catch {
+    return res.status(400).json({ error: 'invalid JSON body' })
+  }
+
+  try {
+    const { event, brand_id, data } = parsedBody || {}
     if (!event) return res.status(400).json({ error: 'event required' })
 
     const { neon } = await import('@neondatabase/serverless')

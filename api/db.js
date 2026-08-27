@@ -100,6 +100,19 @@ export default async function handler(req, res) {
 
     const { query, params } = req.body
     if (!query) return res.status(400).json({ error: 'No query provided' })
+
+    // SECURITY GUARD: the Payments & Documents tables hold financial data,
+    // signatures, bank details and client access tokens. They must never be
+    // reachable through this open SQL endpoint — all access to them goes
+    // through the authenticated docs_* actions in /api/workflow.
+    const SENSITIVE_TABLES =
+      /\b("?)(proposals|invoices|payments|doc_files|doc_signatures|doc_access_tokens|doc_audit_events|doc_settings)\1\b/i
+    if (SENSITIVE_TABLES.test(String(query))) {
+      return res
+        .status(403)
+        .json({ error: 'This table is not accessible through /api/db' })
+    }
+
     const result = await sql.query(query, params || [])
     return res.status(200).json({ data: result?.rows ?? result })
   } catch (error) {
