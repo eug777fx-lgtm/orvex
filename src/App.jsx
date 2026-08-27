@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import {
   NavLink,
   Routes,
@@ -25,6 +25,7 @@ import {
   UserCog,
   Share2,
   Phone,
+  Wallet,
 } from 'lucide-react'
 import { migrateSchema } from './utils/migrateSchema'
 import Background from './components/Background'
@@ -39,6 +40,10 @@ import Import from './pages/Import'
 import Demos from './pages/Demos'
 import Workflow from './pages/Workflow'
 import PublicDemo from './pages/PublicDemo'
+
+// Public client-facing document pages (lazy: keeps pdf.js out of the CRM bundle)
+const ClientProposal = lazy(() => import('./pages/ClientProposal'))
+const ClientInvoice = lazy(() => import('./pages/ClientInvoice'))
 import MarketingEngine from './pages/MarketingEngine'
 import Documents from './pages/Documents'
 import Automations from './pages/Automations'
@@ -46,6 +51,7 @@ import Team from './pages/Team'
 import Social from './pages/Social'
 import AIReceptionist from './pages/AIReceptionist'
 import AppLogin from './components/AppLogin'
+import PaymentsDocs from './pages/PaymentsDocs'
 import { AuthContext } from './lib/auth'
 import useIsMobile from './utils/useIsMobile'
 
@@ -66,6 +72,7 @@ const navItems = [
   { path: '/tasks', label: 'Tasks', icon: CheckSquare },
   { path: '/workflow', label: 'Workflow', icon: ListChecks, adminOnly: true },
   { path: '/documents', label: 'Documents', icon: FileText, adminOnly: true },
+  { path: '/payments-docs', label: 'Payments & Documents', icon: Wallet, roles: ['admin', 'manager'] },
   { path: '/automations', label: 'Automations', icon: Zap, adminOnly: true },
   { path: '/team', label: 'Team', icon: UserCog, roles: ['admin', 'manager'] },
   { path: '/marketing', label: 'AI Office', icon: Sparkles, adminOnly: true },
@@ -273,6 +280,14 @@ function AnimatedRoutes({ role }) {
             <AdminOnly role={role}>
               <Documents />
             </AdminOnly>
+          }
+        />
+        <Route
+          path="/payments-docs"
+          element={
+            <RoleGuard role={role} allow={['admin', 'manager']}>
+              <PaymentsDocs />
+            </RoleGuard>
           }
         />
         <Route
@@ -542,6 +557,26 @@ export default function App() {
       <Routes>
         <Route path="/demo/:slug" element={<PublicDemo />} />
       </Routes>
+    )
+  }
+
+  // Public client-facing proposal & invoice pages (secure tokenized links) —
+  // clients never see the CRM or its login.
+  if (location.pathname.startsWith('/client/')) {
+    return (
+      <Suspense
+        fallback={
+          <div style={{ minHeight: '100vh', background: '#000', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', fontSize: 14 }}>
+            Loading…
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/client/proposal/:token" element={<ClientProposal />} />
+          <Route path="/client/invoice/:token" element={<ClientInvoice />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     )
   }
 
