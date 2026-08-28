@@ -111,10 +111,50 @@ const clientIp = (req) =>
 // Schema (idempotent — runs once per cold start)
 // ---------------------------------------------------------------------------
 
-let schemaReady = false
-async function ensureSchema(sql) {
-  if (schemaReady) return
-  await sql.query(`
+// Concurrent serverless instances can race on CREATE TABLE IF NOT EXISTS —
+// Postgres then throws unique violations on internal catalogs
+// ("pg_type_typname_nsp_index") or "already exists" errors. That only means
+// another instance created the object a moment earlier, so those errors are
+// safe to absorb after a short retry.
+const isConcurrentDdlError = (e) => {
+  const msg = String(e?.message || '')
+  return (
+    e?.code === '23505' || // unique_violation on a system catalog (pg_type/pg_class race)
+    e?.code === '42P07' || // duplicate_table
+    e?.code === '42710' || // duplicate_object
+    msg.includes('pg_type_typname_nsp_index') ||
+    msg.includes('already exists') ||
+    msg.includes('tuple concurrently')
+  )
+}
+
+async function ddl(sql, text) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await sql.query(text)
+      return
+    } catch (e) {
+      if (!isConcurrentDdlError(e)) throw e
+      if (attempt >= 2) return // object was created by another instance — continue
+      await new Promise((r) => setTimeout(r, 250 + Math.floor(Math.random() * 300)))
+    }
+  }
+}
+
+let schemaPromise = null
+function ensureSchema(sql) {
+  // Single-flight per warm instance; reset on failure so the next request retries.
+  if (!schemaPromise) {
+    schemaPromise = createSchema(sql).catch((e) => {
+      schemaPromise = null
+      throw e
+    })
+  }
+  return schemaPromise
+}
+
+async function createSchema(sql) {
+  await ddl(sql, `
     CREATE TABLE IF NOT EXISTS doc_settings (
       id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
       business JSONB DEFAULT '{}'::jsonb,
@@ -124,8 +164,8 @@ async function ensureSchema(sql) {
       updated_at TIMESTAMPTZ DEFAULT now()
     )`)
   await sql.query(`INSERT INTO doc_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`)
-  await sql.query(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type TEXT DEFAULT 'aruba'`)
-  await sql.query(`
+  await ddl(sql, `ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type TEXT DEFAULT 'aruba'`)
+  await ddl(sql, `
     CREATE TABLE IF NOT EXISTS proposals (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       client_id UUID REFERENCES clients(id),
@@ -143,8 +183,8 @@ async function ensureSchema(sql) {
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     )`)
-  await sql.query(`CREATE INDEX IF NOT EXISTS proposals_client_idx ON proposals(client_id)`)
-  await sql.query(`
+  await ddl(sql, `CREATE INDEX IF NOT EXISTS proposals_client_idx ON proposals(client_id)`)
+  await ddl(sql, `
     CREATE TABLE IF NOT EXISTS invoices (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       client_id UUID REFERENCES clients(id),
@@ -164,8 +204,8 @@ async function ensureSchema(sql) {
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     )`)
-  await sql.query(`CREATE INDEX IF NOT EXISTS invoices_client_idx ON invoices(client_id)`)
-  await sql.query(`
+  await ddl(sql, `CREATE INDEX IF NOT EXISTS invoices_client_idx ON invoices(client_id)`)
+  await ddl(sql, `
     CREATE TABLE IF NOT EXISTS doc_files (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       parent_type TEXT NOT NULL,
@@ -178,8 +218,8 @@ async function ensureSchema(sql) {
       sha256 TEXT,
       created_at TIMESTAMPTZ DEFAULT now()
     )`)
-  await sql.query(`CREATE INDEX IF NOT EXISTS doc_files_parent_idx ON doc_files(parent_type, parent_id)`)
-  await sql.query(`
+  await ddl(sql, `CREATE INDEX IF NOT EXISTS doc_files_parent_idx ON doc_files(parent_type, parent_id)`)
+  await ddl(sql, `
     CREATE TABLE IF NOT EXISTS doc_signatures (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       proposal_id UUID UNIQUE REFERENCES proposals(id),
@@ -194,7 +234,7 @@ async function ensureSchema(sql) {
       doc_sha256 TEXT,
       created_at TIMESTAMPTZ DEFAULT now()
     )`)
-  await sql.query(`
+  await ddl(sql, `
     CREATE TABLE IF NOT EXISTS doc_access_tokens (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       token TEXT UNIQUE NOT NULL,
@@ -208,8 +248,8 @@ async function ensureSchema(sql) {
       view_count INT DEFAULT 0,
       created_at TIMESTAMPTZ DEFAULT now()
     )`)
-  await sql.query(`CREATE INDEX IF NOT EXISTS doc_tokens_parent_idx ON doc_access_tokens(parent_type, parent_id)`)
-  await sql.query(`
+  await ddl(sql, `CREATE INDEX IF NOT EXISTS doc_tokens_parent_idx ON doc_access_tokens(parent_type, parent_id)`)
+  await ddl(sql, `
     CREATE TABLE IF NOT EXISTS payments (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       invoice_id UUID REFERENCES invoices(id),
@@ -230,8 +270,8 @@ async function ensureSchema(sql) {
       meta JSONB DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ DEFAULT now()
     )`)
-  await sql.query(`CREATE INDEX IF NOT EXISTS payments_invoice_idx ON payments(invoice_id)`)
-  await sql.query(`
+  await ddl(sql, `CREATE INDEX IF NOT EXISTS payments_invoice_idx ON payments(invoice_id)`)
+  await ddl(sql, `
     CREATE TABLE IF NOT EXISTS doc_audit_events (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       event TEXT NOT NULL,
@@ -242,9 +282,8 @@ async function ensureSchema(sql) {
       meta JSONB DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ DEFAULT now()
     )`)
-  await sql.query(`CREATE INDEX IF NOT EXISTS doc_audit_parent_idx ON doc_audit_events(parent_type, parent_id)`)
-  await sql.query(`CREATE INDEX IF NOT EXISTS doc_audit_client_idx ON doc_audit_events(client_id)`)
-  schemaReady = true
+  await ddl(sql, `CREATE INDEX IF NOT EXISTS doc_audit_parent_idx ON doc_audit_events(parent_type, parent_id)`)
+  await ddl(sql, `CREATE INDEX IF NOT EXISTS doc_audit_client_idx ON doc_audit_events(client_id)`)
 }
 
 async function audit(sql, event, { parentType, parentId, clientId, actor, meta } = {}) {
