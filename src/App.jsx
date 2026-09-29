@@ -26,6 +26,7 @@ import {
   Share2,
   Phone,
   Wallet,
+  Radar,
 } from 'lucide-react'
 import { migrateSchema } from './utils/migrateSchema'
 import Background from './components/Background'
@@ -52,6 +53,7 @@ import Social from './pages/Social'
 import AIReceptionist from './pages/AIReceptionist'
 import AppLogin from './components/AppLogin'
 import PaymentsDocs from './pages/PaymentsDocs'
+import LeadIntelligence from './pages/LeadIntelligence'
 import { AuthContext } from './lib/auth'
 import useIsMobile from './utils/useIsMobile'
 
@@ -66,6 +68,7 @@ import useIsMobile from './utils/useIsMobile'
 const navItems = [
   { path: '/', label: 'Dashboard', end: true, icon: LayoutDashboard },
   { path: '/leads', label: 'Leads', icon: Users },
+  { path: '/discover', label: 'Discover Leads', icon: Radar, roles: ['admin', 'manager'] },
   { path: '/pipeline', label: 'Pipeline', icon: Kanban },
   { path: '/offers', label: 'Offers', icon: Package },
   { path: '/scripts', label: 'Scripts', icon: BookOpen },
@@ -262,6 +265,14 @@ function AnimatedRoutes({ role }) {
         <Route path="/" element={<Dashboard />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/leads/:id" element={<LeadDetail />} />
+        <Route
+          path="/discover"
+          element={
+            <RoleGuard role={role} allow={['admin', 'manager']}>
+              <LeadIntelligence />
+            </RoleGuard>
+          }
+        />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/offers" element={<Offers />} />
         <Route path="/scripts" element={<Scripts />} />
