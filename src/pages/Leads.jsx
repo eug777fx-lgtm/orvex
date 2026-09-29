@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import db from '@/lib/db'
 import AddLeadModal from '../components/AddLeadModal'
-import Discover from '../components/Discover'
+import { LEAD_STATUS_KEYS, STATUS_STYLES, statusLabel } from '../lib/leadStatuses'
 import PageShell from '../components/PageShell'
 import useIsMobile from '../utils/useIsMobile'
 import { useAuth, workflowApi } from '../lib/auth'
@@ -39,16 +39,7 @@ const INDUSTRY_FILTERS = [
   'Gym',
 ]
 
-const STATUS_FILTERS = ['All', 'new', 'contacted', 'follow_up', 'interested', 'closed', 'lost']
-
-const STATUS_STYLES = {
-  new: { bg: 'rgba(255,255,255,0.08)' },
-  contacted: { bg: 'rgba(255,255,255,0.12)' },
-  follow_up: { bg: 'rgba(255,255,255,0.15)' },
-  interested: { bg: 'rgba(255,255,255,0.2)' },
-  closed: { bg: 'rgba(255,255,255,0.25)' },
-  lost: { bg: 'rgba(255,255,255,0.05)', strike: true },
-}
+const STATUS_FILTERS = ['All', ...LEAD_STATUS_KEYS]
 
 const pageHeadingStyle = {
   fontSize: '1.5rem',
@@ -498,14 +489,14 @@ export default function Leads() {
         {[
           { value: 'my', label: 'My Leads' },
           { value: 'booked', label: 'Booked Calls' },
-          { value: 'discover', label: 'Discover' },
+          ...(isRepRole ? [] : [{ value: 'discover', label: 'Discover' }]),
         ].map((t) => {
           const active = tab === t.value
           return (
             <button
               key={t.value}
               type="button"
-              onClick={() => setTab(t.value)}
+              onClick={() => (t.value === 'discover' ? navigate('/discover') : setTab(t.value))}
               style={{
                 padding: '6px 20px',
                 borderRadius: 999,
@@ -523,8 +514,6 @@ export default function Leads() {
           )
         })}
       </div>
-
-      {tab === 'discover' && <Discover onLeadsAdded={fetchLeads} />}
 
       {tab === 'booked' && (
         <div style={glassCardStyle}>
@@ -817,7 +806,7 @@ export default function Leads() {
           <select style={selectStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
             {STATUS_FILTERS.map((s) => (
               <option key={s} value={s}>
-                {s === 'All' ? 'All statuses' : s}
+                {s === 'All' ? 'All statuses' : statusLabel(s)}
               </option>
             ))}
           </select>
@@ -939,7 +928,7 @@ export default function Leads() {
                   {lead.industry && (
                     <span style={industryPillStyle()}>{lead.industry}</span>
                   )}
-                  <span style={statusPillStyle(lead.status)}>{lead.status || 'new'}</span>
+                  <span style={statusPillStyle(lead.status)}>{statusLabel(lead.status || 'new')}</span>
                 </div>
                 {isAdmin && (
                   <div onClick={(e) => e.stopPropagation()}>
@@ -1109,7 +1098,7 @@ export default function Leads() {
                       <ScoreBadge score={lead.opportunity_score} />
                     </td>
                     <td style={tableCellBase}>
-                      <span style={statusPillStyle(lead.status)}>{lead.status || 'new'}</span>
+                      <span style={statusPillStyle(lead.status)}>{statusLabel(lead.status || 'new')}</span>
                     </td>
                     {isAdmin && (
                       <td

@@ -24,15 +24,10 @@ import { useAuth, workflowApi } from '../lib/auth'
 import { pickBestScript } from '../utils/matchScript'
 import { suggestOffer } from '../utils/suggestOffer'
 import useIsMobile from '../utils/useIsMobile'
+import { STATUS_STYLES, statusLabel } from '../lib/leadStatuses'
+import { intelApi, fmtMoney } from '../lib/intelApi'
+import CallModal from '../components/intel/CallModal'
 
-const STATUS_STYLES = {
-  new: { bg: 'rgba(255,255,255,0.08)' },
-  contacted: { bg: 'rgba(255,255,255,0.12)' },
-  follow_up: { bg: 'rgba(255,255,255,0.15)' },
-  interested: { bg: 'rgba(255,255,255,0.2)' },
-  closed: { bg: 'rgba(255,255,255,0.25)' },
-  lost: { bg: 'rgba(255,255,255,0.05)', strike: true },
-}
 
 const cardStyle = {
   background: 'rgba(17, 17, 17,0.65)',
@@ -181,7 +176,7 @@ function StatusPill({ status }) {
   const conf = STATUS_STYLES[status] || STATUS_STYLES.new
   return (
     <Pill bg={conf.bg} strike={conf.strike} muted={conf.strike}>
-      {status || 'new'}
+      {statusLabel(status || 'new')}
     </Pill>
   )
 }
@@ -1514,6 +1509,7 @@ export default function LeadDetail() {
   const [activityPrefill, setActivityPrefill] = useState(null)
   const [dealModalOpen, setDealModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
+  const [intelCallOpen, setIntelCallOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const isMobile = useIsMobile()
@@ -1693,6 +1689,12 @@ export default function LeadDetail() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <StatusPill status={lead.status} />
+          {(appAuth?.role === 'admin' || appAuth?.role === 'manager') && (
+            <button type="button" onClick={() => setIntelCallOpen(true)} style={ghostButtonStyle}>
+              <Phone size={12} />
+              Log call + follow-up
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setEditOpen(true)}
@@ -1747,6 +1749,37 @@ export default function LeadDetail() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
+          {lead.lead_score != null && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                Lead Intelligence
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.5)' }}>Score</span>
+                  <span style={{ color: '#fff', fontWeight: 600 }}>{lead.lead_score}/100</span>
+                </div>
+                {lead.recommended_service && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>Recommended</span>
+                    <span style={{ color: '#fff', textAlign: 'right' }}>{lead.recommended_service}</span>
+                  </div>
+                )}
+                {lead.suggested_price != null && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>Suggested price</span>
+                    <span style={{ color: '#fff' }}>{fmtMoney(lead.suggested_price, lead.price_currency || 'USD')}</span>
+                  </div>
+                )}
+                {lead.next_follow_up && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>Next follow-up</span>
+                    <span style={{ color: '#fff' }}>{String(lead.next_follow_up).slice(0, 10)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           <QuickActionsPanel
             onCreateDeal={() => setDealModalOpen(true)}
             onAddTask={() => setTaskFormOpen(true)}
@@ -1786,6 +1819,24 @@ export default function LeadDetail() {
         </div>
       </div>
 
+      <CallModal
+        key={intelCallOpen ? 'open' : 'closed'}
+        open={intelCallOpen}
+        onClose={() => setIntelCallOpen(false)}
+        business={{ id: lead.id, business_name: lead.company_name, phone: lead.phone, lead: { id: lead.id, status: lead.status } }}
+        onSubmit={async (payload) => {
+          const r = await intelApi('log_call', { lead_id: lead.id, ...payload })
+          if (!r.success) {
+            setToastMessage(r.error || 'Could not save the call')
+            return false
+          }
+          setToastMessage(r.follow_up_created ? 'Call saved and follow-up scheduled' : 'Call saved')
+          reloadLead()
+          reloadActivities()
+          reloadTasks()
+          return true
+        }}
+      />
       <EditLeadModal
         open={editOpen}
         lead={lead}
