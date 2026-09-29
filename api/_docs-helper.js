@@ -22,6 +22,9 @@
 // ============================================================================
 
 import crypto from 'node:crypto'
+import { b64url, issueAuthToken, verifyAuthToken } from './_auth.js'
+
+export { issueAuthToken }
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -29,51 +32,6 @@ import crypto from 'node:crypto'
 
 const rows = (r) => r?.rows ?? r ?? []
 const first = (r) => rows(r)[0] || null
-
-function appSecret() {
-  return (
-    process.env.APP_SECRET ||
-    process.env.WEBHOOK_SECRET ||
-    crypto
-      .createHash('sha256')
-      .update(String(process.env.VITE_DATABASE_URL || 'lithos'))
-      .digest('hex')
-  )
-}
-
-const b64url = (buf) =>
-  Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-
-// --- Admin session tokens (HMAC-signed, issued at login) -------------------
-
-export function issueAuthToken(user) {
-  const payload = b64url(
-    JSON.stringify({
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      exp: Date.now() + 1000 * 60 * 60 * 24 * 14, // 14 days
-    }),
-  )
-  const sig = crypto.createHmac('sha256', appSecret()).update(payload).digest('hex')
-  return `${payload}.${sig}`
-}
-
-function verifyAuthToken(token) {
-  if (!token || typeof token !== 'string' || !token.includes('.')) return null
-  const [payload, sig] = token.split('.')
-  const expected = crypto.createHmac('sha256', appSecret()).update(payload).digest('hex')
-  const a = Buffer.from(String(sig))
-  const b = Buffer.from(expected)
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null
-  try {
-    const data = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64'))
-    if (!data.exp || Date.now() > data.exp) return null
-    return data
-  } catch {
-    return null
-  }
-}
 
 function requireAdmin(req) {
   const token = req.headers['x-auth-token'] || req.body?.auth_token || req.query?.auth_token

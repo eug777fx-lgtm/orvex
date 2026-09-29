@@ -106,7 +106,7 @@ export default async function handler(req, res) {
     // reachable through this open SQL endpoint — all access to them goes
     // through the authenticated docs_* actions in /api/workflow.
     const SENSITIVE_TABLES =
-      /\b("?)(proposals|invoices|payments|doc_files|doc_signatures|doc_access_tokens|doc_audit_events|doc_settings)\1\b/i
+      /\b("?)(proposals|invoices|payments|doc_files|doc_signatures|doc_access_tokens|doc_audit_events|doc_settings|intel_settings|intel_presets|intel_usage_events|lead_discovery_searches|lead_discovery_search_results|discovered_businesses|business_analysis|lead_scores|pricing_recommendations)\1\b/i
     if (SENSITIVE_TABLES.test(String(query))) {
       return res
         .status(403)
