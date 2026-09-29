@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Check } from 'lucide-react'
 import db from '@/lib/db'
+import { LEAD_STATUS_KEYS, statusLabel } from '../lib/leadStatuses'
 import { calculateScore } from '../utils/scoring'
 
 const INDUSTRIES = [
@@ -24,7 +25,7 @@ const INDUSTRIES = [
 
 const SOURCES = ['manual', 'scrape', 'referral']
 
-const STATUSES = ['new', 'contacted', 'follow_up', 'interested', 'closed', 'lost']
+const STATUSES = LEAD_STATUS_KEYS
 
 const FLAG_OPTIONS = [
   { key: 'no_website', label: 'No website' },
@@ -472,7 +473,7 @@ export default function EditLeadModal({ open, lead, onClose, onSaved }) {
             >
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {statusLabel(s)}
                 </option>
               ))}
             </select>
