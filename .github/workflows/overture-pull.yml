@@ -1,0 +1,40 @@
+# Lithos Labs acquisition pilot: pull Overture Maps Places for the target
+# metros/niches. Manual for now ("Run workflow" in the Actions tab); later this
+# becomes the monthly refresh that loads Neon.
+name: Overture places pull
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Overture release (blank = newest)"
+        required: false
+        default: ""
+      min_confidence:
+        description: "Minimum Overture confidence"
+        required: false
+        default: "0.5"
+
+permissions:
+  contents: read
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install duckdb==1.5.6
+      - name: Pull and summarize
+        env:
+          OVERTURE_RELEASE: ${{ inputs.release }}
+          MIN_CONFIDENCE: ${{ inputs.min_confidence }}
+        run: python scripts/overture_pull.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: overture-results
+          path: results/
+          retention-days: 30
