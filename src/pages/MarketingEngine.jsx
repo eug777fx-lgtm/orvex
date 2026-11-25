@@ -410,6 +410,7 @@ function PipelineView({ brand, stats, showToast, onRefresh }) {
     try {
       const res = await fetch(
         `/api/db?action=logs&brand_id=${encodeURIComponent(brand.id)}&limit=10`,
+          { headers: { 'x-auth-token': JSON.parse(localStorage.getItem('lithos_auth') || '{}').auth_token || '' } },
       )
       if (!res.ok) return
       const data = await res.json()
@@ -9395,6 +9396,7 @@ function LogPanel({ entries, wide, brand }) {
       try {
         const res = await fetch(
           `/api/db?action=logs&brand_id=${encodeURIComponent(brand.id)}&limit=20`,
+          { headers: { 'x-auth-token': JSON.parse(localStorage.getItem('lithos_auth') || '{}').auth_token || '' } },
         )
         if (!res.ok) return
         const data = await res.json()
