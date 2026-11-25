@@ -7,6 +7,17 @@
 // GET  /api/db?action=logs&brand_id=<uuid>&limit=20
 //   Returns recent agent_runs with computed items_generated + human message.
 
+import { verifyAuthToken } from './_auth.js'
+
+// The only statements a signed-out visitor may run: the public demo page
+// (/demo/:slug) loading its demo and counting the view. Everything else needs
+// a CRM login token.
+const norm = (q) => String(q || '').replace(/\s+/g, ' ').trim()
+const PUBLIC_QUERIES = new Set([
+  'SELECT * FROM demos WHERE slug = $1 LIMIT 1',
+  "UPDATE demos SET view_count = COALESCE(view_count, 0) + 1, last_viewed_at = now(), status = CASE WHEN status = 'sent' THEN 'viewed' ELSE status END WHERE id = $1",
+])
+
 function logMessageFor(agentType, status, itemsGenerated) {
   if (status === 'error' || status === 'failed') {
     return 'Agent encountered an error — check API keys'
@@ -76,11 +87,13 @@ async function handleLogs(sql, req, res) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') return res.status(204).end()
 
-  if (req.method === 'OPTIONS') return res.status(200).end()
+  // Signed-in CRM users only (the token comes from the login), except the
+  // two public demo-page statements above.
+  const user = verifyAuthToken(req.headers['x-auth-token'])
+  const isPublic = req.method === 'POST' && PUBLIC_QUERIES.has(norm(req.body?.query))
+  if (!user && !isPublic) return res.status(401).json({ error: 'Please sign in again' })
 
   try {
     const { neon } = await import('@neondatabase/serverless')
