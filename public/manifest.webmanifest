@@ -1,0 +1,22 @@
+{
+  "name": "Lithos Labs",
+  "short_name": "Lithos",
+  "description": "Lithos Labs CRM: leads, clients, growth and agents.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Leads", "url": "/leads" },
+    { "name": "Pipeline", "url": "/pipeline" },
+    { "name": "Tasks", "url": "/tasks" }
+  ]
+}
