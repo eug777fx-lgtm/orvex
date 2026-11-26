@@ -30,6 +30,7 @@ export function issueAuthToken(user) {
       id: user.id,
       name: user.name,
       role: user.role,
+      iat: Date.now(), // lets the server revoke older sessions (sales_reps.sessions_valid_after)
       exp: Date.now() + 1000 * 60 * 60 * 24 * 14, // 14 days
     }),
   )

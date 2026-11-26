@@ -56,8 +56,39 @@
 //   Cron-driven worker. Drains up to 3 packages stuck in 'producing' and
 //   runs the full Higgsfield + ElevenLabs + Creatomate production for each.
 
+import crypto from 'node:crypto'
 import { produceVideo } from './_render-helper.js'
 import { docsHandler, issueAuthToken } from './_docs-helper.js'
+import { outreachHandler } from './_outreach.js'
+import {
+  cors, authUser, isAutomation, retellVerified, clientIp, safeEqual, bypassEnabled, forgetUser,
+  hashPassword, verifyPassword, passwordProblem, loginBlocked, recordAttempt, ensureAuthSchema, getSql,
+} from './_guard.js'
+
+// ---- who may call which action -------------------------------------------
+// Public: the login screen and the website's booking form.
+const PUBLIC_ACTIONS = new Set(['rep_login', 'rep_register', 'book_call'])
+// Server-to-server jobs (Make.com, cron) with WEBHOOK_SECRET / CRON_SECRET, or a signed-in admin.
+const AUTOMATION_ACTIONS = new Set([
+  'published', 'daily_report', 'process_productions', 'publish_due_posts', 'test_webhook', 'next',
+  'next_scheduled', 'sync_instagram_analytics', 'analytics_pull', 'render_status', 'pipeline_list',
+])
+// Admin only: money, team, clients, documents, marketing engine, AI agents, social.
+const ADMIN_ACTIONS = new Set([
+  'update_rep_role', 'reset_rep_password', 'delete_rep', 'mark_commission_paid', 'seed_offers',
+  'get_clients', 'add_client', 'get_documents', 'save_document', 'delete_document',
+  'get_automations', 'save_automation', 'delete_automation', 'toggle_automation',
+  'get_ai_agents', 'create_ai_agent', 'update_ai_agent', 'delete_ai_agent', 'get_call_logs', 'get_ai_analytics', 'get_retell_agent',
+  'get_social_posts', 'create_social_post', 'update_social_post', 'delete_social_post', 'get_social_analytics',
+  'approve', 'reject', 'pipeline_start', 'pipeline_advance', 'edit_video', 'post_instagram', 'generate_pdf',
+])
+// Admins and managers: team oversight and lead distribution.
+const MANAGER_ACTIONS = new Set([
+  'outreach_list', 'outreach_add', 'outreach_update',
+  'admin_all_leads', 'admin_all_reps', 'admin_deals', 'admin_leads_pool', 'assign_lead', 'bulk_assign_leads',
+  'reassign_lead', 'get_all_reps', 'get_sales_reps', 'team_overview', 'toggle_rep_status', 'approve_deal',
+  'delete_deal', 'discover_leads',
+])
 
 const MAX_PER_DAY = 3
 const SLOT_GAP_HOURS = 4
@@ -1148,7 +1179,7 @@ async function handleSales(sql, { method, action, query, body }) {
   if (method === 'GET') {
     if (action === 'rep_profile') {
       const r = await sql.query(
-        `SELECT sr.*,
+        `SELECT sr.id, sr.name, sr.email, sr.role, sr.is_active, sr.commission_rate, sr.created_at,
                 COUNT(DISTINCT sl.id) AS total_leads,
                 COUNT(DISTINCT d.id) FILTER (WHERE d.status IN ('approved','commission_paid')) AS deals_closed,
                 COALESCE(SUM(d.commission_amount) FILTER (WHERE d.status IN ('approved','commission_paid')), 0) AS total_earnings
@@ -1249,7 +1280,7 @@ async function handleSales(sql, { method, action, query, body }) {
     }
     if (action === 'admin_all_reps') {
       const r = await sql.query(
-        `SELECT sr.*,
+        `SELECT sr.id, sr.name, sr.email, sr.role, sr.is_active, sr.commission_rate, sr.created_at,
                 COUNT(DISTINCT sl.id) AS total_leads,
                 COUNT(DISTINCT d.id) FILTER (WHERE d.status IN ('approved','commission_paid')) AS deals_closed,
                 COALESCE(SUM(d.commission_amount) FILTER (WHERE d.status = 'commission_paid'), 0) AS paid_commission,
@@ -1431,14 +1462,24 @@ async function handleSales(sql, { method, action, query, body }) {
   if (method === 'POST') {
     if (action === 'rep_login') {
       const email = String(body.email || '').trim()
-      const password = body.password
+      const password = String(body.password || '')
+      const ip = body.__ip || 'unknown'
+      const keys = [[`login:email:${email.toLowerCase()}`, 8], [`login:ip:${ip}`, 30]]
+      if (await loginBlocked(sql, keys)) {
+        return {
+          handled: true,
+          payload: { success: false, error: 'Too many attempts. Wait 15 minutes and try again.' },
+        }
+      }
 
-      // Hard CEO bypass — no database required, so the admin can never be
-      // locked out even on a fresh / unreachable database.
+      // Emergency admin login: only when a strong ADMIN_BYPASS_PASSWORD is set
+      // in Vercel. There is no default password.
       if (
+        bypassEnabled() &&
         email.toLowerCase() === 'admin@lithoslabs.com' &&
-        password === (process.env.ADMIN_BYPASS_PASSWORD || 'admin123')
+        safeEqual(password, process.env.ADMIN_BYPASS_PASSWORD)
       ) {
+        await recordAttempt(sql, keys.map((k) => k[0]), true)
         const adminUser = {
           id: 'admin',
           name: 'Eugene',
@@ -1460,11 +1501,27 @@ async function handleSales(sql, { method, action, query, body }) {
         [email],
       )
       const rep = firstOf(r)
-      if (!rep || rep.password_hash !== password) {
+      // passwords that were ever set by code (old seed and old reset) are public knowledge
+      const RETIRED = ['admin123', 'reset123']
+      if (rep && RETIRED.includes(password) && verifyPassword(password, rep.password_hash).ok) {
+        await recordAttempt(sql, keys.map((k) => k[0]), false)
+        return {
+          handled: true,
+          payload: { success: false, error: 'That password is no longer allowed. Ask an admin to reset it.' },
+        }
+      }
+      const check = rep ? verifyPassword(password, rep.password_hash) : { ok: false }
+      if (!rep || !check.ok) {
+        await recordAttempt(sql, keys.map((k) => k[0]), false)
         return {
           handled: true,
           payload: { success: false, error: 'Invalid credentials' },
         }
+      }
+      await recordAttempt(sql, keys.map((k) => k[0]), true)
+      // old rows kept the password itself: store a scrypt hash from now on
+      if (check.upgrade) {
+        await sql.query('UPDATE sales_reps SET password_hash = $1 WHERE id = $2', [hashPassword(password), rep.id])
       }
       // Roles: admin | manager | sales. Legacy 'rep' rows normalize to 'sales'.
       const role =
@@ -1490,7 +1547,7 @@ async function handleSales(sql, { method, action, query, body }) {
       const name = String(body.name || '').trim()
       const email = String(body.email || '').trim().toLowerCase()
       const { password, invite_code } = body
-      if (invite_code !== process.env.SALES_REP_INVITE_CODE) {
+      if (!process.env.SALES_REP_INVITE_CODE || !safeEqual(String(invite_code || ''), process.env.SALES_REP_INVITE_CODE)) {
         return {
           handled: true,
           payload: { success: false, error: 'Invalid invite code' },
@@ -1502,6 +1559,8 @@ async function handleSales(sql, { method, action, query, body }) {
           payload: { success: false, error: 'Name, email and password required' },
         }
       }
+      const weak = passwordProblem(password)
+      if (weak) return { handled: true, payload: { success: false, error: weak } }
       const existing = await sql.query(
         'SELECT id FROM sales_reps WHERE lower(email)=$1',
         [email],
@@ -1517,7 +1576,7 @@ async function handleSales(sql, { method, action, query, body }) {
           `INSERT INTO sales_reps (name, email, password_hash, role, is_active)
            VALUES ($1, $2, $3, 'sales', true)
            RETURNING id, name, email, role`,
-          [name, email, password],
+          [name, email, hashPassword(password)],
         )
         const rep = firstOf(r)
         return {
@@ -1631,7 +1690,26 @@ async function handleSales(sql, { method, action, query, body }) {
     if (action === 'book_call') {
       // Public webhook: a visitor booked a call on the landing page (via
       // Make.com or a direct form POST). No auth — creates a lead from scratch.
-      const { name, email, phone, company, message, scheduled_time } = body
+      // Public form: cap sizes, require a way to reach them, and limit each
+      // visitor to a few bookings per 15 minutes (counted in Postgres).
+      const clip = (v, n) => String(v ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, n)
+      const name = clip(body.name, 120)
+      const email = clip(body.email, 200)
+      const phone = clip(body.phone, 40)
+      const company = clip(body.company, 160)
+      const message = clip(body.message, 2000)
+      const scheduled_time = clip(body.scheduled_time, 80)
+      if (!name || (!email && !phone)) {
+        return { handled: true, payload: { success: false, error: 'Please add your name and a phone or email' } }
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        return { handled: true, payload: { success: false, error: 'Please enter a valid email' } }
+      }
+      const bookKey = `book:${body.__ip || 'unknown'}`
+      if (await loginBlocked(sql, [[bookKey, 5]])) {
+        return { handled: true, payload: { success: false, error: 'Too many requests. Please try again later.' } }
+      }
+      await recordAttempt(sql, [bookKey], false)
       const noteText = `Booked a call. Message: ${message || ''}. Scheduled: ${
         scheduled_time || 'TBD'
       }`
@@ -1687,7 +1765,8 @@ async function handleSales(sql, { method, action, query, body }) {
         }).catch((e) => console.log('Webhook error:', e.message))
       }
 
-      return { handled: true, payload: { success: true, lead } }
+      void lead
+      return { handled: true, payload: { success: true } }
     }
     if (action === 'update_lead_status') {
       const { lead_id, rep_id, status, notes, next_followup } = body
@@ -2264,7 +2343,9 @@ async function handleSales(sql, { method, action, query, body }) {
       const validRoles = ['sales', 'manager', 'admin']
       if (!validRoles.includes(role))
         return { handled: true, payload: { success: false, error: 'Invalid role' } }
-      await sql.query('UPDATE sales_reps SET role=$1 WHERE id=$2', [role, rep_id])
+      await ensureAuthSchema(sql)
+      await sql.query('UPDATE sales_reps SET role=$1, sessions_valid_after=now() WHERE id=$2', [role, rep_id])
+      forgetUser(rep_id)
       return { handled: true, payload: { success: true } }
     }
     if (action === 'toggle_rep_status') {
@@ -2275,10 +2356,14 @@ async function handleSales(sql, { method, action, query, body }) {
           payload: { success: false, error: 'rep_id required' },
         }
       }
-      await sql.query('UPDATE sales_reps SET is_active=$1 WHERE id=$2', [
-        !!is_active,
-        rep_id,
-      ])
+      await ensureAuthSchema(sql)
+      await sql.query(
+        `UPDATE sales_reps SET is_active=$1,
+                sessions_valid_after = CASE WHEN $1 THEN sessions_valid_after ELSE now() END
+          WHERE id=$2`,
+        [!!is_active, rep_id],
+      )
+      forgetUser(rep_id)
       return { handled: true, payload: { success: true } }
     }
     if (action === 'reset_rep_password') {
@@ -2289,11 +2374,15 @@ async function handleSales(sql, { method, action, query, body }) {
           payload: { success: false, error: 'rep_id required' },
         }
       }
+      // A random temporary password, shown once to the admin who reset it.
+      const temp = crypto.randomBytes(9).toString('base64').replace(/[+/=]/g, '').slice(0, 12)
+      await ensureAuthSchema(sql)
       await sql.query(
-        "UPDATE sales_reps SET password_hash='reset123' WHERE id=$1",
-        [rep_id],
+        'UPDATE sales_reps SET password_hash=$1, sessions_valid_after=now() WHERE id=$2',
+        [hashPassword(temp), rep_id],
       )
-      return { handled: true, payload: { success: true } }
+      forgetUser(rep_id)
+      return { handled: true, payload: { success: true, temp_password: temp } }
     }
     if (action === 'delete_rep') {
       const { rep_id } = body
@@ -2489,14 +2578,58 @@ async function handleSales(sql, { method, action, query, body }) {
 export const config = { maxDuration: 300 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') return res.status(200).end()
+  cors(req, res)
+  if (req.method === 'OPTIONS') return res.status(204).end()
 
   // Handled before the GET/POST split so it works with either method.
   const action = req.body?.action || req.query?.action
+
+  // ---- access gate: every action is checked on the server ------------------
+  if (typeof action === 'string' && action.startsWith('docs_')) {
+    // Payments & Documents checks its own access (admin token, or a client's
+    // document link). A login that was revoked or deactivated stops here.
+    if (action.startsWith('docs_client_')) {
+      // a client's own document link (token checked inside docsHandler)
+    } else {
+      const user = await authUser(req)
+      if (!user) return res.status(401).json({ success: false, error: 'Please sign in again', code: 'auth' })
+      if (user.role === 'sales') return res.status(403).json({ success: false, error: 'You do not have access to this' })
+    }
+  } else if (action === 'retell_webhook') {
+    if (!retellVerified(req)) return res.status(401).json({ error: 'unverified webhook' })
+  } else if (PUBLIC_ACTIONS.has(action)) {
+    if ((action === 'rep_login' || action === 'book_call') && req.body && typeof req.body === 'object') req.body.__ip = clientIp(req)
+  } else {
+    const auto = AUTOMATION_ACTIONS.has(action) && isAutomation(req)
+    if (!auto) {
+      const user = await authUser(req)
+      if (!user) return res.status(401).json({ success: false, error: 'Please sign in again', code: 'auth' })
+      const needAdmin = ADMIN_ACTIONS.has(action) || AUTOMATION_ACTIONS.has(action)
+      if (needAdmin && user.role !== 'admin') return res.status(403).json({ success: false, error: 'You do not have access to this' })
+      if (MANAGER_ACTIONS.has(action) && user.role === 'sales') return res.status(403).json({ success: false, error: 'You do not have access to this' })
+      if (user.role === 'sales') {
+        // a sales rep only ever acts as themself, at their own commission rate
+        if (req.body && typeof req.body === 'object') {
+          if ('rep_id' in req.body) req.body.rep_id = user.id
+          if (action === 'submit_deal') req.body.commission_rate = user.commission_rate ?? 10
+        }
+        if (req.query && 'rep_id' in req.query) req.query.rep_id = user.id
+      }
+      req.authUser = user
+    }
+  }
+
+  // Outreach queue and the "New from a call" quick add (api/_outreach.js)
+  if (action === 'quick_add' || (typeof action === 'string' && action.startsWith('outreach_'))) {
+    try {
+      const sql = await getSql()
+      const out = await outreachHandler(sql, action, req.body && typeof req.body === 'object' ? req.body : {}, req.authUser)
+      return res.status(200).json(out)
+    } catch (e) {
+      console.error('outreach error:', e.message)
+      return res.status(500).json({ success: false, error: 'Something went wrong. Please try again.' })
+    }
+  }
 
   // Payments & Documents module (proposals / e-signature / invoices / payments).
   // All of its actions are namespaced docs_* and implemented in _docs-helper.js
@@ -2613,7 +2746,7 @@ export default async function handler(req, res) {
                 headers: {
                   'Content-Type': 'application/json',
                   'x-internal-key':
-                    process.env.AWATEC_INTERNAL_KEY || 'awatec_internal_2024',
+                    process.env.AWATEC_INTERNAL_KEY || '',
                 },
                 body: JSON.stringify(ticketPayload),
               })
@@ -3397,9 +3530,10 @@ View dashboard: https://lithos-labs.vercel.app`
 
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (error) {
-    console.error('workflow handler error:', error.message)
+    console.error('workflow handler error:', action, error.message)
+    const status = error.status || 500
     return res
-      .status(error.status || 500)
-      .json({ error: error.message })
+      .status(status)
+      .json({ error: status >= 500 ? 'Something went wrong. Please try again.' : error.message })
   }
 }

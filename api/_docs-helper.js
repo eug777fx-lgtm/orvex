@@ -758,9 +758,7 @@ export async function handleStripeWebhook(req, res, rawBody) {
 // ---------------------------------------------------------------------------
 
 export async function docsHandler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-auth-token')
+  // CORS is set by the caller (workflow.js cors()), never "*"
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   const action = req.body?.action || req.query?.action

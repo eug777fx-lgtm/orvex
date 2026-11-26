@@ -1,3 +1,4 @@
+import { cors, isAutomation, requireUser } from './_guard.js'
 // Required env var (set in Vercel project settings):
 //   VITE_DATABASE_URL — Neon Postgres connection string
 //
@@ -118,11 +119,11 @@ async function updateAnalytics(sql, body) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  cors(req, res, 'GET, POST, OPTIONS')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
+  // AI office is admin only; Make.com / cron may call with the automation secret
+  if (!isAutomation(req) && !(await requireUser(req, res, ['admin']))) return
 
   try {
     const sql = await getDb()

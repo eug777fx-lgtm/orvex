@@ -1,3 +1,4 @@
+import { cors, isAutomation, requireUser } from './_guard.js'
 // Required env vars (set in Vercel project settings):
 //   VITE_DATABASE_URL   — Neon Postgres connection string
 //   HIGGSFIELD_API_KEY  — Higgsfield API key for image/video generation
@@ -150,11 +151,11 @@ export async function generateVideo({ brand_id, type, prompt, image_url, sql }) 
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  cors(req, res, 'POST, OPTIONS')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
+  // AI office is admin only; Make.com / cron may call with the automation secret
+  if (!isAutomation(req) && !(await requireUser(req, res, ['admin']))) return
   if (req.method !== 'POST')
     return res.status(405).json({ error: 'Method not allowed' })
 

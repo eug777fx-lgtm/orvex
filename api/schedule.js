@@ -1,3 +1,4 @@
+import { cors, isAutomation, requireUser } from './_guard.js'
 // GET /api/schedule?brand_id=<uuid>
 //
 // Returns today's scheduled content for a brand from the schedules table.
@@ -5,11 +6,11 @@
 // When no schedules exist for today: { schedules: [], is_empty: true }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  cors(req, res, 'GET, OPTIONS')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
+  // AI office is admin only; Make.com / cron may call with the automation secret
+  if (!isAutomation(req) && !(await requireUser(req, res, ['admin']))) return
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   const { brand_id } = req.query || {}

@@ -7,7 +7,7 @@
 // GET  /api/db?action=logs&brand_id=<uuid>&limit=20
 //   Returns recent agent_runs with computed items_generated + human message.
 
-import { verifyAuthToken } from './_auth.js'
+import { authUser, cors } from './_guard.js'
 
 // The only statements a signed-out visitor may run: the public demo page
 // (/demo/:slug) loading its demo and counting the view. Everything else needs
@@ -87,13 +87,31 @@ async function handleLogs(sql, req, res) {
 }
 
 export default async function handler(req, res) {
+  cors(req, res)
   if (req.method === 'OPTIONS') return res.status(204).end()
 
-  // Signed-in CRM users only (the token comes from the login), except the
-  // two public demo-page statements above.
-  const user = verifyAuthToken(req.headers['x-auth-token'])
+  // Signed-in CRM users only (token from the login, account still active),
+  // except the two public demo-page statements above.
   const isPublic = req.method === 'POST' && PUBLIC_QUERIES.has(norm(req.body?.query))
-  if (!user && !isPublic) return res.status(401).json({ error: 'Please sign in again' })
+  const user = isPublic ? null : await authUser(req)
+  if (!user && !isPublic) return res.status(401).json({ error: 'Please sign in again', code: 'auth' })
+
+  if (user && req.method === 'POST') {
+    const q = String(req.body?.query || '')
+    // nobody reads password hashes through this endpoint
+    if (/password_hash/i.test(q)) return res.status(403).json({ error: 'Not allowed' })
+    if (user.role !== 'admin') {
+      // one statement per call
+      if (/;\s*\S/.test(q)) return res.status(403).json({ error: 'Not allowed' })
+      // only the admin may change the schema or touch accounts and roles
+      if (/^\s*(alter|drop|truncate|create|grant|revoke|comment|vacuum|reindex)\b/i.test(q)) {
+        return res.status(403).json({ error: 'Not allowed' })
+      }
+      if (/\b(insert|update|delete)\b[\s\S]*\bsales_reps\b|\bsales_reps\b[\s\S]*\b(insert|update|delete)\b/i.test(q)) {
+        return res.status(403).json({ error: 'Not allowed' })
+      }
+    }
+  }
 
   try {
     const { neon } = await import('@neondatabase/serverless')
@@ -127,9 +145,21 @@ export default async function handler(req, res) {
     }
 
     const result = await sql.query(query, params || [])
-    return res.status(200).json({ data: result?.rows ?? result })
+    let data = result?.rows ?? result
+    // a "SELECT *" on the accounts table must never hand out password hashes
+    if (Array.isArray(data)) {
+      data = data.map((row) => {
+        if (row && typeof row === 'object' && 'password_hash' in row) {
+          const { password_hash: _omit, ...rest } = row
+          return rest
+        }
+        return row
+      })
+    }
+    return res.status(200).json({ data })
   } catch (error) {
+    // the real reason goes to the server log; admins also see it to fix queries
     console.error('DB Error:', error.message)
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: user?.role === 'admin' ? error.message : 'Database error' })
   }
 }

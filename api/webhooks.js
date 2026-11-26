@@ -8,6 +8,7 @@
 //   parsing is disabled below and JSON is parsed manually for other callers.
 
 import { handleStripeWebhook } from './_docs-helper.js'
+import { safeEqual } from './_guard.js'
 
 // Stripe signature verification needs the exact raw bytes of the payload.
 export const config = { api: { bodyParser: false } }
@@ -22,9 +23,7 @@ function readRawBody(req) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-webhook-secret')
+  // server to server only (Make.com, Stripe): no browser CORS needed
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -36,7 +35,8 @@ export default async function handler(req, res) {
     return handleStripeWebhook(req, res, rawBody)
   }
 
-  if (req.headers['x-webhook-secret'] !== process.env.WEBHOOK_SECRET) {
+  const secret = process.env.WEBHOOK_SECRET
+  if (!secret || secret.length < 16 || !safeEqual(String(req.headers['x-webhook-secret'] || ''), secret)) {
     return res.status(401).json({ error: 'unauthorized' })
   }
 

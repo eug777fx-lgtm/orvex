@@ -1,10 +1,11 @@
 import { startRemotionRender } from './_render-helper.js'
+import { cors, isAutomation, requireUser } from './_guard.js'
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  cors(req, res, 'POST, OPTIONS')
   if (req.method === 'OPTIONS') return res.status(200).end()
+  // AI office is admin only; Make.com / cron may call with the automation secret
+  if (!isAutomation(req) && !(await requireUser(req, res, ['admin']))) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { composition_id, props, brand_id, backgroundVideoUrl } = req.body || {}

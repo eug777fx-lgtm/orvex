@@ -15,9 +15,14 @@
 // ============================================================================
 
 import { intelHandler } from './_intel-handler.js'
+import { cors, requireUser } from './_guard.js'
 
 // Max duration (60s) is set for this function in vercel.json.
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
+  cors(req, res, 'POST, OPTIONS')
+  if (req.method === 'OPTIONS') return res.status(204).end()
+  // checks the account in the database too (still active, current role)
+  if (!(await requireUser(req, res, ['admin', 'manager']))) return
   return intelHandler(req, res)
 }
