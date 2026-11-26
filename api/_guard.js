@@ -48,19 +48,28 @@ export function getSql() {
 const rowsOf = (r) => r?.rows ?? r ?? []
 
 // Additive only (IF NOT EXISTS): new auth columns and the attempts log.
+// Each statement runs on its own; when two serverless instances start at the
+// same moment Postgres can report a duplicate for one of them, which is fine.
 let schemaReady = null
+const benign = (e) => /already exists|duplicate key|pg_class_relname_nsp_index|pg_type_typname_nsp_index/i.test(e?.message || '')
 export function ensureAuthSchema(sql) {
   if (!schemaReady) {
     schemaReady = (async () => {
-      try {
-        await sql.query('ALTER TABLE sales_reps ADD COLUMN IF NOT EXISTS sessions_valid_after TIMESTAMPTZ')
-        await sql.query(`CREATE TABLE IF NOT EXISTS auth_attempts (
-          id BIGSERIAL PRIMARY KEY, key TEXT NOT NULL, ok BOOLEAN NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())`)
-        await sql.query('CREATE INDEX IF NOT EXISTS auth_attempts_key_time ON auth_attempts (key, created_at)')
-      } catch (e) {
-        schemaReady = null
-        console.error('auth schema:', e.message)
+      const steps = [
+        'ALTER TABLE sales_reps ADD COLUMN IF NOT EXISTS sessions_valid_after TIMESTAMPTZ',
+        `CREATE TABLE IF NOT EXISTS auth_attempts (
+          id BIGSERIAL PRIMARY KEY, key TEXT NOT NULL, ok BOOLEAN NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())`,
+        'CREATE INDEX IF NOT EXISTS auth_attempts_key_time ON auth_attempts (key, created_at)',
+      ]
+      let failed = false
+      for (const q of steps) {
+        try {
+          await sql.query(q)
+        } catch (e) {
+          if (!benign(e)) { failed = true; console.error('auth schema:', e.message) }
+        }
       }
+      if (failed) schemaReady = null
     })()
   }
   return schemaReady
@@ -83,10 +92,16 @@ export async function authUser(req) {
     try {
       const sql = await getSql()
       await ensureAuthSchema(sql)
-      const r = await sql.query(
-        'SELECT id, role, is_active, commission_rate, sessions_valid_after FROM sales_reps WHERE id::text = $1',
-        [key],
-      )
+      let r
+      try {
+        r = await sql.query(
+          'SELECT id, role, is_active, commission_rate, sessions_valid_after FROM sales_reps WHERE id::text = $1',
+          [key],
+        )
+      } catch (e) {
+        if (!/sessions_valid_after/.test(e.message)) throw e
+        r = await sql.query('SELECT id, role, is_active, commission_rate FROM sales_reps WHERE id::text = $1', [key])
+      }
       hit = { row: rowsOf(r)[0] || null, t: Date.now() }
       userCache.set(key, hit)
       if (userCache.size > 2000) userCache.clear()

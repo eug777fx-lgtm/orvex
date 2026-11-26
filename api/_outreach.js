@@ -50,7 +50,8 @@ function ensureSchema(sql) {
       await sql.query('CREATE INDEX IF NOT EXISTS outreach_status_idx ON outreach (status, followup_at)')
     })().catch((e) => {
       schemaReady = null
-      throw e
+      // two instances creating the table at the same moment: the other one won
+      if (!/already exists|duplicate key|pg_class_relname_nsp_index|pg_type_typname_nsp_index/i.test(e.message || '')) throw e
     })
   }
   return schemaReady
