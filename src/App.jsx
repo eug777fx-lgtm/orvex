@@ -9,9 +9,7 @@ import {
 import { AnimatePresence } from 'framer-motion'
 import { migrateSchema } from './utils/migrateSchema'
 import Background from './components/Background'
-import Dashboard from './pages/Dashboard'
 import Home from './pages/Home'
-import Agents from './pages/Agents'
 import Shell from './shell/Shell'
 import Leads from './pages/Leads'
 import LeadDetail from './pages/LeadDetail'
@@ -19,24 +17,29 @@ import Pipeline from './pages/Pipeline'
 import Offers from './pages/Offers'
 import Scripts from './pages/Scripts'
 import Tasks from './pages/Tasks'
-import Import from './pages/Import'
-import Demos from './pages/Demos'
-import Workflow from './pages/Workflow'
 import PublicDemo from './pages/PublicDemo'
 
 // Public client-facing document pages (lazy: keeps pdf.js out of the CRM bundle)
 const ClientProposal = lazy(() => import('./pages/ClientProposal'))
 const ClientInvoice = lazy(() => import('./pages/ClientInvoice'))
-import MarketingEngine from './pages/MarketingEngine'
-import Documents from './pages/Documents'
-import Automations from './pages/Automations'
-import Team from './pages/Team'
-import Social from './pages/Social'
-import AIReceptionist from './pages/AIReceptionist'
 import AppLogin from './components/AppLogin'
-import PaymentsDocs from './pages/PaymentsDocs'
-import LeadIntelligence from './pages/LeadIntelligence'
 import { AuthContext } from './lib/auth'
+
+// Heavier pages load on first visit, so login and Today open fast
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Agents = lazy(() => import('./pages/Agents'))
+const Import = lazy(() => import('./pages/Import'))
+const Demos = lazy(() => import('./pages/Demos'))
+const Workflow = lazy(() => import('./pages/Workflow'))
+const MarketingEngine = lazy(() => import('./pages/MarketingEngine'))
+const Documents = lazy(() => import('./pages/Documents'))
+const Automations = lazy(() => import('./pages/Automations'))
+const Team = lazy(() => import('./pages/Team'))
+const Social = lazy(() => import('./pages/Social'))
+const AIReceptionist = lazy(() => import('./pages/AIReceptionist'))
+const PaymentsDocs = lazy(() => import('./pages/PaymentsDocs'))
+const LeadIntelligence = lazy(() => import('./pages/LeadIntelligence'))
+const Outreach = lazy(() => import('./pages/Outreach'))
 
 // Admin-only route guard. Non-admins hitting an admin URL bounce home.
 function AdminOnly({ role, children }) {
@@ -53,6 +56,7 @@ function RoleGuard({ role, allow, children }) {
 function AnimatedRoutes({ role }) {
   const location = useLocation()
   return (
+    <Suspense fallback={<div style={{ minHeight: '40vh' }} />}>
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<Home />} />
@@ -76,6 +80,14 @@ function AnimatedRoutes({ role }) {
           }
         />
         <Route path="/pipeline" element={<Pipeline />} />
+        <Route
+          path="/outreach"
+          element={
+            <RoleGuard role={role} allow={['admin', 'manager']}>
+              <Outreach />
+            </RoleGuard>
+          }
+        />
         <Route path="/offers" element={<Offers />} />
         <Route path="/scripts" element={<Scripts />} />
         <Route path="/tasks" element={<Tasks />} />
@@ -162,6 +174,7 @@ function AnimatedRoutes({ role }) {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>
+    </Suspense>
   )
 }
 
