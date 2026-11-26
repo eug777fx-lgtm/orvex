@@ -170,7 +170,10 @@ export default function Team() {
         method: 'POST',
         body: { rep_id: rep.id },
       })
-      if (data?.success) showToast('Password reset to reset123')
+      if (data?.success && data.temp_password) {
+        // shown once: the rep signs in with it and their old sessions are signed out
+        window.prompt(`Temporary password for ${rep.name || rep.email}. Copy it and send it to them privately:`, data.temp_password)
+      } else if (data?.success) showToast('Password reset')
       else showToast('Could not reset password')
     } catch (e) {
       showToast('Could not reset password')

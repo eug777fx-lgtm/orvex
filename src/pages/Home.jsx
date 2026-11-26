@@ -43,6 +43,35 @@ const S = {
   empty: { padding: '30px 18px', color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center' },
 }
 
+// Outreach at a glance (admin and manager): what is waiting in the email queue.
+function OutreachToday({ onOpen }) {
+  const [c, setC] = useState(null)
+  useEffect(() => {
+    let live = true
+    fetch('/api/workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'outreach_list' }) })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!live || !j.success) return
+        const n = (k) => j.items.filter((r) => r.column_key === k).length
+        setC({ ready: n('ready'), follow: n('follow'), replied: n('replied'), booked: n('booked') })
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [])
+  if (!c || (!c.ready && !c.follow && !c.replied)) return null
+  return (
+    <section className="lx-panel" style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', padding: '16px 18px', marginBottom: 18 }}>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.48)' }}>Outreach today</div>
+        <div style={{ marginTop: 6, fontSize: 14 }}>
+          {[c.ready && `${c.ready} email${c.ready > 1 ? 's' : ''} ready to send`, c.follow && `${c.follow} follow up${c.follow > 1 ? 's' : ''} due`, c.replied && `${c.replied} repl${c.replied > 1 ? 'ies' : 'y'} to answer`].filter(Boolean).join(' · ')}
+        </div>
+      </div>
+      <button className="lx-btn primary" onClick={onOpen}>Open Outreach</button>
+    </section>
+  )
+}
+
 export default function Home() {
   const { appAuth } = useAuth()
   const navigate = useNavigate()
@@ -115,6 +144,8 @@ export default function Home() {
         <div style={S.num}><div style={S.numK}>New leads</div><div style={S.numV}>{data ? data.leads.week ?? 0 : '·'}</div><div style={S.numS}>this week · {data?.leads.total ?? 0} total</div></div>
         <div style={S.num}><div style={S.numK}>Due today</div><div style={S.numV}>{data ? data.tasks.length : '·'}</div><div style={S.numS}>{data?.tasks.some((t) => dueLabel(t.due_date).includes('overdue')) ? 'some are overdue' : 'tasks to finish'}</div></div>
       </div>
+
+      {canFind && <OutreachToday onOpen={() => navigate('/outreach')} />}
 
       <div style={S.grid}>
         <section className="lx-panel">
