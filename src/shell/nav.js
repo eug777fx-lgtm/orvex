@@ -25,6 +25,7 @@ export const AREAS = [
     tabs: [
       { path: '/leads', label: 'Leads' },
       { path: '/pipeline', label: 'Pipeline' },
+      { path: '/outreach', label: 'Outreach', roles: ['admin', 'manager'] },
       { path: '/discover', label: 'Lead finder', roles: ['admin', 'manager'] },
       { path: '/offers', label: 'Offers' },
       { path: '/scripts', label: 'Scripts' },

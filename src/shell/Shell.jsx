@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Search, LogOut, UserCog, CornerDownLeft } from 'lucide-react'
+import { Search, LogOut, UserCog, CornerDownLeft, Plus } from 'lucide-react'
+import QuickAdd from '../components/QuickAdd'
 import useIsMobile from '../utils/useIsMobile'
 import { areasForRole, areaForPath, tabMatches, SETTINGS_TABS, canSee } from './nav'
 import './shell.css'
@@ -95,6 +96,7 @@ export default function Shell({ appAuth, onLogout, children, background }) {
   const areas = useMemo(() => areasForRole(appAuth.role), [appAuth.role])
   const current = areaForPath(areas, location.pathname)
   const [palette, setPalette] = useState(false)
+  const [quick, setQuick] = useState(false)
 
   // remember the last tab you used in each area
   useEffect(() => {
@@ -137,6 +139,7 @@ export default function Shell({ appAuth, onLogout, children, background }) {
             })}
           </nav>
           <div className="lx-right">
+            <button type="button" className="lx-new" onClick={() => setQuick(true)} aria-label="New lead from a call"><Plus size={15} strokeWidth={2.4} /><span>New</span></button>
             <button type="button" className="lx-search" onClick={() => setPalette(true)}>
               <Search size={14} /><span>Jump to…</span><span className="lx-kbd">⌘K</span>
             </button>
@@ -160,20 +163,24 @@ export default function Shell({ appAuth, onLogout, children, background }) {
       </header>
       <main className={`lx-main ${location.pathname === '/agents' ? 'flush' : ''}`}>{children}</main>
       {isMobile && (
-        <nav className="lx-mobile" style={{ '--n': areas.length }} aria-label="Areas">
-          {areas.map((a) => {
+        <nav className="lx-mobile" style={{ '--n': areas.length + 1 }} aria-label="Areas">
+          {areas.flatMap((a, i) => {
             const Icon = a.icon
             const on = current?.key === a.key
-            return (
+            const btn = (
               <button key={a.key} type="button" className={on ? 'on' : ''} onClick={() => openArea(a)}>
                 <Icon size={20} strokeWidth={on ? 2.2 : 1.8} />
                 {a.label}
               </button>
             )
+            return i === Math.min(1, areas.length - 1)
+              ? [btn, <button key="plus" type="button" className="lx-plus" onClick={() => setQuick(true)} aria-label="New lead from a call"><i><Plus size={22} /></i></button>]
+              : [btn]
           })}
         </nav>
       )}
       {palette && <CommandPalette areas={areas} appAuth={appAuth} onClose={() => setPalette(false)} />}
+      {quick && <QuickAdd onClose={() => setQuick(false)} onSaved={(id) => id && navigate(`/leads/${id}`)} />}
     </div>
   )
 }

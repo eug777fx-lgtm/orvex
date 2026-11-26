@@ -1,0 +1,42 @@
+/* Outreach board, company drawer and the "New from a call" form. Monochrome. */
+.ox-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 22px 0 16px; }
+.ox-stat { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 14px 16px; background: #0a0a0b; }
+.ox-stat b { display: block; font: 600 26px/1.1 'Inter Tight', Inter, sans-serif; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.ox-stat span { font-size: 12px; color: rgba(255, 255, 255, 0.48); }
+.ox-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.ox-col { background: #0a0a0b; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 360px; min-width: 0; }
+.ox-col h3 { margin: 4px 6px 6px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.48); font-weight: 500; display: flex; justify-content: space-between; }
+.ox-card { text-align: left; background: #111113; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 11px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; width: 100%; color: #fff; font: inherit; }
+.ox-card:hover { border-color: rgba(255, 255, 255, 0.18); }
+.ox-card b { font-weight: 600; font-size: 13.5px; }
+.ox-card .m { font-size: 12px; color: rgba(255, 255, 255, 0.48); }
+.ox-card .i { font-size: 12px; color: rgba(255, 255, 255, 0.72); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ox-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; border: 1px solid rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.72); width: fit-content; }
+.ox-chip.solid { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
+.ox-empty { font-size: 12.5px; color: rgba(255, 255, 255, 0.3); padding: 10px 6px; }
+.ox-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 140; }
+.ox-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: #0b0b0c; border-left: 1px solid rgba(255, 255, 255, 0.14); z-index: 141; overflow-y: auto; padding: calc(20px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) calc(28px + env(safe-area-inset-bottom, 0px)) 22px; display: flex; flex-direction: column; gap: 16px; color: #fff; }
+.ox-drawer h2 { font: 600 22px/1.2 'Inter Tight', Inter, sans-serif; letter-spacing: -0.02em; margin: 10px 0 0; }
+.ox-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ox-box { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; background: #0a0a0b; }
+.ox-box h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.48); font-weight: 500; }
+.ox-box pre { white-space: pre-wrap; font: 13px/1.6 Inter, sans-serif; margin: 0; color: rgba(255, 255, 255, 0.78); }
+.ox-tl { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.ox-tl li { display: grid; grid-template-columns: 92px 1fr; gap: 10px; font-size: 13px; }
+.ox-tl li span { color: rgba(255, 255, 255, 0.48); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ox-x { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); background: none; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; width: 32px; height: 32px; cursor: pointer; color: #fff; display: grid; place-items: center; }
+.ox-modal { position: fixed; z-index: 141; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(540px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow-y: auto; background: #0b0b0c; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 18px; padding: 22px; display: flex; flex-direction: column; gap: 14px; color: #fff; }
+.ox-f { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ox-f label { font-size: 12px; color: rgba(255, 255, 255, 0.48); }
+.ox-f input, .ox-f textarea, .ox-f select { background: #141416; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 10px; padding: 10px 12px; color: #fff; font: 14px Inter, sans-serif; width: 100%; }
+.ox-f input:focus, .ox-f textarea:focus, .ox-f select:focus { outline: none; border-color: rgba(255, 255, 255, 0.5); }
+.ox-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 520px) { .ox-grid2 { grid-template-columns: 1fr; } }
+.ox-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
+.ox-toggle button { border: 1px solid rgba(255, 255, 255, 0.14); background: none; border-radius: 999px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; color: rgba(255, 255, 255, 0.72); }
+.ox-toggle button.on { background: #fff; color: #000; border-color: #fff; }
+.ox-err { color: #ff9a9a; font-size: 13px; }
+.lx-new { height: 32px; padding: 0 12px; border-radius: 9px; background: #fff; color: #000; border: 0; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.lx-mobile .lx-plus { color: #000; }
+.lx-mobile .lx-plus i { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fff; color: #000; font-style: normal; }
+@media (max-width: 900px) { .lx-new span { display: none; } .lx-new { padding: 0 9px; } }
