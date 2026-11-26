@@ -548,15 +548,8 @@ export async function setupMarketingDB() {
     console.log('Migration skip:', e.message)
   }
 
-  try {
-    await db.query(`
-      INSERT INTO sales_reps (name, email, password_hash, role, commission_rate)
-      VALUES ('Eugene', 'admin@lithoslabs.com', 'admin123', 'admin', 0)
-      ON CONFLICT (email) DO UPDATE SET role='admin', password_hash='admin123'
-    `)
-  } catch (e) {
-    console.log('Migration skip:', e.message)
-  }
+  // (Removed: this used to recreate an admin account with a fixed, publicly known
+  // password on every login. Admin access now comes only from real accounts.)
 
   // One-time fresh start: wipe all generated content but keep brands and
   // brand_memory completely intact. Runs before the seed inserts below.
