@@ -16,14 +16,64 @@ const COLS = [
   ['booked', 'Call booked'],
   ['no', 'Not interested'],
 ]
-const FOLLOW_TEXT = [
-  (r) => `Hi${greetName(r)}, just bumping this up in case it got buried. Happy to send a 2 minute video of what I'd change on ${r.company}'s site instead of a call, if that's easier.\n\nEugene`,
-  (r) => `Hi${greetName(r)}, last note from me. If a new website or a simpler way to track leads ever makes it onto the list, I'm one reply away. Wishing ${r.company} a strong season.\n\nEugene`,
-]
-function greetName(r) {
-  const m = /^Hi ([^,]+),/.exec(r.body || '')
-  return m && !/ team$/i.test(m[1]) ? ` ${m[1]}` : ''
+// Follow ups ask about operations (missed calls, open quotes, lead response),
+// never about the prospect's website. Unverified problems are phrased as
+// questions. Every follow up repeats the CAN-SPAM footer from the first email.
+const SIGNATURE = 'Eugene Muyden\nFounder, Lithos Labs\nlithoslabs.agency'
+const FALLBACK_FOOTER =
+  'Lithos Labs is a brand of Avenqor Group LLC, 30 N Gould St Ste N, Sheridan, WY 82801, United States.\nNot interested? Just reply "unsubscribe" and we won\'t email you again.'
+
+function footer(r) {
+  const m = /Lithos Labs is a brand[\s\S]*$/.exec(r.body || '')
+  return m ? m[0].trim() : FALLBACK_FOOTER
 }
+// Reuse the exact greeting of the first email ("Hi Steadfast team,").
+function greeting(r) {
+  const m = /^Hi ([^,\n]+),/.exec(r.body || '')
+  return m ? m[1].trim() : `${shortName(r)} team`
+}
+function shortName(r) {
+  return String(r.company || '')
+    .replace(/,?\s+(LLC|Inc\.?|Co\.?|Corp\.?|Company)$/i, '')
+    .replace(/\s+Remodeling & Construction$/i, '')
+    .trim()
+}
+function reviewCount(r) {
+  const m = /\((\d[\d,]*)\)/.exec(r.rating || '')
+  return m ? Number(m[1].replace(/,/g, '')) : null
+}
+function nicheKey(r) {
+  const n = String(r.niche || '').toLowerCase()
+  if (/hvac|roof|heat|air/.test(n)) return 'hvac'
+  if (/plumb|drain/.test(n)) return 'plumbing'
+  if (/remodel|construct|contract|renovat|repair/.test(n)) return 'remodeling'
+  if (/real estate|realty|realtor/.test(n)) return 'realestate'
+  return 'general'
+}
+
+const FIRST_FOLLOW = {
+  hvac: (r, busy) =>
+    `A quick follow up, with a different question than my last note. ${busy}I'm curious how your office keeps up with two things most shops tell me are hardest in peak season: calls that come in after hours or while everyone is on a job, and estimates that went out but never got a yes.\n\nIf either one slips through sometimes, I'd be glad to show you how we automate the follow up around the software you already use, whether that's Jobber, Housecall Pro or a spreadsheet. If it's all handled, no worries at all.\n\nWorth 15 minutes next week?`,
+  plumbing: (r, busy) =>
+    `Following up with a better question than my last email. Plumbing calls tend to be urgent, so the shop that answers first usually gets the job. ${busy}I'm curious what happens to a call that comes in at 9pm, or while your dispatcher is already on the phone.\n\nWe build systems that catch those calls and texts, book the job or alert the on call tech, and follow up on estimates automatically, all connected to the tools you already use. If that's already covered, just tell me and I'll leave you be.\n\nOpen to a 15 minute call next week?`,
+  remodeling: () =>
+    `A quick follow up with a different question. For remodelers, the jobs are big but the leads are few, so each one matters. When you're on a job site all day, how fast does a new inquiry usually get a reply, and how do you keep track of quotes that are still waiting on the homeowner?\n\nWe help contractors answer new inquiries right away, book site visits, and follow up on open quotes automatically, without changing the software they already use. If you've got that handled, no problem at all.\n\nWould 15 minutes next week be useful?`,
+  realestate: () =>
+    `A short follow up with a better question than my first email. How quickly does a new online lead usually hear back from your team on evenings and weekends, and what happens to the leads who aren't ready to buy yet?\n\nWe connect lead capture, instant replies and long term follow up to the CRM you already use, so no inquiry sits waiting. If that's already running smoothly, just let me know.\n\nWorth a quick call?`,
+  general: () =>
+    `A quick follow up with a better question than my first email. Where does your team lose the most time each week: answering calls and messages, chasing quotes, or keeping customers updated?\n\nWe automate that kind of follow up around the software you already use. If it's all handled, no worries at all.\n\nWorth 15 minutes next week?`,
+}
+
+const FOLLOW_TEXT = [
+  (r) => {
+    const n = reviewCount(r)
+    const busy = n ? `With ${n} reviews on Google you're clearly busy, so ` : ''
+    const text = FIRST_FOLLOW[nicheKey(r)](r, busy)
+    return `Hi ${greeting(r)},\n\n${text}\n\n${SIGNATURE}\n\n${footer(r)}`
+  },
+  (r) =>
+    `Hi ${greeting(r)},\n\nI haven't heard back, so I'll assume the timing isn't right and close this out on my side. If missed calls or quote follow ups ever become a headache, my door is open.\n\nAll the best for the season,\nEugene\n\n${footer(r)}`,
+]
 const fmt = (d) => (d ? new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '')
 
 async function api(body) {
