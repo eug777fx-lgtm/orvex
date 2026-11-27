@@ -1,0 +1,26 @@
+{
+  "_comment": "Agent budgets are CEILINGS. The orchestrator picks the smallest effective team. 'agents' counts distinct subagent invocations planned for implementation + review + verification (not the orchestrator itself). Token ranges are rough planning estimates for the approval checkpoint, not measurements.",
+  "absoluteMax": 100,
+  "modes": {
+    "quick":      { "min": 3,  "max": 5,   "checkpoint": "only-if-over-budget", "verifyVotes": 1, "maxFixRounds": 1, "maxRetries": 1, "isolationDefault": "shared" },
+    "build":      { "min": 8,  "max": 15,  "checkpoint": "always",              "verifyVotes": 2, "maxFixRounds": 2, "maxRetries": 1, "isolationDefault": "shared" },
+    "enterprise": { "min": 15, "max": 30,  "checkpoint": "always",              "verifyVotes": 3, "maxFixRounds": 2, "maxRetries": 1, "isolationDefault": "shared" },
+    "swarm":      { "min": 10, "max": 100, "checkpoint": "always",              "verifyVotes": 2, "maxFixRounds": 2, "maxRetries": 1, "isolationDefault": "worktree" },
+    "audit":      { "min": 5,  "max": 10,  "checkpoint": "only-if-over-budget", "verifyVotes": 2, "maxFixRounds": 0, "maxRetries": 0, "isolationDefault": "shared" },
+    "design":     { "min": 4,  "max": 8,   "checkpoint": "only-if-over-budget", "verifyVotes": 1, "maxFixRounds": 2, "maxRetries": 1, "isolationDefault": "shared" }
+  },
+  "estimates": {
+    "_comment": "Output+input tokens per agent invocation, rough order of magnitude for planning only.",
+    "implementer":  { "low": 40000, "high": 150000 },
+    "reviewer":     { "low": 20000, "high": 80000 },
+    "verifier":     { "low": 5000,  "high": 25000 },
+    "discovery":    { "low": 15000, "high": 60000 }
+  },
+  "platformLimits": {
+    "_comment": "Documented Claude Code workflow limits (code.claude.com/docs/en/workflows). Concurrency also capped by available CPUs.",
+    "workflowConcurrentAgentsDefault": 16,
+    "workflowConcurrencyEnvVar": "CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS",
+    "workflowMaxAgentsPerRun": 1000,
+    "workflowMaxItemsPerCall": 4096
+  }
+}
