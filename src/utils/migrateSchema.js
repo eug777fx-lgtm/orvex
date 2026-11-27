@@ -74,6 +74,9 @@ export function migrateSchema() {
       )
 
       await db.query('ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at timestamptz')
+      // AddTaskModal saves a notes field; without this column every
+      // "Add Task" submit fails with `column "notes" does not exist`.
+      await db.query('ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notes text')
 
       await db.query(`
         CREATE TABLE IF NOT EXISTS discovery_runs (
